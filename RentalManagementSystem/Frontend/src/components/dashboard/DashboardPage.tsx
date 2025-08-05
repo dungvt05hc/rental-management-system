@@ -260,12 +260,11 @@ export function DashboardPage() {
           </p>
         </div>
         <div className="flex items-center space-x-4">
-          <p className="text-sm text-gray-500">
-            Welcome to the Rental Management System
-          </p>
+          <p className="text-sm text-gray-500">Welcome to the Rental Management System</p>
           <button
             onClick={loadDashboardData}
             disabled={isLoading}
+            aria-label="Refresh dashboard data"
             className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
             title="Refresh data"
           >
@@ -293,12 +292,14 @@ export function DashboardPage() {
       )}
 
       {/* System Alerts */}
-      {alerts.length > 0 && (
-        <div className="space-y-3">
-          <h2 className="text-lg font-semibold text-gray-900 flex items-center">
-            <Bell className="h-5 w-5 mr-2" />
-            System Alerts ({alerts.length})
-          </h2>
+      <div className="space-y-3">
+        <h2 className="text-lg font-semibold text-gray-900 flex items-center">
+          <Bell className="h-5 w-5 mr-2" />
+          System Alerts {alerts.length > 0 && `(${alerts.length})`}
+        </h2>
+        {alerts.length === 0 ? (
+          <p className="text-sm text-gray-500">No alerts at this time.</p>
+        ) : (
           <div className="grid gap-3">
             {alerts.map((alert) => {
               const Icon = getAlertIcon(alert.type);
@@ -316,6 +317,7 @@ export function DashboardPage() {
                       <button
                         onClick={() => dismissAlert(alert.id)}
                         className="text-gray-400 hover:text-gray-600 ml-4"
+                        aria-label="Dismiss alert"
                       >
                         <XCircle className="h-4 w-4" />
                       </button>
@@ -325,8 +327,8 @@ export function DashboardPage() {
               );
             })}
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Main Statistics Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">

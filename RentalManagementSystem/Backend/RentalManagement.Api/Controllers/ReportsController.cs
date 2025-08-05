@@ -23,25 +23,44 @@ public class ReportsController : ControllerBase
     }
 
     /// <summary>
-    /// Gets occupancy rate report
+    /// Gets current occupancy report
     /// </summary>
-    /// <param name="fromDate">Start date for the report</param>
-    /// <param name="toDate">End date for the report</param>
-    /// <returns>Occupancy rate statistics</returns>
-    [HttpGet("occupancy-rate")]
-    public async Task<ActionResult<ApiResponse<object>>> GetOccupancyRateReport(
-        [FromQuery] DateTime? fromDate = null, 
-        [FromQuery] DateTime? toDate = null)
+    /// <returns>Occupancy statistics</returns>
+    [HttpGet("occupancy")]
+    public async Task<ActionResult<ApiResponse<object>>> GetOccupancyReport()
     {
         try
         {
-            var result = await _reportingService.GetOccupancyRateReportAsync(fromDate, toDate);
+            var result = await _reportingService.GetOccupancyReportAsync();
             return Ok(result);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error retrieving occupancy rate report");
-            return StatusCode(500, ApiResponse<object>.ErrorResponse("An error occurred while retrieving occupancy rate report"));
+            _logger.LogError(ex, "Error retrieving occupancy report");
+            return StatusCode(500, ApiResponse<object>.ErrorResponse("An error occurred while retrieving occupancy report"));
+        }
+    }
+
+    /// <summary>
+    /// Gets revenue report
+    /// </summary>
+    /// <param name="startDate">Optional start date filter</param>
+    /// <param name="endDate">Optional end date filter</param>
+    /// <returns>Revenue statistics</returns>
+    [HttpGet("revenue")]
+    public async Task<ActionResult<ApiResponse<object>>> GetRevenueReport(
+        [FromQuery] DateTime? startDate = null,
+        [FromQuery] DateTime? endDate = null)
+    {
+        try
+        {
+            var result = await _reportingService.GetRevenueReportAsync(startDate, endDate);
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving revenue report");
+            return StatusCode(500, ApiResponse<object>.ErrorResponse("An error occurred while retrieving revenue report"));
         }
     }
 

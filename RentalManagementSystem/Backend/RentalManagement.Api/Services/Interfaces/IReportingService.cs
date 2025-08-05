@@ -8,12 +8,18 @@ namespace RentalManagement.Api.Services.Interfaces;
 public interface IReportingService
 {
     /// <summary>
-    /// Gets occupancy rate report
+    /// Gets current occupancy report summary
     /// </summary>
-    /// <param name="fromDate">Start date for the report</param>
-    /// <param name="toDate">End date for the report</param>
-    /// <returns>Occupancy rate statistics</returns>
-    Task<ApiResponse<object>> GetOccupancyRateReportAsync(DateTime? fromDate = null, DateTime? toDate = null);
+    /// <returns>Occupancy statistics</returns>
+    Task<ApiResponse<object>> GetOccupancyReportAsync();
+
+    /// <summary>
+    /// Gets revenue report summary
+    /// </summary>
+    /// <param name="startDate">Optional start date filter</param>
+    /// <param name="endDate">Optional end date filter</param>
+    /// <returns>Revenue statistics</returns>
+    Task<ApiResponse<object>> GetRevenueReportAsync(DateTime? startDate = null, DateTime? endDate = null);
 
     /// <summary>
     /// Gets monthly revenue report

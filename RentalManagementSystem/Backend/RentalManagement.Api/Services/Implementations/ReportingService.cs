@@ -24,62 +24,81 @@ public class ReportingService : IReportingService
         _logger = logger;
     }
 
-    public async Task<ApiResponse<object>> GetOccupancyRateReportAsync(DateTime? fromDate = null, DateTime? toDate = null)
-    {
-        try
-        {
-            var now = DateTime.UtcNow;
-            var startDate = fromDate ?? now.AddMonths(-12);
-            var endDate = toDate ?? now;
-
-            var totalRooms = await _context.Rooms.CountAsync();
-            
-            // Get occupancy data by month
-            var occupancyData = await _context.Tenants
-                .Where(t => t.IsActive && t.RoomId.HasValue)
-                .Where(t => t.ContractStartDate <= endDate && 
-                           (t.ContractEndDate == null || t.ContractEndDate >= startDate))
-                .GroupBy(t => new { 
-                    Year = t.ContractStartDate!.Value.Year, 
-                    Month = t.ContractStartDate!.Value.Month 
-                })
-                .Select(g => new {
-                    Year = g.Key.Year,
-                    Month = g.Key.Month,
-                    OccupiedRooms = g.Count()
-                })
-                .OrderBy(x => x.Year)
-                .ThenBy(x => x.Month)
-                .ToListAsync();
-
-            var currentOccupancy = await _context.Tenants
-                .CountAsync(t => t.IsActive && t.RoomId.HasValue);
+      public async Task<ApiResponse<object>> GetOccupancyReportAsync()
+      {
+          try
+          {
+              var totalRooms = await _context.Rooms.CountAsync();
+              var occupiedRooms = await _context.Rooms.CountAsync(r => r.Status == RoomStatus.Rented);
+              var maintenanceRooms = await _context.Rooms.CountAsync(r => r.Status == RoomStatus.Maintenance);
+              var availableRooms = totalRooms - occupiedRooms - maintenanceRooms;
 
             var report = new
             {
-                ReportPeriod = new { FromDate = startDate, ToDate = endDate },
-                TotalRooms = totalRooms,
-                CurrentOccupancy = currentOccupancy,
-                CurrentOccupancyRate = totalRooms > 0 ? Math.Round((double)currentOccupancy / totalRooms * 100, 2) : 0,
-                MonthlyOccupancy = occupancyData.Select(x => new {
-                    Period = $"{x.Year}-{x.Month:D2}",
-                    OccupiedRooms = x.OccupiedRooms,
-                    OccupancyRate = totalRooms > 0 ? Math.Round((double)x.OccupiedRooms / totalRooms * 100, 2) : 0
-                }).ToList(),
-                AverageOccupancyRate = occupancyData.Count > 0 && totalRooms > 0 
-                    ? Math.Round(occupancyData.Average(x => (double)x.OccupiedRooms / totalRooms * 100), 2) 
-                    : 0
+                totalRooms,
+                occupiedRooms,
+                availableRooms,
+                maintenanceRooms,
+                occupancyRate = totalRooms > 0 ? Math.Round((double)occupiedRooms / totalRooms * 100, 2) : 0
             };
 
-            _logger.LogInformation("Generated occupancy rate report from {FromDate} to {ToDate}", startDate, endDate);
-            return ApiResponse<object>.SuccessResponse(report);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error generating occupancy rate report");
-            return ApiResponse<object>.ErrorResponse("Error generating occupancy rate report");
-        }
-    }
+              _logger.LogInformation("Generated occupancy report");
+              return ApiResponse<object>.SuccessResponse(report);
+          }
+          catch (Exception ex)
+          {
+              _logger.LogError(ex, "Error generating occupancy report");
+              return ApiResponse<object>.ErrorResponse("Error generating occupancy report");
+          }
+      }
+
+      public async Task<ApiResponse<object>> GetRevenueReportAsync(DateTime? startDate = null, DateTime? endDate = null)
+      {
+          try
+          {
+              var invoicesQuery = _context.Invoices.AsQueryable();
+
+              if (startDate.HasValue)
+              {
+                  invoicesQuery = invoicesQuery.Where(i => i.IssueDate >= startDate.Value);
+              }
+
+              if (endDate.HasValue)
+              {
+                  invoicesQuery = invoicesQuery.Where(i => i.IssueDate <= endDate.Value);
+              }
+
+              var paidAmount = await invoicesQuery.SumAsync(i => i.PaidAmount);
+              var overdueAmount = await invoicesQuery
+                  .Where(i => i.Status == InvoiceStatus.Overdue)
+                  .SumAsync(i => i.RemainingBalance);
+              var pendingAmount = await invoicesQuery
+                  .Where(i => i.Status != InvoiceStatus.Paid && i.Status != InvoiceStatus.Overdue)
+                  .SumAsync(i => i.RemainingBalance);
+
+              var totalRevenue = paidAmount + overdueAmount + pendingAmount;
+              var collectionRate = totalRevenue > 0
+                  ? Math.Round(paidAmount / totalRevenue * 100, 2)
+                  : 0;
+
+            var report = new
+            {
+                totalRevenue,
+                paidAmount,
+                pendingAmount,
+                overdueAmount,
+                collectionRate
+            };
+
+              _logger.LogInformation("Generated revenue report");
+              return ApiResponse<object>.SuccessResponse(report);
+          }
+          catch (Exception ex)
+          {
+              _logger.LogError(ex, "Error generating revenue report");
+              return ApiResponse<object>.ErrorResponse("Error generating revenue report");
+          }
+      }
 
     public async Task<ApiResponse<object>> GetMonthlyRevenueReportAsync(int year)
     {
