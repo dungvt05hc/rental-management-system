@@ -11,24 +11,20 @@ import {
   BarChart3, 
   LogOut,
   Menu,
-  X
+  X,
+  Package,
+  Settings
 } from 'lucide-react';
 import { useState } from 'react';
+import { LanguageSwitcher, LanguageSwitcherCompact } from '../LanguageSwitcher';
+import { useTranslation } from '../../hooks/useTranslation';
 
 interface LayoutProps {
   children: ReactNode;
 }
 
-const navigation = [
-  { name: 'Dashboard', href: '/', icon: Home },
-  { name: 'Rooms', href: '/rooms', icon: Building },
-  { name: 'Tenants', href: '/tenants', icon: Users },
-  { name: 'Invoices', href: '/invoices', icon: FileText },
-  { name: 'Payments', href: '/payments', icon: CreditCard },
-  { name: 'Reports', href: '/reports', icon: BarChart3 },
-];
-
 export function Layout({ children }: LayoutProps) {
+  const { t } = useTranslation();
   const { user, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
@@ -38,6 +34,17 @@ export function Layout({ children }: LayoutProps) {
     await logout();
     navigate('/login');
   };
+
+  const navigation = [
+    { name: t('dashboard.title', 'Dashboard'), href: '/', icon: Home },
+    { name: t('rooms.title', 'Rooms'), href: '/rooms', icon: Building },
+    { name: t('tenants.title', 'Tenants'), href: '/tenants', icon: Users },
+    { name: t('invoices.title', 'Invoices'), href: '/invoices', icon: FileText },
+    { name: t('items.title', 'Items'), href: '/items', icon: Package },
+    { name: t('payments.title', 'Payments'), href: '/payments', icon: CreditCard },
+    { name: t('reports.title', 'Reports'), href: '/reports', icon: BarChart3 },
+    { name: t('system.title', 'System'), href: '/system', icon: Settings },
+  ];
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -57,8 +64,9 @@ export function Layout({ children }: LayoutProps) {
           </div>
           
           <div className="flex flex-1 flex-col pt-5 pb-4">
-            <div className="flex flex-shrink-0 items-center px-4">
-              <h1 className="text-xl font-bold text-gray-900">Rental Management</h1>
+            {/* Language Switcher for Mobile Sidebar */}
+            <div className="px-4 pb-4 border-b border-gray-200">
+              <LanguageSwitcherCompact />
             </div>
             
             <nav className="mt-5 flex-1 space-y-1 bg-white px-2">
@@ -104,8 +112,9 @@ export function Layout({ children }: LayoutProps) {
       <div className="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-64 lg:flex-col">
         <div className="flex min-h-0 flex-1 flex-col border-r border-gray-200 bg-white">
           <div className="flex flex-1 flex-col pt-5 pb-4 overflow-y-auto">
-            <div className="flex flex-shrink-0 items-center px-4">
-              <h1 className="text-xl font-bold text-gray-900">Rental Management</h1>
+            {/* Language Switcher for Desktop Sidebar */}
+            <div className="px-4 pb-4 border-b border-gray-200">
+              <LanguageSwitcher />
             </div>
             
             <nav className="mt-5 flex-1 space-y-1 bg-white px-2">
@@ -166,7 +175,10 @@ export function Layout({ children }: LayoutProps) {
             >
               <Menu className="h-6 w-6" />
             </button>
-            <h1 className="text-lg font-semibold text-gray-900">Rental Management</h1>
+            {/* Language Switcher for Mobile Top Bar */}
+            <div className="flex-1 flex justify-center">
+              <LanguageSwitcherCompact />
+            </div>
             <Button
               variant="ghost"
               size="sm"

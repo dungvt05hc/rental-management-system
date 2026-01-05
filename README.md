@@ -259,8 +259,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 📞 Support
 
-For support, email dung.vo@davies-group.com or create an issue in this repository.
+For support, email vothaidung9611@gmail.com or create an issue in this repository.
 
 ---
-
-Made with ❤️ by [Davies Group Engineering](https://github.com/dungvo-davies)

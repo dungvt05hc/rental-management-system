@@ -1,15 +1,23 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { NotificationProvider } from './contexts/NotificationContext';
+import { NotificationContainer } from './components/ui/NotificationContainer';
 import { Layout } from './components/layout/Layout';
 import { LoginPage } from './components/auth/LoginPage';
 import { DashboardPage } from './components/dashboard/DashboardPage';
 import { RoomsPage } from './components/rooms/RoomsPage';
 import { TenantsPage } from './components/tenants/TenantsPage';
 import { InvoicesPage } from './components/invoices/InvoicesPage';
-import { PaymentsPage } from './components/dashboard/PaymentsPage';
+import { InvoiceFormPage } from './components/invoices/InvoiceFormPage';
+import { InvoiceDetailPage } from './components/invoices/InvoiceDetailPage';
+import { PaymentsPage } from './components/payments/PaymentsPage';
 import { ReportsPage } from './components/dashboard/ReportsPage';
+import { ItemsPage } from './components/items/ItemsPage';
+import SystemManagement from './components/SystemManagement/SystemManagement';
 import type { ReactNode } from 'react';
+import './index.css'
+import { LocalizationProvider } from './contexts/LocalizationContext'
 
 // Create a client
 const queryClient = new QueryClient({
@@ -80,13 +88,43 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       />
-            <Route
+      <Route
+        path="/invoices/new"
+        element={
+          <ProtectedRoute>
+            <InvoiceFormPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/invoices/:id"
+        element={
+          <ProtectedRoute>
+            <InvoiceDetailPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/invoices/:id/edit"
+        element={
+          <ProtectedRoute>
+            <InvoiceFormPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/items"
+        element={
+          <ProtectedRoute>
+            <ItemsPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/payments"
         element={
           <ProtectedRoute>
-            <Layout>
-              <PaymentsPage />
-            </Layout>
+            <PaymentsPage />
           </ProtectedRoute>
         }
       />
@@ -94,9 +132,15 @@ function AppRoutes() {
         path="/reports"
         element={
           <ProtectedRoute>
-            <Layout>
-              <ReportsPage />
-            </Layout>
+            <ReportsPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/system"
+        element={
+          <ProtectedRoute>
+            <SystemManagement />
           </ProtectedRoute>
         }
       />
@@ -107,15 +151,20 @@ function AppRoutes() {
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <Router>
-        <AuthProvider>
-          <div className="App">
-            <AppRoutes />
-          </div>
-        </AuthProvider>
-      </Router>
-    </QueryClientProvider>
+    <LocalizationProvider>
+      <QueryClientProvider client={queryClient}>
+        <Router>
+          <AuthProvider>
+            <NotificationProvider>
+              <div className="App">
+                <AppRoutes />
+                <NotificationContainer />
+              </div>
+            </NotificationProvider>
+          </AuthProvider>
+        </Router>
+      </QueryClientProvider>
+    </LocalizationProvider>
   );
 }
 

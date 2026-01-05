@@ -139,6 +139,11 @@ public class Invoice
     public virtual ICollection<Payment> Payments { get; set; } = new List<Payment>();
 
     /// <summary>
+    /// Collection of line items for this invoice
+    /// </summary>
+    public virtual ICollection<InvoiceItem> InvoiceItems { get; set; } = new List<InvoiceItem>();
+
+    /// <summary>
     /// Whether the invoice is overdue
     /// </summary>
     public bool IsOverdue => Status != InvoiceStatus.Paid && DateTime.UtcNow > DueDate;

@@ -35,6 +35,31 @@ public class RentalManagementContext : IdentityDbContext<User>
     /// </summary>
     public DbSet<Payment> Payments { get; set; } = null!;
 
+    /// <summary>
+    /// Invoice line items
+    /// </summary>
+    public DbSet<InvoiceItem> InvoiceItems { get; set; } = null!;
+
+    /// <summary>
+    /// Reusable items that can be added to invoices
+    /// </summary>
+    public DbSet<Item> Items { get; set; } = null!;
+
+    /// <summary>
+    /// Supported languages
+    /// </summary>
+    public DbSet<Language> Languages { get; set; } = null!;
+
+    /// <summary>
+    /// Translations for localization
+    /// </summary>
+    public DbSet<Translation> Translations { get; set; } = null!;
+
+    /// <summary>
+    /// System settings and configuration
+    /// </summary>
+    public DbSet<SystemSetting> SystemSettings { get; set; } = null!;
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -159,6 +184,147 @@ public class RentalManagementContext : IdentityDbContext<User>
                   .OnDelete(DeleteBehavior.Cascade);
         });
 
+        // Configure InvoiceItem entity
+        modelBuilder.Entity<InvoiceItem>(entity =>
+        {
+            entity.HasIndex(ii => new { ii.InvoiceId, ii.LineNumber })
+                  .HasDatabaseName("IX_InvoiceItems_InvoiceId_LineNumber");
+
+            entity.Property(ii => ii.Quantity)
+                  .HasPrecision(18, 3);
+
+            entity.Property(ii => ii.UnitPrice)
+                  .HasPrecision(18, 2);
+
+            entity.Property(ii => ii.DiscountPercent)
+                  .HasPrecision(5, 2);
+
+            entity.Property(ii => ii.DiscountAmount)
+                  .HasPrecision(18, 2);
+
+            entity.Property(ii => ii.TaxPercent)
+                  .HasPrecision(5, 2);
+
+            entity.Property(ii => ii.TaxAmount)
+                  .HasPrecision(18, 2);
+
+            entity.Property(ii => ii.LineTotal)
+                  .HasPrecision(18, 2);
+
+            entity.Property(ii => ii.LineTotalWithTax)
+                  .HasPrecision(18, 2);
+
+            entity.Property(ii => ii.CreatedAt)
+                  .HasDefaultValueSql("GETUTCDATE()");
+
+            entity.Property(ii => ii.UpdatedAt)
+                  .HasDefaultValueSql("GETUTCDATE()");
+
+            // Configure relationship with Invoice
+            entity.HasOne(ii => ii.Invoice)
+                  .WithMany(i => i.InvoiceItems)
+                  .HasForeignKey(ii => ii.InvoiceId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // Configure Item entity
+        modelBuilder.Entity<Item>(entity =>
+        {
+            entity.HasIndex(i => i.ItemCode)
+                  .IsUnique()
+                  .HasDatabaseName("IX_Items_ItemCode");
+
+            entity.HasIndex(i => i.Category)
+                  .HasDatabaseName("IX_Items_Category");
+
+            entity.Property(i => i.UnitPrice)
+                  .HasPrecision(18, 2);
+
+            entity.Property(i => i.TaxPercent)
+                  .HasPrecision(5, 2);
+
+            entity.Property(i => i.CreatedAt)
+                  .HasDefaultValueSql("GETUTCDATE()");
+
+            entity.Property(i => i.UpdatedAt)
+                  .HasDefaultValueSql("GETUTCDATE()");
+        });
+
+        // Configure Language entity
+        modelBuilder.Entity<Language>(entity =>
+        {
+            entity.HasIndex(l => l.Code)
+                  .IsUnique()
+                  .HasDatabaseName("IX_Languages_Code");
+
+            entity.Property(l => l.Code)
+                  .HasMaxLength(10);
+
+            entity.Property(l => l.Name)
+                  .HasMaxLength(100);
+
+            entity.Property(l => l.NativeName)
+                  .HasMaxLength(100);
+
+            entity.Property(l => l.CreatedAt)
+                  .HasDefaultValueSql("GETUTCDATE()");
+        });
+
+        // Configure Translation entity
+        modelBuilder.Entity<Translation>(entity =>
+        {
+            entity.HasIndex(t => new { t.LanguageId, t.Key })
+                  .IsUnique()
+                  .HasDatabaseName("IX_Translations_LanguageId_Key");
+
+            entity.HasIndex(t => t.Category)
+                  .HasDatabaseName("IX_Translations_Category");
+
+            entity.Property(t => t.Key)
+                  .HasMaxLength(255);
+
+            entity.Property(t => t.Category)
+                  .HasMaxLength(50);
+
+            entity.Property(t => t.CreatedAt)
+                  .HasDefaultValueSql("GETUTCDATE()");
+
+            entity.Property(t => t.UpdatedAt)
+                  .HasDefaultValueSql("GETUTCDATE()");
+
+            // Configure relationship with Language
+            entity.HasOne(t => t.Language)
+                  .WithMany(l => l.Translations)
+                  .HasForeignKey(t => t.LanguageId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // Configure SystemSetting entity
+        modelBuilder.Entity<SystemSetting>(entity =>
+        {
+            entity.HasIndex(s => s.Key)
+                  .IsUnique()
+                  .HasDatabaseName("IX_SystemSettings_Key");
+
+            entity.HasIndex(s => s.Category)
+                  .HasDatabaseName("IX_SystemSettings_Category");
+
+            entity.Property(s => s.Key)
+                  .HasMaxLength(255);
+
+            entity.Property(s => s.Category)
+                  .HasMaxLength(50);
+
+            entity.Property(s => s.DataType)
+                  .HasMaxLength(50);
+
+            entity.Property(s => s.CreatedAt)
+                  .HasDefaultValueSql("GETUTCDATE()");
+
+            entity.Property(s => s.UpdatedAt)
+                  .HasDefaultValueSql("GETUTCDATE()");
+        });
+
         // Seed data for room types and statuses (if needed)
         SeedData(modelBuilder);
     }
@@ -168,6 +334,9 @@ public class RentalManagementContext : IdentityDbContext<User>
     /// </summary>
     private static void SeedData(ModelBuilder modelBuilder)
     {
+        // Use a static date for seed data to avoid migration issues
+        var seedDate = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        
         // Seed some sample rooms for development
         modelBuilder.Entity<Room>().HasData(
             new Room
@@ -183,8 +352,8 @@ public class RentalManagementContext : IdentityDbContext<User>
                 HasAirConditioning = true,
                 HasPrivateBathroom = true,
                 IsFurnished = false,
-                CreatedAt = DateTime.UtcNow,
-                UpdatedAt = DateTime.UtcNow
+                CreatedAt = seedDate,
+                UpdatedAt = seedDate
             },
             new Room
             {
@@ -199,8 +368,8 @@ public class RentalManagementContext : IdentityDbContext<User>
                 HasAirConditioning = true,
                 HasPrivateBathroom = true,
                 IsFurnished = true,
-                CreatedAt = DateTime.UtcNow,
-                UpdatedAt = DateTime.UtcNow
+                CreatedAt = seedDate,
+                UpdatedAt = seedDate
             },
             new Room
             {
@@ -215,8 +384,8 @@ public class RentalManagementContext : IdentityDbContext<User>
                 HasAirConditioning = true,
                 HasPrivateBathroom = true,
                 IsFurnished = true,
-                CreatedAt = DateTime.UtcNow,
-                UpdatedAt = DateTime.UtcNow
+                CreatedAt = seedDate,
+                UpdatedAt = seedDate
             }
         );
     }

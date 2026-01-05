@@ -15,11 +15,16 @@ public class InvoicesController : ControllerBase
 {
     private readonly IInvoiceService _invoiceService;
     private readonly ILogger<InvoicesController> _logger;
+    private readonly IPdfService _pdfService;
 
-    public InvoicesController(IInvoiceService invoiceService, ILogger<InvoicesController> logger)
+    public InvoicesController(
+        IInvoiceService invoiceService, 
+        ILogger<InvoicesController> logger,
+        IPdfService pdfService)
     {
         _invoiceService = invoiceService;
         _logger = logger;
+        _pdfService = pdfService;
     }
 
     /// <summary>
@@ -288,6 +293,31 @@ public class InvoicesController : ControllerBase
         {
             _logger.LogError(ex, "Error retrieving invoice statistics");
             return StatusCode(500, ApiResponse<object>.ErrorResponse("An error occurred while retrieving invoice statistics"));
+        }
+    }
+
+    /// <summary>
+    /// Exports an invoice as PDF
+    /// </summary>
+    /// <param name="id">Invoice ID to export</param>
+    /// <returns>PDF file of the invoice</returns>
+    [HttpGet("{id}/export-pdf")]
+    public async Task<IActionResult> ExportInvoicePdf(int id)
+    {
+        try
+        {
+            var pdfBytes = await _pdfService.GenerateInvoicePdfAsync(id);
+            
+            // Get invoice number for filename
+            var invoice = await _invoiceService.GetInvoiceByIdAsync(id);
+            var filename = $"Invoice_{invoice.Data?.InvoiceNumber ?? id.ToString()}_{DateTime.UtcNow:yyyyMMdd}.pdf";
+            
+            return File(pdfBytes, "application/pdf", filename);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error exporting invoice {Id} to PDF", id);
+            return StatusCode(500, ApiResponse<bool>.ErrorResponse("An error occurred while exporting the invoice to PDF"));
         }
     }
 }

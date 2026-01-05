@@ -1,17 +1,20 @@
 import { useState, useEffect } from 'react';
 import { Plus, Search, Edit, Trash2, User, Phone, Mail, Calendar } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, Button, Input, Badge } from '../ui';
+import { TenantDialog } from './TenantDialog';
 import { tenantService } from '../../services';
 import { formatDate } from '../../utils';
-import type { Tenant, TenantSearchRequest, PaginatedResult, TenantStatus } from '../../types';
+import type { Tenant, TenantSearchRequest } from '../../types';
+import { useTranslation } from '../../hooks/useTranslation';
 
 export function TenantsPage() {
+  const { t } = useTranslation();
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<TenantStatus | ''>('');
-  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<string>('');
+  const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedTenant, setSelectedTenant] = useState<Tenant | null>(null);
   const [pagination, setPagination] = useState({
     page: 1,
@@ -33,19 +36,22 @@ export function TenantsPage() {
         page: pagination.page,
         pageSize: pagination.pageSize,
         search: searchQuery || undefined,
-        status: statusFilter || undefined,
       };
+
+      if (statusFilter) {
+        (searchParams as any).isActive = statusFilter === 'Active' ? true : statusFilter === 'Inactive' ? false : undefined;
+      }
 
       const response = await tenantService.getTenants(searchParams);
 
       if (response.success && response.data) {
-        const paginatedData = response.data as PaginatedResult<Tenant>;
-        setTenants(paginatedData.data);
+        const paginatedData = response.data as any;
+        setTenants(paginatedData.items || []);
         setPagination({
-          page: paginatedData.pageNumber,
-          pageSize: paginatedData.pageSize,
-          totalCount: paginatedData.totalCount,
-          totalPages: paginatedData.totalPages,
+          page: paginatedData.page || 1,
+          pageSize: paginatedData.pageSize || 10,
+          totalCount: paginatedData.totalItems || 0,
+          totalPages: paginatedData.totalPages || 1,
         });
       } else {
         throw new Error(response.message || 'Failed to load tenants');
@@ -59,40 +65,40 @@ export function TenantsPage() {
 
   const handleCreateTenant = () => {
     setSelectedTenant(null);
-    setShowCreateModal(true);
+    setDialogOpen(true);
   };
 
   const handleEditTenant = (tenant: Tenant) => {
     setSelectedTenant(tenant);
-    setShowCreateModal(true);
+    setDialogOpen(true);
   };
 
   const handleDeleteTenant = async (tenantId: string) => {
-    if (!confirm('Are you sure you want to delete this tenant?')) return;
+    if (!confirm(t('common.confirm', 'Are you sure you want to delete this tenant? This action cannot be undone.'))) return;
 
     try {
       const response = await tenantService.deleteTenant(tenantId);
       if (response.success) {
+        alert(t('common.success', 'Tenant deleted successfully'));
         await loadTenants();
       } else {
-        alert('Failed to delete tenant: ' + response.message);
+        alert(t('common.error', 'Failed to delete tenant: ') + response.message);
       }
     } catch (err) {
-      alert('Error deleting tenant: ' + (err instanceof Error ? err.message : 'Unknown error'));
+      alert(t('common.error', 'Error deleting tenant: ') + (err instanceof Error ? err.message : 'Unknown error'));
     }
   };
 
-  const getStatusBadgeColor = (status: string) => {
-    switch (status.toLowerCase()) {
-      case 'active':
-        return 'bg-green-100 text-green-800';
-      case 'inactive':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'terminated':
-        return 'bg-red-100 text-red-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
+  const handleDialogSuccess = () => {
+    loadTenants();
+  };
+
+  const getStatusBadgeColor = (isActive: boolean) => {
+    return isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800';
+  };
+
+  const getTenantStatus = (tenant: any) => {
+    return tenant.isActive ? t('tenants.active', 'Active') : t('tenants.inactive', 'Inactive');
   };
 
   const handlePageChange = (page: number) => {
@@ -102,10 +108,10 @@ export function TenantsPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">Tenants Management</h1>
+        <h1 className="text-2xl font-bold text-gray-900">{t('tenants.title', 'Tenants Management')}</h1>
         <Button onClick={handleCreateTenant} className="flex items-center space-x-2">
           <Plus className="h-4 w-4" />
-          <span>Add Tenant</span>
+          <span>{t('common.add', 'Add Tenant')}</span>
         </Button>
       </div>
 
@@ -117,7 +123,7 @@ export function TenantsPage() {
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                 <Input
-                  placeholder="Search tenants..."
+                  placeholder={t('common.search', 'Search tenants...')}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-10"
@@ -127,13 +133,12 @@ export function TenantsPage() {
             <div className="w-full md:w-48">
               <select
                 value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value as TenantStatus | '')}
+                onChange={(e) => setStatusFilter(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
-                <option value="">All Status</option>
-                <option value="Active">Active</option>
-                <option value="Inactive">Inactive</option>
-                <option value="Terminated">Terminated</option>
+                <option value="">{t('common.filter', 'All Status')}</option>
+                <option value="Active">{t('tenants.active', 'Active')}</option>
+                <option value="Inactive">{t('tenants.inactive', 'Inactive')}</option>
               </select>
             </div>
           </div>
@@ -146,7 +151,7 @@ export function TenantsPage() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Total Tenants</p>
+                <p className="text-sm font-medium text-gray-600">{t('tenants.totalTenants', 'Total Tenants')}</p>
                 <p className="text-2xl font-bold text-gray-900">{pagination.totalCount}</p>
               </div>
               <div className="p-3 rounded-lg bg-blue-100">
@@ -159,9 +164,9 @@ export function TenantsPage() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Active</p>
+                <p className="text-sm font-medium text-gray-600">{t('tenants.active', 'Active')}</p>
                 <p className="text-2xl font-bold text-green-600">
-                  {tenants.filter(t => t.status === 'Active').length}
+                  {tenants?.filter(t => (t as any).isActive === true).length || 0}
                 </p>
               </div>
               <div className="p-3 rounded-lg bg-green-100">
@@ -174,9 +179,9 @@ export function TenantsPage() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Inactive</p>
+                <p className="text-sm font-medium text-gray-600">{t('tenants.inactive', 'Inactive')}</p>
                 <p className="text-2xl font-bold text-yellow-600">
-                  {tenants.filter(t => t.status === 'Inactive').length}
+                  {tenants?.filter(t => (t as any).isActive === false).length || 0}
                 </p>
               </div>
               <div className="p-3 rounded-lg bg-yellow-100">
@@ -189,13 +194,13 @@ export function TenantsPage() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Terminated</p>
-                <p className="text-2xl font-bold text-red-600">
-                  {tenants.filter(t => t.status === 'Terminated').length}
+                <p className="text-sm font-medium text-gray-600">{t('tenants.withRooms', 'With Rooms')}</p>
+                <p className="text-2xl font-bold text-purple-600">
+                  {tenants?.filter(t => (t as any).room || t.room).length || 0}
                 </p>
               </div>
-              <div className="p-3 rounded-lg bg-red-100">
-                <User className="h-6 w-6 text-red-600" />
+              <div className="p-3 rounded-lg bg-purple-100">
+                <User className="h-6 w-6 text-purple-600" />
               </div>
             </div>
           </CardContent>
@@ -205,7 +210,7 @@ export function TenantsPage() {
       {/* Tenants Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Tenants</CardTitle>
+          <CardTitle>{t('tenants.title', 'Tenants')}</CardTitle>
         </CardHeader>
         <CardContent>
           {isLoading ? (
@@ -216,7 +221,14 @@ export function TenantsPage() {
             <div className="text-center py-8">
               <p className="text-red-600">{error}</p>
               <Button onClick={loadTenants} className="mt-4">
-                Try Again
+                {t('common.refresh', 'Try Again')}
+              </Button>
+            </div>
+          ) : tenants.length === 0 ? (
+            <div className="text-center py-8">
+              <p className="text-gray-500">{t('tenants.noTenantsFound', 'No tenants found')}</p>
+              <Button onClick={handleCreateTenant} className="mt-4">
+                {t('tenants.addFirstTenant', 'Add Your First Tenant')}
               </Button>
             </div>
           ) : (
@@ -226,27 +238,27 @@ export function TenantsPage() {
                   <thead className="bg-gray-50">
                     <tr>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Name
+                        {t('tenants.name', 'Name')}
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Contact
+                        {t('tenants.contact', 'Contact')}
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Room
+                        {t('tenants.room', 'Room')}
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Status
+                        {t('rooms.status', 'Status')}
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Check-in Date
+                        {t('tenants.contractPeriod', 'Contract Period')}
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Actions
+                        {t('common.edit', 'Actions')}
                       </th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {tenants.map((tenant) => (
+                    {tenants?.map((tenant) => (
                       <tr key={tenant.id} className="hover:bg-gray-50">
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex items-center">
@@ -257,10 +269,10 @@ export function TenantsPage() {
                             </div>
                             <div className="ml-4">
                               <div className="text-sm font-medium text-gray-900">
-                                {tenant.firstName} {tenant.lastName}
+                                {(tenant as any).fullName || `${tenant.firstName} ${tenant.lastName}`}
                               </div>
                               <div className="text-sm text-gray-500">
-                                ID: {tenant.identityNumber}
+                                ID: {(tenant as any).identificationNumber || tenant.identityNumber || 'N/A'}
                               </div>
                             </div>
                           </div>
@@ -278,23 +290,34 @@ export function TenantsPage() {
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          {tenant.room ? (
+                          {(tenant as any).room || tenant.room ? (
                             <div className="text-sm font-medium text-gray-900">
-                              Room {tenant.room.roomNumber}
+                              {t('tenants.roomNumber', 'Room')} {((tenant as any).room?.roomNumber || tenant.room?.roomNumber)}
                             </div>
                           ) : (
-                            <div className="text-sm text-gray-500">No room assigned</div>
+                            <div className="text-sm text-gray-500">{t('tenants.noRoomAssigned', 'No room assigned')}</div>
                           )}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <Badge className={getStatusBadgeColor(tenant.status)}>
-                            {tenant.status}
+                          <Badge className={getStatusBadgeColor((tenant as any).isActive)}>
+                            {getTenantStatus(tenant)}
                           </Badge>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center text-sm text-gray-900">
-                            <Calendar className="h-4 w-4 mr-2 text-gray-400" />
-                            {tenant.checkInDate ? formatDate(tenant.checkInDate) : 'Not set'}
+                          <div className="text-sm text-gray-900">
+                            {(tenant as any).contractStartDate || tenant.checkInDate ? (
+                              <div className="flex items-center">
+                                <Calendar className="h-4 w-4 mr-2 text-gray-400" />
+                                {formatDate((tenant as any).contractStartDate || tenant.checkInDate!)}
+                                {((tenant as any).contractEndDate || tenant.checkOutDate) && (
+                                  <span className="mx-1">→</span>
+                                )}
+                                {((tenant as any).contractEndDate || tenant.checkOutDate) && 
+                                  formatDate((tenant as any).contractEndDate || tenant.checkOutDate!)}
+                              </div>
+                            ) : (
+                              <span className="text-gray-500">{t('tenants.notSet', 'Not set')}</span>
+                            )}
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
@@ -304,14 +327,16 @@ export function TenantsPage() {
                               size="sm"
                               onClick={() => handleEditTenant(tenant)}
                               className="h-8 w-8 p-0"
+                              title={t('common.edit', 'Edit Tenant')}
                             >
                               <Edit className="h-4 w-4" />
                             </Button>
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => handleDeleteTenant(tenant.id)}
+                              onClick={() => handleDeleteTenant(String(tenant.id))}
                               className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
+                              title={t('common.delete', 'Delete Tenant')}
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>
@@ -338,17 +363,21 @@ export function TenantsPage() {
                     >
                       Previous
                     </Button>
-                    {Array.from({ length: pagination.totalPages }, (_, i) => i + 1).map((pageNum) => (
-                      <Button
-                        key={pageNum}
-                        variant={pagination.page === pageNum ? 'primary' : 'outline'}
-                        size="sm"
-                        onClick={() => handlePageChange(pageNum)}
-                        className="w-8"
-                      >
-                        {pageNum}
-                      </Button>
-                    ))}
+                    {Array.from({ length: Math.min(pagination.totalPages, 5) }, (_, i) => {
+                      const startPage = Math.max(1, pagination.page - 2);
+                      const pageNum = startPage + i;
+                      if (pageNum > pagination.totalPages) return null;
+                      return (
+                        <Button
+                          key={pageNum}
+                          variant={pagination.page === pageNum ? 'primary' : 'outline'}
+                          size="sm"
+                          onClick={() => handlePageChange(pageNum)}
+                        >
+                          {pageNum}
+                        </Button>
+                      );
+                    })}
                     <Button
                       variant="outline"
                       size="sm"
@@ -365,28 +394,13 @@ export function TenantsPage() {
         </CardContent>
       </Card>
 
-      {/* Create/Edit Modal */}
-      {showCreateModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <h2 className="text-lg font-semibold mb-4">
-              {selectedTenant ? 'Edit Tenant' : 'Add New Tenant'}
-            </h2>
-            <p className="text-gray-600 mb-4">Tenant form will be implemented here</p>
-            <div className="flex justify-end space-x-2">
-              <Button
-                variant="outline"
-                onClick={() => setShowCreateModal(false)}
-              >
-                Cancel
-              </Button>
-              <Button onClick={() => setShowCreateModal(false)}>
-                {selectedTenant ? 'Update' : 'Create'}
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Tenant Dialog */}
+      <TenantDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        tenant={selectedTenant}
+        onSuccess={handleDialogSuccess}
+      />
     </div>
   );
 }

@@ -13,7 +13,7 @@ import {
 import { useQuery } from '@tanstack/react-query';
 import { reportService } from '../../services';
 import { formatCurrency, formatPercentage } from '../../utils';
-import type { OccupancyReport, RevenueReport, MonthlyReport } from '../../types';
+import type { OccupancyReport, RevenueReport } from '../../types';
 
 export function ReportsPage() {
   const [selectedReport, setSelectedReport] = useState<string>('occupancy');
@@ -27,19 +27,22 @@ export function ReportsPage() {
 
   const { data: revenueResponse, isLoading: revenueLoading } = useQuery({
     queryKey: ['revenue-report'],
-    queryFn: () => reportService.getRevenueReport(),
+    queryFn: () => reportService.getMonthlyRevenueReport(new Date().getFullYear()),
     enabled: selectedReport === 'revenue'
   });
 
   const { data: monthlyResponse, isLoading: monthlyLoading } = useQuery({
-    queryKey: ['monthly-report'],
-    queryFn: () => reportService.getYearlyReport(new Date().getFullYear()),
+    queryKey: ['financial-summary'],
+    queryFn: () => reportService.getFinancialSummary(
+      new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0], // Start of year
+      new Date().toISOString().split('T')[0] // Today
+    ),
     enabled: selectedReport === 'monthly'
   });
 
   const occupancyData = occupancyResponse?.data as OccupancyReport;
   const revenueData = revenueResponse?.data as RevenueReport;
-  const monthlyData = monthlyResponse?.data as MonthlyReport[];
+  const monthlyData = monthlyResponse?.data; // Use generic data type since we don't have MonthlyReport[] from service
 
   const reportTypes = [
     {
@@ -226,56 +229,39 @@ export function ReportsPage() {
   };
 
   const renderMonthlyReport = () => {
-    if (!monthlyData || monthlyData.length === 0) return null;
+    if (!monthlyData) return null;
 
+    // Since the financial summary doesn't return MonthlyReport[], 
+    // let's render a different view for the financial summary data
     return (
       <div className="space-y-6">
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center">
               <BarChart3 className="h-5 w-5 mr-2" />
-              Monthly Performance
+              Financial Summary
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-gray-200">
-                    <th className="text-left py-3 px-4 font-medium text-gray-900">Month</th>
-                    <th className="text-left py-3 px-4 font-medium text-gray-900">Total Rooms</th>
-                    <th className="text-left py-3 px-4 font-medium text-gray-900">Occupied</th>
-                    <th className="text-left py-3 px-4 font-medium text-gray-900">Occupancy Rate</th>
-                    <th className="text-left py-3 px-4 font-medium text-gray-900">Total Revenue</th>
-                    <th className="text-left py-3 px-4 font-medium text-gray-900">Collected</th>
-                    <th className="text-left py-3 px-4 font-medium text-gray-900">Pending</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {monthlyData.map((month) => (
-                    <tr key={`${month.year}-${month.month}`} className="border-b border-gray-100 hover:bg-gray-50">
-                      <td className="py-3 px-4">
-                        <span className="font-medium">
-                          {new Date(month.year, month.month - 1).toLocaleDateString('en-US', { 
-                            year: 'numeric', 
-                            month: 'long' 
-                          })}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4">{month.totalRooms}</td>
-                      <td className="py-3 px-4">{month.occupiedRooms}</td>
-                      <td className="py-3 px-4">
-                        <span className="text-blue-600 font-medium">
-                          {formatPercentage((month.occupiedRooms / month.totalRooms) * 100)}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4 font-medium">{formatCurrency(month.totalRevenue)}</td>
-                      <td className="py-3 px-4 text-green-600 font-medium">{formatCurrency(month.collectedRevenue)}</td>
-                      <td className="py-3 px-4 text-yellow-600 font-medium">{formatCurrency(month.pendingRevenue)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {Object.entries(monthlyData).map(([key, value]) => (
+                <div key={key} className="text-center p-4 bg-gray-50 rounded-lg">
+                  <h3 className="text-lg font-semibold text-gray-900 capitalize">
+                    {key.replace(/([A-Z])/g, ' $1').trim()}
+                  </h3>
+                  <p className="text-2xl font-bold text-blue-600">
+                    {typeof value === 'number' ? 
+                      (key.toLowerCase().includes('amount') || key.toLowerCase().includes('revenue') ? 
+                        formatCurrency(value) : 
+                        key.toLowerCase().includes('rate') || key.toLowerCase().includes('percentage') ?
+                          formatPercentage(value) :
+                          value.toLocaleString()
+                      ) : 
+                      String(value)
+                    }
+                  </p>
+                </div>
+              ))}
             </div>
           </CardContent>
         </Card>

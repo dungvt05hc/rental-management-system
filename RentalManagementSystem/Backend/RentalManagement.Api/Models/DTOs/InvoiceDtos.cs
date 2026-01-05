@@ -55,6 +55,11 @@ public class CreateInvoiceDto
     /// </summary>
     [StringLength(1000)]
     public string Notes { get; set; } = string.Empty;
+
+    /// <summary>
+    /// List of line items for this invoice
+    /// </summary>
+    public List<CreateInvoiceItemDto> InvoiceItems { get; set; } = new();
 }
 
 /// <summary>
@@ -95,6 +100,11 @@ public class UpdateInvoiceDto
     /// </summary>
     [StringLength(1000)]
     public string? Notes { get; set; }
+
+    /// <summary>
+    /// List of line items for this invoice (will replace existing items)
+    /// </summary>
+    public List<CreateInvoiceItemDto>? InvoiceItems { get; set; }
 }
 
 /// <summary>
@@ -206,6 +216,11 @@ public class InvoiceDto
     /// List of payments made for this invoice
     /// </summary>
     public List<PaymentSummaryDto> Payments { get; set; } = new();
+
+    /// <summary>
+    /// List of line items for this invoice
+    /// </summary>
+    public List<InvoiceItemDto> InvoiceItems { get; set; } = new();
 
     /// <summary>
     /// When the invoice was created
@@ -488,4 +503,263 @@ public class InvoiceSearchDto
     /// Sort direction (asc/desc)
     /// </summary>
     public string SortDirection { get; set; } = "desc";
+}
+
+/// <summary>
+/// DTO for creating a new invoice item
+/// </summary>
+public class CreateInvoiceItemDto
+{
+    /// <summary>
+    /// Item code or SKU
+    /// </summary>
+    [Required]
+    [StringLength(50)]
+    public string ItemCode { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Item name or description
+    /// </summary>
+    [Required]
+    [StringLength(200)]
+    public string ItemName { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Detailed description of the item
+    /// </summary>
+    [StringLength(500)]
+    public string Description { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Quantity of this item
+    /// </summary>
+    [Required]
+    [Range(0.001, double.MaxValue)]
+    public decimal Quantity { get; set; }
+
+    /// <summary>
+    /// Unit of measure (e.g., pcs, kg, m, hrs)
+    /// </summary>
+    [StringLength(20)]
+    public string UnitOfMeasure { get; set; } = "pcs";
+
+    /// <summary>
+    /// Unit price for this item
+    /// </summary>
+    [Required]
+    [Range(0, double.MaxValue)]
+    public decimal UnitPrice { get; set; }
+
+    /// <summary>
+    /// Discount percentage (0-100)
+    /// </summary>
+    [Range(0, 100)]
+    public decimal DiscountPercent { get; set; } = 0;
+
+    /// <summary>
+    /// Discount amount
+    /// </summary>
+    [Range(0, double.MaxValue)]
+    public decimal DiscountAmount { get; set; } = 0;
+
+    /// <summary>
+    /// Tax percentage (0-100)
+    /// </summary>
+    [Range(0, 100)]
+    public decimal TaxPercent { get; set; } = 0;
+
+    /// <summary>
+    /// Line number for ordering
+    /// </summary>
+    public int LineNumber { get; set; }
+
+    /// <summary>
+    /// Item category or type
+    /// </summary>
+    [StringLength(100)]
+    public string Category { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Additional notes for this line item
+    /// </summary>
+    [StringLength(500)]
+    public string Notes { get; set; } = string.Empty;
+}
+
+/// <summary>
+/// DTO for updating an invoice item
+/// </summary>
+public class UpdateInvoiceItemDto
+{
+    /// <summary>
+    /// Item code or SKU
+    /// </summary>
+    [StringLength(50)]
+    public string? ItemCode { get; set; }
+
+    /// <summary>
+    /// Item name or description
+    /// </summary>
+    [StringLength(200)]
+    public string? ItemName { get; set; }
+
+    /// <summary>
+    /// Detailed description of the item
+    /// </summary>
+    [StringLength(500)]
+    public string? Description { get; set; }
+
+    /// <summary>
+    /// Quantity of this item
+    /// </summary>
+    [Range(0.001, double.MaxValue)]
+    public decimal? Quantity { get; set; }
+
+    /// <summary>
+    /// Unit of measure
+    /// </summary>
+    [StringLength(20)]
+    public string? UnitOfMeasure { get; set; }
+
+    /// <summary>
+    /// Unit price for this item
+    /// </summary>
+    [Range(0, double.MaxValue)]
+    public decimal? UnitPrice { get; set; }
+
+    /// <summary>
+    /// Discount percentage
+    /// </summary>
+    [Range(0, 100)]
+    public decimal? DiscountPercent { get; set; }
+
+    /// <summary>
+    /// Discount amount
+    /// </summary>
+    [Range(0, double.MaxValue)]
+    public decimal? DiscountAmount { get; set; }
+
+    /// <summary>
+    /// Tax percentage
+    /// </summary>
+    [Range(0, 100)]
+    public decimal? TaxPercent { get; set; }
+
+    /// <summary>
+    /// Line number
+    /// </summary>
+    public int? LineNumber { get; set; }
+
+    /// <summary>
+    /// Item category
+    /// </summary>
+    [StringLength(100)]
+    public string? Category { get; set; }
+
+    /// <summary>
+    /// Notes
+    /// </summary>
+    [StringLength(500)]
+    public string? Notes { get; set; }
+}
+
+/// <summary>
+/// DTO for invoice item response
+/// </summary>
+public class InvoiceItemDto
+{
+    /// <summary>
+    /// Unique identifier
+    /// </summary>
+    public int Id { get; set; }
+
+    /// <summary>
+    /// Invoice ID
+    /// </summary>
+    public int InvoiceId { get; set; }
+
+    /// <summary>
+    /// Item code or SKU
+    /// </summary>
+    public string ItemCode { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Item name
+    /// </summary>
+    public string ItemName { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Description
+    /// </summary>
+    public string Description { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Quantity
+    /// </summary>
+    public decimal Quantity { get; set; }
+
+    /// <summary>
+    /// Unit of measure
+    /// </summary>
+    public string UnitOfMeasure { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Unit price
+    /// </summary>
+    public decimal UnitPrice { get; set; }
+
+    /// <summary>
+    /// Discount percentage
+    /// </summary>
+    public decimal DiscountPercent { get; set; }
+
+    /// <summary>
+    /// Discount amount
+    /// </summary>
+    public decimal DiscountAmount { get; set; }
+
+    /// <summary>
+    /// Tax percentage
+    /// </summary>
+    public decimal TaxPercent { get; set; }
+
+    /// <summary>
+    /// Tax amount
+    /// </summary>
+    public decimal TaxAmount { get; set; }
+
+    /// <summary>
+    /// Line total before tax
+    /// </summary>
+    public decimal LineTotal { get; set; }
+
+    /// <summary>
+    /// Line total with tax
+    /// </summary>
+    public decimal LineTotalWithTax { get; set; }
+
+    /// <summary>
+    /// Line number
+    /// </summary>
+    public int LineNumber { get; set; }
+
+    /// <summary>
+    /// Category
+    /// </summary>
+    public string Category { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Notes
+    /// </summary>
+    public string Notes { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Created date
+    /// </summary>
+    public DateTime CreatedAt { get; set; }
+
+    /// <summary>
+    /// Updated date
+    /// </summary>
+    public DateTime UpdatedAt { get; set; }
 }

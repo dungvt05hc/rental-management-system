@@ -254,7 +254,7 @@ RentalManagement.Api/
 ```json
 {
   "ConnectionStrings": {
-    "DefaultConnection": "Server=(localdb)\\mssqllocaldb;Database=RentalManagementDb;Trusted_Connection=true;MultipleActiveResultSets=true"
+    "DefaultConnection": "Server=localhost,1433;Database=RentalManagementDb;User Id=sa;Password=123456aA@3;TrustServerCertificate=True"
   }
 }
 ```

@@ -48,8 +48,10 @@ public class InvoiceService : IInvoiceService
                 return ApiResponse<InvoiceDto>.ErrorResponse("Tenant must be assigned to a room");
             }
 
-            // Calculate total amount based on room's monthly rent
+            // Get monthly rent from the room
             var monthlyRent = tenant.Room.MonthlyRent;
+            
+            // Initialize total amount (will be recalculated from line items if they exist)
             var totalAmount = monthlyRent + createInvoiceDto.AdditionalCharges - createInvoiceDto.Discount;
 
             var invoice = new Invoice
@@ -60,7 +62,7 @@ public class InvoiceService : IInvoiceService
                 MonthlyRent = monthlyRent,
                 AdditionalCharges = createInvoiceDto.AdditionalCharges,
                 Discount = createInvoiceDto.Discount,
-                TotalAmount = totalAmount,
+                TotalAmount = totalAmount, // Will be recalculated if line items exist
                 RemainingBalance = totalAmount,
                 BillingPeriod = createInvoiceDto.BillingPeriod,
                 IssueDate = DateTime.UtcNow,
@@ -73,10 +75,40 @@ public class InvoiceService : IInvoiceService
             _context.Invoices.Add(invoice);
             await _context.SaveChangesAsync();
 
+            // Add invoice items if provided and recalculate total from line items
+            if (createInvoiceDto.InvoiceItems != null && createInvoiceDto.InvoiceItems.Any())
+            {
+                decimal lineItemsTotal = 0m;
+                
+                foreach (var itemDto in createInvoiceDto.InvoiceItems)
+                {
+                    var invoiceItem = _mapper.Map<InvoiceItem>(itemDto);
+                    invoiceItem.InvoiceId = invoice.Id;
+                    
+                    // Calculate totals for the invoice item
+                    invoiceItem.CalculateTotals();
+                    
+                    _context.InvoiceItems.Add(invoiceItem);
+                    
+                    // Sum up the line item totals
+                    lineItemsTotal += invoiceItem.LineTotalWithTax;
+                }
+                
+                await _context.SaveChangesAsync();
+                
+                // Recalculate invoice total from line items
+                invoice.TotalAmount = lineItemsTotal;
+                invoice.RemainingBalance = lineItemsTotal;
+                await _context.SaveChangesAsync();
+                
+                // Reload invoice with items to include in response
+                await _context.Entry(invoice).Collection(i => i.InvoiceItems).LoadAsync();
+            }
+
             var invoiceDto = _mapper.Map<InvoiceDto>(invoice);
             
-            _logger.LogInformation("Created invoice {InvoiceNumber} for tenant {TenantId}", 
-                invoice.InvoiceNumber, tenant.Id);
+            _logger.LogInformation("Created invoice {InvoiceNumber} for tenant {TenantId} with total amount {TotalAmount}", 
+                invoice.InvoiceNumber, tenant.Id, invoice.TotalAmount);
 
             return ApiResponse<InvoiceDto>.SuccessResponse(invoiceDto, "Invoice created successfully");
         }
@@ -98,6 +130,7 @@ public class InvoiceService : IInvoiceService
                 .Include(i => i.Tenant)
                 .Include(i => i.Room)
                 .Include(i => i.Payments)
+                .Include(i => i.InvoiceItems)
                 .FirstOrDefaultAsync(i => i.Id == id);
 
             if (invoice == null)
@@ -126,6 +159,7 @@ public class InvoiceService : IInvoiceService
                 .Include(i => i.Tenant)
                 .Include(i => i.Room)
                 .Include(i => i.Payments)
+                .Include(i => i.InvoiceItems)
                 .AsQueryable();
 
             // Apply filters
@@ -215,7 +249,10 @@ public class InvoiceService : IInvoiceService
     {
         try
         {
-            var invoice = await _context.Invoices.FindAsync(id);
+            var invoice = await _context.Invoices
+                .Include(i => i.InvoiceItems)
+                .FirstOrDefaultAsync(i => i.Id == id);
+                
             if (invoice == null)
             {
                 return ApiResponse<InvoiceDto>.ErrorResponse("Invoice not found");
@@ -240,22 +277,69 @@ public class InvoiceService : IInvoiceService
             if (updateInvoiceDto.Status.HasValue)
                 invoice.Status = updateInvoiceDto.Status.Value;
 
-            if (!string.IsNullOrEmpty(updateInvoiceDto.AdditionalChargesDescription))
+            // Allow updating these fields even if they are empty strings (to clear them)
+            if (updateInvoiceDto.AdditionalChargesDescription != null)
                 invoice.AdditionalChargesDescription = updateInvoiceDto.AdditionalChargesDescription;
 
-            if (!string.IsNullOrEmpty(updateInvoiceDto.Notes))
+            if (updateInvoiceDto.Notes != null)
                 invoice.Notes = updateInvoiceDto.Notes;
 
-            // Recalculate total amount
-            invoice.TotalAmount = invoice.MonthlyRent + invoice.AdditionalCharges - invoice.Discount;
+            // Handle invoice items update if provided
+            if (updateInvoiceDto.InvoiceItems != null)
+            {
+                // Remove all existing invoice items
+                if (invoice.InvoiceItems != null && invoice.InvoiceItems.Any())
+                {
+                    _context.InvoiceItems.RemoveRange(invoice.InvoiceItems);
+                }
+
+                // Add new invoice items
+                decimal lineItemsTotal = 0m;
+                foreach (var itemDto in updateInvoiceDto.InvoiceItems)
+                {
+                    var invoiceItem = _mapper.Map<InvoiceItem>(itemDto);
+                    invoiceItem.InvoiceId = invoice.Id;
+                    
+                    // Calculate totals for the invoice item
+                    invoiceItem.CalculateTotals();
+                    
+                    _context.InvoiceItems.Add(invoiceItem);
+                    
+                    // Sum up the line item totals
+                    lineItemsTotal += invoiceItem.LineTotalWithTax;
+                }
+
+                // Recalculate invoice total from line items
+                invoice.TotalAmount = lineItemsTotal + invoice.AdditionalCharges - invoice.Discount;
+            }
+            else
+            {
+                // Recalculate total amount from existing line items if they exist
+                if (invoice.InvoiceItems != null && invoice.InvoiceItems.Any())
+                {
+                    decimal lineItemsTotal = invoice.InvoiceItems.Sum(item => item.LineTotalWithTax);
+                    invoice.TotalAmount = lineItemsTotal + invoice.AdditionalCharges - invoice.Discount;
+                }
+                else
+                {
+                    invoice.TotalAmount = invoice.MonthlyRent + invoice.AdditionalCharges - invoice.Discount;
+                }
+            }
+            
             invoice.RemainingBalance = invoice.TotalAmount - invoice.PaidAmount;
             invoice.UpdatedAt = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
 
+            // Reload the invoice with all related data for the response
+            await _context.Entry(invoice).Reference(i => i.Tenant).LoadAsync();
+            await _context.Entry(invoice).Reference(i => i.Room).LoadAsync();
+            await _context.Entry(invoice).Collection(i => i.Payments).LoadAsync();
+            await _context.Entry(invoice).Collection(i => i.InvoiceItems).LoadAsync();
+
             var invoiceDto = _mapper.Map<InvoiceDto>(invoice);
             
-            _logger.LogInformation("Updated invoice {InvoiceId}", id);
+            _logger.LogInformation("Updated invoice {InvoiceId} with total amount {TotalAmount}", id, invoice.TotalAmount);
             return ApiResponse<InvoiceDto>.SuccessResponse(invoiceDto, "Invoice updated successfully");
         }
         catch (Exception ex)
@@ -372,6 +456,7 @@ public class InvoiceService : IInvoiceService
                 .Include(i => i.Tenant)
                 .Include(i => i.Room)
                 .Include(i => i.Payments)
+                .Include(i => i.InvoiceItems)
                 .Where(i => i.TenantId == tenantId)
                 .OrderByDescending(i => i.IssueDate)
                 .ToListAsync();
@@ -397,6 +482,7 @@ public class InvoiceService : IInvoiceService
                 .Include(i => i.Tenant)
                 .Include(i => i.Room)
                 .Include(i => i.Payments)
+                .Include(i => i.InvoiceItems)
                 .Where(i => i.Status != InvoiceStatus.Paid && i.DueDate < DateTime.UtcNow)
                 .OrderBy(i => i.DueDate)
                 .ToListAsync();

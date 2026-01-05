@@ -101,7 +101,7 @@ VITE_API_BASE_URL=https://localhost:7041/api
 
 The application uses JWT tokens for authentication. Demo credentials:
 
-- **Admin**: admin@rentalms.com / Admin123!
+- **Admin**: admin@rentalmanagement.com / Admin123!
 - **Manager**: manager@rentalms.com / Manager123!
 - **Staff**: staff@rentalms.com / Staff123!
 
@@ -197,7 +197,7 @@ The application uses JWT tokens for authentication. Demo credentials:
 
 ```bash
 # API Configuration
-VITE_API_BASE_URL=https://localhost:7041/api
+VITE_API_BASE_URL=http://localhost:5152/api
 
 # App Configuration  
 VITE_APP_NAME=Rental Management System

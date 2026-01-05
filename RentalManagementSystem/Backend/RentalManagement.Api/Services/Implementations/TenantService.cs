@@ -327,26 +327,38 @@ public class TenantService : ITenantService
                 return ApiResponse<bool>.ErrorResponse("Room not found");
             }
 
-            // Check if room is available
+            // Check if tenant is already assigned to the same room
+            if (tenant.RoomId.HasValue && tenant.RoomId.Value == assignmentDto.RoomId)
+            {
+                return ApiResponse<bool>.ErrorResponse("Tenant is already assigned to this room");
+            }
+
+            // Check if the new room is available
             if (room.Status != RoomStatus.Vacant)
             {
                 return ApiResponse<bool>.ErrorResponse("Room is not available");
             }
 
-            // Check if tenant is already assigned to a room
+            // If tenant is currently in another room, make it vacant
             if (tenant.RoomId.HasValue)
             {
-                return ApiResponse<bool>.ErrorResponse("Tenant is already assigned to a room");
+                var oldRoom = await _context.Rooms.FindAsync(tenant.RoomId.Value);
+                if (oldRoom != null)
+                {
+                    oldRoom.Status = RoomStatus.Vacant;
+                    oldRoom.UpdatedAt = DateTime.UtcNow;
+                    _logger.LogInformation("Made room {OldRoomId} vacant (tenant {TenantId} reassigned)", oldRoom.Id, tenantId);
+                }
             }
 
-            // Assign tenant to room
+            // Assign tenant to new room
             tenant.RoomId = assignmentDto.RoomId;
             tenant.MonthlyRent = assignmentDto.MonthlyRent ?? room.MonthlyRent;
             tenant.ContractStartDate = assignmentDto.ContractStartDate;
             tenant.ContractEndDate = assignmentDto.ContractEndDate;
             tenant.UpdatedAt = DateTime.UtcNow;
 
-            // Update room status
+            // Update new room status
             room.Status = RoomStatus.Rented;
             room.UpdatedAt = DateTime.UtcNow;
 

@@ -4,6 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { Button, Input, Card, CardHeader, CardTitle, CardContent } from '../ui';
 import { useForm } from '../../hooks';
 import { isValidEmail } from '../../utils';
+import { useTranslation } from '../../hooks/useTranslation';
 
 interface LoginFormData {
   email: string;
@@ -11,6 +12,7 @@ interface LoginFormData {
 }
 
 export function LoginPage() {
+  const { t } = useTranslation();
   const { login, isAuthenticated, isLoading } = useAuth();
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -34,18 +36,18 @@ export function LoginPage() {
     let isValid = true;
 
     if (!values.email) {
-      setError('email', 'Email is required');
+      setError('email', t('auth.emailRequired', 'Email is required'));
       isValid = false;
     } else if (!isValidEmail(values.email)) {
-      setError('email', 'Please enter a valid email address');
+      setError('email', t('auth.validEmailRequired', 'Please enter a valid email address'));
       isValid = false;
     }
 
     if (!values.password) {
-      setError('password', 'Password is required');
+      setError('password', t('auth.passwordRequired', 'Password is required'));
       isValid = false;
     } else if (values.password.length < 6) {
-      setError('password', 'Password must be at least 6 characters');
+      setError('password', t('auth.passwordMinLength', 'Password must be at least 6 characters'));
       isValid = false;
     }
 
@@ -85,36 +87,36 @@ export function LoginPage() {
       <div className="max-w-md w-full space-y-8">
         <div className="text-center">
           <h2 className="mt-6 text-3xl font-extrabold text-gray-900">
-            Sign in to your account
+            {t('auth.signInToAccount', 'Sign in to your account')}
           </h2>
           <p className="mt-2 text-sm text-gray-600">
-            Welcome to the Rental Management System
+            {t('auth.welcomeMessage', 'Welcome to the Rental Management System')}
           </p>
         </div>
 
         <Card>
           <CardHeader>
-            <CardTitle>Login</CardTitle>
+            <CardTitle>{t('auth.login', 'Login')}</CardTitle>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
               <Input
-                label="Email Address"
+                label={t('auth.email', 'Email Address')}
                 type="email"
                 value={values.email}
                 onChange={(e) => setValue('email', e.target.value)}
                 error={errors.email}
-                placeholder="Enter your email"
+                placeholder={t('auth.enterEmail', 'Enter your email')}
                 required
               />
 
               <Input
-                label="Password"
+                label={t('auth.password', 'Password')}
                 type="password"
                 value={values.password}
                 onChange={(e) => setValue('password', e.target.value)}
                 error={errors.password}
-                placeholder="Enter your password"
+                placeholder={t('auth.enterPassword', 'Enter your password')}
                 required
               />
 
@@ -124,18 +126,18 @@ export function LoginPage() {
                 isLoading={isSubmitting}
                 disabled={isSubmitting}
               >
-                Sign In
+                {t('auth.signIn', 'Sign In')}
               </Button>
             </form>
 
             <div className="mt-4 text-center">
               <p className="text-sm text-gray-600">
-                Need an account?{' '}
+                {t('auth.needAccount', 'Need an account?')}{' '}
                 <Link
                   to="/register"
                   className="font-medium text-primary hover:text-primary/80"
                 >
-                  Register here
+                  {t('auth.registerHere', 'Register here')}
                 </Link>
               </p>
             </div>
@@ -145,7 +147,7 @@ export function LoginPage() {
                 to="/forgot-password"
                 className="text-sm font-medium text-primary hover:text-primary/80"
               >
-                Forgot your password?
+                {t('auth.forgotPassword', 'Forgot your password?')}
               </Link>
             </div>
           </CardContent>
@@ -154,11 +156,11 @@ export function LoginPage() {
         {/* Demo credentials */}
         <Card className="bg-blue-50 border-blue-200">
           <CardContent className="pt-6">
-            <h3 className="text-sm font-medium text-blue-900 mb-2">Demo Credentials</h3>
+            <h3 className="text-sm font-medium text-blue-900 mb-2">{t('auth.demoCredentials', 'Demo Credentials')}</h3>
             <div className="text-xs text-blue-800 space-y-1">
-              <p><strong>Admin:</strong> admin@rentalms.com / Admin123!</p>
-              <p><strong>Manager:</strong> manager@rentalms.com / Manager123!</p>
-              <p><strong>Staff:</strong> staff@rentalms.com / Staff123!</p>
+              <p><strong>{t('auth.admin', 'Admin')}:</strong> admin@rentalmanagement.com / Admin123!</p>
+              <p><strong>{t('auth.manager', 'Manager')}:</strong> manager@rentalms.com / Manager123!</p>
+              <p><strong>{t('auth.staff', 'Staff')}:</strong> staff@rentalms.com / Staff123!</p>
             </div>
           </CardContent>
         </Card>

@@ -52,31 +52,63 @@ export interface Room {
   description?: string;
   monthlyRent: number;
   status: RoomStatus;
+  type: RoomType;
+  typeName?: string;
+  statusName?: string;
+  floor: number;
+  area?: number;
+  hasAirConditioning: boolean;
+  hasPrivateBathroom: boolean;
+  isFurnished: boolean;
   createdAt: string;
   updatedAt: string;
   tenant?: Tenant;
+  currentTenant?: Tenant;
 }
 
 export enum RoomStatus {
-  Available = 'Available',
-  Occupied = 'Occupied',
-  Maintenance = 'Maintenance'
+  Vacant = 1,
+  Rented = 2,
+  Maintenance = 3,
+  Reserved = 4
+}
+
+export enum RoomType {
+  Single = 1,
+  Double = 2,
+  Triple = 3,
+  Suite = 4,
+  Studio = 5,
+  Apartment = 6
 }
 
 export interface CreateRoomRequest {
   roomNumber: string;
-  description?: string;
+  type: RoomType;
   monthlyRent: number;
+  floor: number;
+  area?: number;
+  description?: string;
+  hasAirConditioning: boolean;
+  hasPrivateBathroom: boolean;
+  isFurnished: boolean;
+}
+
+export interface UpdateRoomRequest extends Partial<CreateRoomRequest> {
   status: RoomStatus;
 }
 
-export interface UpdateRoomRequest extends Partial<CreateRoomRequest> {}
-
 export interface RoomSearchRequest {
   search?: string;
+  searchTerm?: string;
   status?: RoomStatus;
+  type?: RoomType;
   minRent?: number;
   maxRent?: number;
+  floor?: number;
+  hasAirConditioning?: boolean;
+  hasPrivateBathroom?: boolean;
+  isFurnished?: boolean;
   page?: number;
   pageSize?: number;
 }
@@ -86,20 +118,37 @@ export interface Tenant {
   id: string;
   firstName: string;
   lastName: string;
+  fullName?: string;
   email: string;
   phoneNumber: string;
-  identityNumber: string;
-  address: string;
-  emergencyContact: string;
-  emergencyPhone: string;
-  roomId?: string;
+  dateOfBirth?: string;
+  age?: number;
+  identityNumber?: string;
+  identificationNumber?: string;
+  address?: string;
+  emergencyContact?: string;
+  emergencyContactName?: string;
+  emergencyPhone?: string;
+  emergencyContactPhone?: string;
   checkInDate?: string;
   checkOutDate?: string;
+  contractStartDate?: string;
+  contractEndDate?: string;
   securityDeposit: number;
+  monthlyRent?: number;
   status: TenantStatus;
+  isActive?: boolean;
+  hasActiveContract?: boolean;
+  notes?: string;
   createdAt: string;
   updatedAt: string;
-  room?: Room;
+  room?: {
+    id: string;
+    roomNumber: string;
+    typeName?: string;
+    monthlyRent: number;
+    floor: number;
+  };
 }
 
 export enum TenantStatus {
@@ -113,23 +162,34 @@ export interface CreateTenantRequest {
   lastName: string;
   email: string;
   phoneNumber: string;
-  identityNumber: string;
-  address: string;
-  emergencyContact: string;
-  emergencyPhone: string;
-  roomId?: string;
-  checkInDate?: string;
-  checkOutDate?: string;
+  dateOfBirth?: string;
+  identificationNumber?: string;
+  emergencyContactName?: string;
+  emergencyContactPhone?: string;
   securityDeposit: number;
-  status: TenantStatus;
+  monthlyRent: number;
+  notes?: string;
 }
 
-export interface UpdateTenantRequest extends Partial<CreateTenantRequest> {}
+export interface UpdateTenantRequest extends Partial<CreateTenantRequest> {
+  isActive?: boolean;
+}
+
+export interface AssignRoomRequest {
+  roomId: number;
+  contractStartDate: string;
+  contractEndDate: string;
+  monthlyRent: number;
+}
 
 export interface TenantSearchRequest {
   search?: string;
+  searchTerm?: string;
   status?: TenantStatus;
   roomId?: string;
+  hasRoom?: boolean;
+  isActive?: boolean;
+  hasActiveContract?: boolean;
   page?: number;
   pageSize?: number;
 }
@@ -141,45 +201,162 @@ export interface Invoice {
   roomId: string;
   invoiceNumber: string;
   amount: number;
+  totalAmount?: number;
+  paidAmount?: number;
+  remainingBalance?: number;
+  monthlyRent?: number;
+  additionalCharges?: number;
+  discount?: number;
   dueDate: string;
-  issuedDate: string;
+  issuedDate?: string;
+  issueDate?: string;
+  billingPeriod?: string;
+  paidDate?: string;
   status: InvoiceStatus;
+  statusName?: string;
   description?: string;
+  additionalChargesDescription?: string;
+  notes?: string;
+  isOverdue?: boolean;
+  isPartiallyPaid?: boolean;
   createdAt: string;
   updatedAt: string;
   tenant?: Tenant;
   room?: Room;
   payments?: Payment[];
+  invoiceItems?: InvoiceItem[];
 }
 
 export enum InvoiceStatus {
-  Pending = 'Pending',
-  Paid = 'Paid',
-  Overdue = 'Overdue',
-  Cancelled = 'Cancelled'
+  Draft = 1,
+  Issued = 2,
+  Unpaid = 3,
+  PartiallyPaid = 4,
+  Paid = 5,
+  Overdue = 6,
+  Cancelled = 7
 }
 
 export interface CreateInvoiceRequest {
-  tenantId: string;
-  roomId: string;
-  amount: number;
+  tenantId: number;
+  roomId: number;
+  billingPeriod: string;
+  additionalCharges?: number;
+  discount?: number;
   dueDate: string;
-  description?: string;
+  additionalChargesDescription?: string;
+  notes?: string;
+  invoiceItems?: CreateInvoiceItemRequest[];
 }
 
-export interface UpdateInvoiceRequest extends Partial<CreateInvoiceRequest> {
-  status?: InvoiceStatus;
+export interface UpdateInvoiceRequest {
+  additionalCharges?: number;
+  discount?: number;
+  status?: InvoiceStatus | string;
+  dueDate?: string;
+  additionalChargesDescription?: string;
+  notes?: string;
 }
 
 export interface InvoiceSearchRequest {
   search?: string;
+  searchTerm?: string;
   status?: InvoiceStatus;
   tenantId?: string;
   roomId?: string;
-  startDate?: string;
-  endDate?: string;
+  billingPeriod?: string;
+  dueDateFrom?: string;
+  dueDateTo?: string;
+  isOverdue?: boolean;
   page?: number;
   pageSize?: number;
+}
+
+export interface InvoiceItem {
+  id?: string;
+  invoiceId?: string;
+  itemCode: string;
+  itemName: string;
+  description?: string;
+  quantity: number;
+  unitOfMeasure: string;
+  unitPrice: number;
+  discountPercent: number;
+  discountAmount: number;
+  taxPercent: number;
+  taxAmount: number;
+  lineTotal: number;
+  lineTotalWithTax: number;
+  lineNumber: number;
+  category?: string;
+  notes?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface CreateInvoiceItemRequest {
+  itemCode: string;
+  itemName: string;
+  description?: string;
+  quantity: number;
+  unitOfMeasure: string;
+  unitPrice: number;
+  discountPercent?: number;
+  discountAmount?: number;
+  taxPercent?: number;
+  lineNumber: number;
+  category?: string;
+  notes?: string;
+}
+
+// Item Types
+export interface Item {
+  id: string;
+  itemCode: string;
+  itemName: string;
+  description?: string;
+  unitOfMeasure: string;
+  unitPrice: number;
+  taxPercent: number;
+  category?: string;
+  isActive: boolean;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateItemRequest {
+  itemCode: string;
+  itemName: string;
+  description?: string;
+  unitOfMeasure: string;
+  unitPrice: number;
+  taxPercent?: number;
+  category?: string;
+  isActive?: boolean;
+  notes?: string;
+}
+
+export interface UpdateItemRequest {
+  itemCode?: string;
+  itemName?: string;
+  description?: string;
+  unitOfMeasure?: string;
+  unitPrice?: number;
+  taxPercent?: number;
+  category?: string;
+  isActive?: boolean;
+  notes?: string;
+}
+
+export interface ItemSearchRequest {
+  searchTerm?: string;
+  category?: string;
+  isActive?: boolean;
+  page?: number;
+  pageSize?: number;
+  sortBy?: string;
+  sortDirection?: string;
 }
 
 // Payment Types

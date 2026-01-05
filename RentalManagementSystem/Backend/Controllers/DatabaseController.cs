@@ -7,7 +7,8 @@ namespace RentalManagementSystem.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    [Authorize(Roles = "Admin")]
+    [AllowAnonymous]
+    //[Authorize(Roles = "Admin")]
     public class DatabaseController : ControllerBase
     {
         private readonly IDatabaseManagementService _databaseService;

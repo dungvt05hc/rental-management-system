@@ -4,6 +4,7 @@ import type {
   CreateTenantRequest, 
   UpdateTenantRequest, 
   TenantSearchRequest,
+  AssignRoomRequest,
   PaginatedResult,
   ApiResponse 
 } from '../types';
@@ -32,6 +33,16 @@ export const tenantService = {
   // Delete tenant
   async deleteTenant(id: string): Promise<ApiResponse> {
     return apiService.delete(`/tenants/${id}`);
+  },
+
+  // Assign tenant to room
+  async assignRoom(id: string, assignment: AssignRoomRequest): Promise<ApiResponse<Tenant>> {
+    return apiService.post<Tenant>(`/tenants/${id}/assign-room`, assignment);
+  },
+
+  // Remove tenant from room
+  async removeFromRoom(id: string): Promise<ApiResponse<Tenant>> {
+    return apiService.post<Tenant>(`/tenants/${id}/remove-room`, {});
   },
 
   // Get active tenants

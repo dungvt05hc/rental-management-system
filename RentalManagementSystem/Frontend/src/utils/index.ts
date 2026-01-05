@@ -40,6 +40,9 @@ export function parseDateFromInput(dateString: string): Date {
 
 // Format percentage
 export function formatPercentage(value: number, decimals = 1): string {
+  if (value === undefined || value === null || isNaN(value)) {
+    return '0.0%';
+  }
   return `${value.toFixed(decimals)}%`;
 }
 

@@ -1,24 +1,27 @@
 import { useState, useEffect } from 'react';
 import { Plus, Search, Edit, Trash2, MapPin, DollarSign } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, Button, Input, Badge } from '../ui';
+import { RoomDialog } from './RoomDialog';
 import { roomService } from '../../services';
 import { formatCurrency } from '../../utils';
-import type { Room, RoomSearchRequest, PaginatedResult, RoomStatus } from '../../types';
+import type { Room, RoomSearchRequest, RoomStatus } from '../../types';
+import { useTranslation } from '../../hooks/useTranslation';
 
 export function RoomsPage() {
+  const { t } = useTranslation();
   const [rooms, setRooms] = useState<Room[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<RoomStatus | ''>('');
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
   const [pagination, setPagination] = useState({
     page: 1,
     pageSize: 10,
     totalCount: 0,
     totalPages: 0,
   });
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
 
   useEffect(() => {
     loadRooms();
@@ -32,20 +35,21 @@ export function RoomsPage() {
       const searchParams: RoomSearchRequest = {
         page: pagination.page,
         pageSize: pagination.pageSize,
-        search: searchQuery || undefined,
+        searchTerm: searchQuery || undefined,
         status: statusFilter || undefined,
       };
 
       const response = await roomService.getRooms(searchParams);
 
       if (response.success && response.data) {
-        const paginatedData = response.data as PaginatedResult<Room>;
-        setRooms(paginatedData.data);
+        const paginatedData = response.data as any;
+        // API returns items, page, pageSize, totalItems, totalPages
+        setRooms(paginatedData.items || []);
         setPagination({
-          page: paginatedData.pageNumber,
-          pageSize: paginatedData.pageSize,
-          totalCount: paginatedData.totalCount,
-          totalPages: paginatedData.totalPages,
+          page: paginatedData.page || 1,
+          pageSize: paginatedData.pageSize || 10,
+          totalCount: paginatedData.totalItems || 0,
+          totalPages: paginatedData.totalPages || 1,
         });
       } else {
         throw new Error(response.message || 'Failed to load rooms');
@@ -59,37 +63,46 @@ export function RoomsPage() {
 
   const handleCreateRoom = () => {
     setSelectedRoom(null);
-    setShowCreateModal(true);
+    setDialogOpen(true);
   };
 
   const handleEditRoom = (room: Room) => {
     setSelectedRoom(room);
-    setShowCreateModal(true);
+    setDialogOpen(true);
   };
 
   const handleDeleteRoom = async (roomId: string) => {
-    if (!confirm('Are you sure you want to delete this room?')) return;
+    if (!confirm(t('common.confirm', 'Are you sure you want to delete this room? This action cannot be undone.'))) return;
 
     try {
       const response = await roomService.deleteRoom(roomId);
       if (response.success) {
+        // Show success message
+        alert(t('common.success', 'Room deleted successfully'));
         await loadRooms();
       } else {
-        alert('Failed to delete room: ' + response.message);
+        alert(t('common.error', 'Failed to delete room: ') + response.message);
       }
     } catch (err) {
-      alert('Error deleting room: ' + (err instanceof Error ? err.message : 'Unknown error'));
+      alert(t('common.error', 'Error deleting room: ') + (err instanceof Error ? err.message : 'Unknown error'));
     }
+  };
+
+  const handleDialogSuccess = () => {
+    loadRooms();
   };
 
   const getStatusBadgeColor = (status: string) => {
     switch (status.toLowerCase()) {
-      case 'available':
+      case 'vacant':
         return 'bg-green-100 text-green-800';
+      case 'rented':
       case 'occupied':
         return 'bg-blue-100 text-blue-800';
       case 'maintenance':
         return 'bg-yellow-100 text-yellow-800';
+      case 'reserved':
+        return 'bg-purple-100 text-purple-800';
       default:
         return 'bg-gray-100 text-gray-800';
     }
@@ -102,10 +115,10 @@ export function RoomsPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">Rooms Management</h1>
+        <h1 className="text-2xl font-bold text-gray-900">{t('rooms.title', 'Rooms Management')}</h1>
         <Button onClick={handleCreateRoom} className="flex items-center space-x-2">
           <Plus className="h-4 w-4" />
-          <span>Add Room</span>
+          <span>{t('common.add', 'Add Room')}</span>
         </Button>
       </div>
 
@@ -117,7 +130,7 @@ export function RoomsPage() {
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                 <Input
-                  placeholder="Search rooms..."
+                  placeholder={t('common.search', 'Search rooms...')}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-10"
@@ -130,9 +143,9 @@ export function RoomsPage() {
                 onChange={(e) => setStatusFilter(e.target.value as RoomStatus | '')}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
-                <option value="">All Status</option>
-                <option value="Available">Available</option>
-                <option value="Occupied">Occupied</option>
+                <option value="">{t('common.filter', 'All Status')}</option>
+                <option value="Available">{t('rooms.available', 'Available')}</option>
+                <option value="Occupied">{t('rooms.occupied', 'Occupied')}</option>
                 <option value="Maintenance">Maintenance</option>
               </select>
             </div>
@@ -146,7 +159,7 @@ export function RoomsPage() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Total Rooms</p>
+                <p className="text-sm font-medium text-gray-600">{t('dashboard.totalRooms', 'Total Rooms')}</p>
                 <p className="text-2xl font-bold text-gray-900">{pagination.totalCount}</p>
               </div>
               <div className="p-3 rounded-lg bg-blue-100">
@@ -159,9 +172,9 @@ export function RoomsPage() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Available</p>
+                <p className="text-sm font-medium text-gray-600">{t('rooms.available', 'Available')}</p>
                 <p className="text-2xl font-bold text-green-600">
-                  {rooms.filter(r => r.status === 'Available').length}
+                  {rooms?.filter(r => (r as any).statusName?.toLowerCase() === 'vacant').length || 0}
                 </p>
               </div>
               <div className="p-3 rounded-lg bg-green-100">
@@ -174,9 +187,9 @@ export function RoomsPage() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Occupied</p>
+                <p className="text-sm font-medium text-gray-600">{t('rooms.occupied', 'Occupied')}</p>
                 <p className="text-2xl font-bold text-blue-600">
-                  {rooms.filter(r => r.status === 'Occupied').length}
+                  {rooms?.filter(r => (r as any).statusName?.toLowerCase() === 'rented' || (r as any).statusName?.toLowerCase() === 'occupied').length || 0}
                 </p>
               </div>
               <div className="p-3 rounded-lg bg-blue-100">
@@ -189,9 +202,9 @@ export function RoomsPage() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Avg. Rent</p>
+                <p className="text-sm font-medium text-gray-600">{t('dashboard.revenue', 'Avg. Rent')}</p>
                 <p className="text-2xl font-bold text-purple-600">
-                  {rooms.length > 0 ? formatCurrency(rooms.reduce((sum, r) => sum + r.monthlyRent, 0) / rooms.length) : '$0'}
+                  {rooms && rooms.length > 0 ? formatCurrency(rooms.reduce((sum, r) => sum + r.monthlyRent, 0) / rooms.length) : '0'}
                 </p>
               </div>
               <div className="p-3 rounded-lg bg-purple-100">
@@ -205,7 +218,7 @@ export function RoomsPage() {
       {/* Rooms Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Rooms</CardTitle>
+          <CardTitle>{t('rooms.title', 'Rooms')}</CardTitle>
         </CardHeader>
         <CardContent>
           {isLoading ? (
@@ -216,7 +229,14 @@ export function RoomsPage() {
             <div className="text-center py-8">
               <p className="text-red-600">{error}</p>
               <Button onClick={loadRooms} className="mt-4">
-                Try Again
+                {t('common.refresh', 'Try Again')}
+              </Button>
+            </div>
+          ) : rooms.length === 0 ? (
+            <div className="text-center py-8">
+              <p className="text-gray-500">{t('common.loading', 'No rooms found')}</p>
+              <Button onClick={handleCreateRoom} className="mt-4">
+                {t('common.add', 'Add Your First Room')}
               </Button>
             </div>
           ) : (
@@ -226,31 +246,37 @@ export function RoomsPage() {
                   <thead className="bg-gray-50">
                     <tr>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Room Number
+                        {t('rooms.roomNumber', 'Room Number')}
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Status
+                        {t('rooms.roomType', 'Type')}
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Monthly Rent
+                        {t('rooms.status', 'Status')}
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Description
+                        {t('rooms.price', 'Monthly Rent')}
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Actions
+                        Floor
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        {t('common.edit', 'Actions')}
                       </th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {rooms.map((room) => (
+                    {rooms?.map((room) => (
                       <tr key={room.id} className="hover:bg-gray-50">
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="font-medium text-gray-900">{room.roomNumber}</div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <Badge className={getStatusBadgeColor(room.status)}>
-                            {room.status}
+                          <div className="text-gray-700">{(room as any).typeName || 'N/A'}</div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <Badge className={getStatusBadgeColor((room as any).statusName || room.status)}>
+                            {(room as any).statusName || room.status}
                           </Badge>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
@@ -258,10 +284,8 @@ export function RoomsPage() {
                             {formatCurrency(room.monthlyRent)}
                           </div>
                         </td>
-                        <td className="px-6 py-4">
-                          <div className="text-gray-700 max-w-xs truncate">
-                            {room.description || 'No description'}
-                          </div>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-gray-700">Floor {room.floor}</div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex space-x-2">
@@ -270,21 +294,23 @@ export function RoomsPage() {
                               size="sm"
                               onClick={() => handleEditRoom(room)}
                               className="h-8 w-8 p-0"
+                              title={t('common.edit', 'Edit Room')}
                             >
                               <Edit className="h-4 w-4" />
                             </Button>
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => handleDeleteRoom(room.id)}
+                              onClick={() => handleDeleteRoom(String(room.id))}
                               className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
+                              title={t('common.delete', 'Delete Room')}
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>
                           </div>
                         </td>
                       </tr>
-                    ))}
+                    )) || []}
                   </tbody>
                 </table>
               </div>
@@ -304,17 +330,21 @@ export function RoomsPage() {
                     >
                       Previous
                     </Button>
-                    {Array.from({ length: pagination.totalPages }, (_, i) => i + 1).map((pageNum) => (
-                      <Button
-                        key={pageNum}
-                        variant={pagination.page === pageNum ? 'primary' : 'outline'}
-                        size="sm"
-                        onClick={() => handlePageChange(pageNum)}
-                        className="w-8"
-                      >
-                        {pageNum}
-                      </Button>
-                    ))}
+                    {Array.from({ length: Math.min(pagination.totalPages, 5) }, (_, i) => {
+                      const startPage = Math.max(1, pagination.page - 2);
+                      const pageNum = startPage + i;
+                      if (pageNum > pagination.totalPages) return null;
+                      return (
+                        <Button
+                          key={pageNum}
+                          variant={pagination.page === pageNum ? "primary" : "outline"}
+                          size="sm"
+                          onClick={() => handlePageChange(pageNum)}
+                        >
+                          {pageNum}
+                        </Button>
+                      );
+                    })}
                     <Button
                       variant="outline"
                       size="sm"
@@ -331,28 +361,13 @@ export function RoomsPage() {
         </CardContent>
       </Card>
 
-      {/* Create/Edit Modal would go here */}
-      {showCreateModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <h2 className="text-lg font-semibold mb-4">
-              {selectedRoom ? 'Edit Room' : 'Add New Room'}
-            </h2>
-            <p className="text-gray-600 mb-4">Room form will be implemented here</p>
-            <div className="flex justify-end space-x-2">
-              <Button
-                variant="outline"
-                onClick={() => setShowCreateModal(false)}
-              >
-                Cancel
-              </Button>
-              <Button onClick={() => setShowCreateModal(false)}>
-                {selectedRoom ? 'Update' : 'Create'}
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Room Dialog */}
+      <RoomDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        room={selectedRoom}
+        onSuccess={handleDialogSuccess}
+      />
     </div>
   );
 }

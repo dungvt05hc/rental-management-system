@@ -90,11 +90,16 @@ builder.Services.AddFluentValidationAutoValidation();
 // Add CORS
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowAll", policy =>
+    options.AddPolicy("AllowFrontend", policy =>
     {
-        policy.AllowAnyOrigin()
+        policy.WithOrigins(
+                "http://localhost:3000",  // React dev server
+                "http://localhost:5173",  // Vite dev server
+                "http://localhost:5174"   // Alternative Vite port
+              )
               .AllowAnyMethod()
-              .AllowAnyHeader();
+              .AllowAnyHeader()
+              .AllowCredentials();
     });
 });
 
@@ -105,6 +110,12 @@ builder.Services.AddScoped<ITenantService, TenantService>();
 builder.Services.AddScoped<IInvoiceService, InvoiceService>();
 builder.Services.AddScoped<IPaymentService, PaymentService>();
 builder.Services.AddScoped<IReportingService, ReportingService>();
+builder.Services.AddScoped<IItemService, ItemService>();
+builder.Services.AddScoped<IPdfService, PdfService>();
+builder.Services.AddScoped<IDatabaseManagementService, DatabaseManagementService>();
+builder.Services.AddScoped<IDatabaseSeeder, DatabaseSeeder>();
+builder.Services.AddScoped<ILocalizationService, LocalizationService>();
+builder.Services.AddScoped<ISystemManagementService, SystemManagementService>();
 
 // Add controllers
 builder.Services.AddControllers();
@@ -168,19 +179,23 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI(c =>
     {
         c.SwaggerEndpoint("/swagger/v1/swagger.json", "Rental Management System API v1");
-        c.RoutePrefix = "swagger"; // Serve Swagger UI at /swagger
+        c.RoutePrefix = "swagger";
     });
 }
+else
+{
+    // Only use HTTPS redirection in production
+    app.UseHttpsRedirection();
+}
 
-app.UseHttpsRedirection();
-
-app.UseCors("AllowAll");
-
-app.UseAuthentication();
-app.UseAuthorization();
+// CORS must be placed before Authentication and Authorization
+app.UseCors("AllowFrontend");
 
 // Add request logging
 app.UseSerilogRequestLogging();
+
+app.UseAuthentication();
+app.UseAuthorization();
 
 app.MapControllers();
 

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '../ui';
+import { useNavigate } from 'react-router-dom';
+import { Card, CardContent, CardHeader, CardTitle, Button } from '../ui';
 import { 
   Building, 
   Users, 
@@ -12,11 +13,13 @@ import {
   Clock,
   Bell,
   CheckCircle,
-  XCircle
+  XCircle,
+  ArrowRight
 } from 'lucide-react';
-import { reportService } from '../../services';
+import { reportService, roomService } from '../../services';
 import { formatCurrency, formatPercentage } from '../../utils';
-import type { OccupancyReport, RevenueReport } from '../../types';
+import type { OccupancyReport, RevenueReport, Room } from '../../types';
+import { useTranslation } from '../../hooks/useTranslation';
 
 interface DashboardStats {
   totalRooms: number;
@@ -39,6 +42,8 @@ interface SystemAlert {
 }
 
 export function DashboardPage() {
+  const { t } = useTranslation();
+  const navigate = useNavigate();
   const [stats, setStats] = useState<DashboardStats>({
     totalRooms: 0,
     occupiedRooms: 0,
@@ -50,6 +55,7 @@ export function DashboardPage() {
     occupancyRate: 0,
     collectionRate: 0,
   });
+  const [recentRooms, setRecentRooms] = useState<Room[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
@@ -67,30 +73,40 @@ export function DashboardPage() {
       setIsLoading(true);
       setError(null);
 
-      // Load occupancy and revenue reports
-      const [occupancyResponse, revenueResponse] = await Promise.all([
+      // Load dashboard summary which includes both occupancy and revenue data
+      const [occupancyResponse, dashboardResponse, roomsResponse] = await Promise.all([
         reportService.getOccupancyReport(),
-        reportService.getRevenueReport(),
+        reportService.getDashboardSummary(),
+        roomService.getRooms({ page: 1, pageSize: 5 }),
       ]);
 
-      if (occupancyResponse.success && revenueResponse.success) {
+      if (occupancyResponse.success && dashboardResponse.success) {
         const occupancy = occupancyResponse.data as OccupancyReport;
-        const revenue = revenueResponse.data as RevenueReport;
+        const dashboard = dashboardResponse.data as any; // Dashboard summary data
 
+        // Add null checks and fallback values
         setStats({
-          totalRooms: occupancy.totalRooms,
-          occupiedRooms: occupancy.occupiedRooms,
-          availableRooms: occupancy.availableRooms,
-          totalRevenue: revenue.totalRevenue,
-          paidAmount: revenue.paidAmount,
-          pendingAmount: revenue.pendingAmount,
-          overdueAmount: revenue.overdueAmount,
-          occupancyRate: occupancy.occupancyRate,
-          collectionRate: revenue.collectionRate,
+          totalRooms: occupancy?.totalRooms ?? 0,
+          occupiedRooms: occupancy?.occupiedRooms ?? 0,
+          availableRooms: occupancy?.availableRooms ?? 0,
+          totalRevenue: dashboard?.totalRevenue ?? 0,
+          paidAmount: dashboard?.paidAmount ?? 0,
+          pendingAmount: dashboard?.pendingAmount ?? 0,
+          overdueAmount: dashboard?.overdueAmount ?? 0,
+          occupancyRate: occupancy?.occupancyRate ?? 0,
+          collectionRate: dashboard?.collectionRate ?? 0,
         });
 
-        // Generate system alerts based on data
-        generateSystemAlerts(occupancy, revenue);
+        // Set recent rooms
+        if (roomsResponse.success && roomsResponse.data) {
+          const paginatedData = roomsResponse.data as any;
+          setRecentRooms(paginatedData.items || []);
+        }
+
+        // Generate system alerts based on data - only if data exists
+        if (occupancy && dashboard) {
+          generateSystemAlerts(occupancy, dashboard);
+        }
         setLastUpdated(new Date());
       } else {
         throw new Error('Failed to load dashboard data');
@@ -110,8 +126,8 @@ export function DashboardPage() {
       newAlerts.push({
         id: 'low-occupancy',
         type: 'warning',
-        title: 'Low Occupancy Rate',
-        message: `Current occupancy rate is ${formatPercentage(occupancy.occupancyRate)}. Consider marketing strategies.`,
+        title: t('dashboard.lowOccupancy', 'Low Occupancy Rate'),
+        message: `${t('dashboard.currentOccupancyRate', 'Current occupancy rate is')} ${formatPercentage(occupancy.occupancyRate)}. ${t('dashboard.considerMarketing', 'Consider marketing strategies.')}.`,
         timestamp: new Date(),
       });
     }
@@ -121,8 +137,8 @@ export function DashboardPage() {
       newAlerts.push({
         id: 'high-overdue',
         type: 'error',
-        title: 'High Overdue Amount',
-        message: `${formatCurrency(revenue.overdueAmount)} in overdue payments requires immediate attention.`,
+        title: t('dashboard.highOverdue', 'High Overdue Amount'),
+        message: `${formatCurrency(revenue.overdueAmount)} ${t('dashboard.overdueRequiresAttention', 'in overdue payments requires immediate attention')}.`,
         timestamp: new Date(),
       });
     }
@@ -132,8 +148,8 @@ export function DashboardPage() {
       newAlerts.push({
         id: 'good-collection',
         type: 'success',
-        title: 'Excellent Collection Rate',
-        message: `Current collection rate is ${formatPercentage(revenue.collectionRate)}. Keep up the good work!`,
+        title: t('dashboard.excellentCollection', 'Excellent Collection Rate'),
+        message: `${t('dashboard.currentCollectionRate', 'Current collection rate is')} ${formatPercentage(revenue.collectionRate)}. ${t('dashboard.keepUpGoodWork', 'Keep up the good work!')}`,
         timestamp: new Date(),
       });
     }
@@ -143,8 +159,8 @@ export function DashboardPage() {
       newAlerts.push({
         id: 'high-occupancy',
         type: 'info',
-        title: 'High Occupancy Rate',
-        message: `Occupancy rate is ${formatPercentage(occupancy.occupancyRate)}. Consider expanding capacity.`,
+        title: t('dashboard.highOccupancyTitle', 'High Occupancy Rate'),
+        message: `${t('dashboard.occupancyRateIs', 'Occupancy rate is')} ${formatPercentage(occupancy.occupancyRate)}. ${t('dashboard.considerExpanding', 'Consider expanding capacity.')}.`,
         timestamp: new Date(),
       });
     }
@@ -186,45 +202,65 @@ export function DashboardPage() {
     }
   };
 
+  const handleQuickAction = (action: 'rooms' | 'tenants' | 'invoices') => {
+    navigate(`/${action}`);
+  };
+
+  const getStatusBadgeColor = (status: string) => {
+    switch (status.toLowerCase()) {
+      case 'vacant':
+        return 'bg-green-100 text-green-800';
+      case 'rented':
+      case 'occupied':
+        return 'bg-blue-100 text-blue-800';
+      case 'maintenance':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'reserved':
+        return 'bg-purple-100 text-purple-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  };
+
   const mainStatCards = [
     {
-      title: 'Total Rooms',
+      title: t('dashboard.totalRooms', 'Total Rooms'),
       value: stats.totalRooms.toString(),
       icon: Building,
       color: 'text-blue-600',
       bgColor: 'bg-blue-100',
-      description: 'Total properties available',
+      description: t('dashboard.totalPropertiesAvailable', 'Total properties available'),
       trend: null,
     },
     {
-      title: 'Occupied Rooms',
+      title: t('dashboard.occupiedRooms', 'Occupied Rooms'),
       value: stats.occupiedRooms.toString(),
-      subtitle: `${stats.availableRooms} available`,
+      subtitle: `${stats.availableRooms} ${t('rooms.available', 'available')}`,
       icon: Users,
       color: 'text-green-600',
       bgColor: 'bg-green-100',
-      description: 'Currently occupied rooms',
-      trend: `${formatPercentage(stats.occupancyRate)} occupancy`,
+      description: t('dashboard.currentlyOccupiedRooms', 'Currently occupied rooms'),
+      trend: `${formatPercentage(stats.occupancyRate)} ${t('dashboard.occupancy', 'occupancy')}`,
     },
     {
-      title: 'Total Revenue',
+      title: t('dashboard.totalRevenue', 'Total Revenue'),
       value: formatCurrency(stats.totalRevenue),
-      subtitle: formatCurrency(stats.paidAmount) + ' collected',
+      subtitle: formatCurrency(stats.paidAmount) + ' ' + t('dashboard.collected', 'collected'),
       icon: DollarSign,
       color: 'text-purple-600',
       bgColor: 'bg-purple-100',
-      description: 'Total revenue this month',
-      trend: `${formatPercentage(stats.collectionRate)} collection rate`,
+      description: t('dashboard.totalRevenueThisMonth', 'Total revenue this month'),
+      trend: `${formatPercentage(stats.collectionRate)} ${t('dashboard.collectionRate', 'collection rate')}`,
     },
     {
-      title: 'Pending Amount',
+      title: t('dashboard.pendingAmount', 'Pending Amount'),
       value: formatCurrency(stats.pendingAmount),
-      subtitle: formatCurrency(stats.overdueAmount) + ' overdue',
+      subtitle: formatCurrency(stats.overdueAmount) + ' ' + t('dashboard.overdue', 'overdue'),
       icon: FileText,
       color: stats.overdueAmount > 0 ? 'text-red-600' : 'text-yellow-600',
       bgColor: stats.overdueAmount > 0 ? 'bg-red-100' : 'bg-yellow-100',
-      description: 'Outstanding payments',
-      trend: stats.overdueAmount > 0 ? 'Attention needed' : 'On track',
+      description: t('dashboard.outstandingPayments', 'Outstanding payments'),
+      trend: stats.overdueAmount > 0 ? t('dashboard.attentionNeeded', 'Attention needed') : t('dashboard.onTrack', 'On track'),
     },
   ];
 
@@ -232,7 +268,7 @@ export function DashboardPage() {
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+          <h1 className="text-2xl font-bold text-gray-900">{t('dashboard.title', 'Dashboard')}</h1>
           <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900"></div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -253,21 +289,21 @@ export function DashboardPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+          <h1 className="text-2xl font-bold text-gray-900">{t('dashboard.title', 'Dashboard')}</h1>
           <p className="text-sm text-gray-500 flex items-center mt-1">
             <Clock className="h-4 w-4 mr-1" />
-            Last updated: {lastUpdated.toLocaleTimeString()}
+            {t('dashboard.lastUpdated', 'Last updated')}: {lastUpdated.toLocaleTimeString()}
           </p>
         </div>
         <div className="flex items-center space-x-4">
           <p className="text-sm text-gray-500">
-            Welcome to the Rental Management System
+            {t('dashboard.welcomeMessage', 'Welcome to the Rental Management System')}
           </p>
           <button
             onClick={loadDashboardData}
             disabled={isLoading}
             className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
-            title="Refresh data"
+            title={t('common.refresh', 'Refresh data')}
           >
             <RefreshCw className={`h-5 w-5 ${isLoading ? 'animate-spin' : ''}`} />
           </button>
@@ -280,12 +316,12 @@ export function DashboardPage() {
           <CardContent className="p-6">
             <div className="flex items-center space-x-2 text-red-800">
               <AlertCircle className="h-5 w-5" />
-              <p>Error loading dashboard data: {error}</p>
+              <p>{t('common.error', 'Error loading dashboard data')}: {error}</p>
               <button
                 onClick={loadDashboardData}
                 className="ml-4 px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700 transition-colors"
               >
-                Retry
+                {t('common.refresh', 'Retry')}
               </button>
             </div>
           </CardContent>
@@ -297,7 +333,7 @@ export function DashboardPage() {
         <div className="space-y-3">
           <h2 className="text-lg font-semibold text-gray-900 flex items-center">
             <Bell className="h-5 w-5 mr-2" />
-            System Alerts ({alerts.length})
+            {t('dashboard.systemAlerts', 'System Alerts')} ({alerts.length})
           </h2>
           <div className="grid gap-3">
             {alerts.map((alert) => {
@@ -374,13 +410,13 @@ export function DashboardPage() {
           <CardHeader>
             <CardTitle className="flex items-center">
               <TrendingUp className="h-5 w-5 mr-2" />
-              Occupancy Metrics
+              {t('dashboard.occupancyMetrics', 'Occupancy Metrics')}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
               <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">Current Occupancy Rate</span>
+                <span className="text-sm text-gray-600">{t('dashboard.currentOccupancyRate', 'Current Occupancy Rate')}</span>
                 <span className="font-semibold">{formatPercentage(stats.occupancyRate)}</span>
               </div>
               <div className="w-full bg-gray-200 rounded-full h-2">
@@ -392,11 +428,11 @@ export function DashboardPage() {
               <div className="grid grid-cols-2 gap-4 pt-4">
                 <div className="text-center">
                   <p className="text-2xl font-bold text-green-600">{stats.occupiedRooms}</p>
-                  <p className="text-sm text-gray-500">Occupied</p>
+                  <p className="text-sm text-gray-500">{t('rooms.occupied', 'Occupied')}</p>
                 </div>
                 <div className="text-center">
                   <p className="text-2xl font-bold text-blue-600">{stats.availableRooms}</p>
-                  <p className="text-sm text-gray-500">Available</p>
+                  <p className="text-sm text-gray-500">{t('rooms.available', 'Available')}</p>
                 </div>
               </div>
             </div>
@@ -407,13 +443,13 @@ export function DashboardPage() {
           <CardHeader>
             <CardTitle className="flex items-center">
               <DollarSign className="h-5 w-5 mr-2" />
-              Revenue Metrics
+              {t('dashboard.revenueMetrics', 'Revenue Metrics')}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
               <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">Collection Rate</span>
+                <span className="text-sm text-gray-600">{t('dashboard.collectionRate', 'Collection Rate')}</span>
                 <span className="font-semibold">{formatPercentage(stats.collectionRate)}</span>
               </div>
               <div className="w-full bg-gray-200 rounded-full h-2">
@@ -425,15 +461,15 @@ export function DashboardPage() {
               <div className="grid grid-cols-3 gap-2 pt-4">
                 <div className="text-center">
                   <p className="text-lg font-bold text-green-600">{formatCurrency(stats.paidAmount)}</p>
-                  <p className="text-xs text-gray-500">Collected</p>
+                  <p className="text-xs text-gray-500">{t('dashboard.collected', 'Collected')}</p>
                 </div>
                 <div className="text-center">
                   <p className="text-lg font-bold text-yellow-600">{formatCurrency(stats.pendingAmount)}</p>
-                  <p className="text-xs text-gray-500">Pending</p>
+                  <p className="text-xs text-gray-500">{t('invoices.unpaid', 'Pending')}</p>
                 </div>
                 <div className="text-center">
                   <p className="text-lg font-bold text-red-600">{formatCurrency(stats.overdueAmount)}</p>
-                  <p className="text-xs text-gray-500">Overdue</p>
+                  <p className="text-xs text-gray-500">{t('dashboard.overdue', 'Overdue')}</p>
                 </div>
               </div>
             </div>
@@ -446,49 +482,49 @@ export function DashboardPage() {
         <CardHeader>
           <CardTitle className="flex items-center">
             <Calendar className="h-5 w-5 mr-2" />
-            Quick Actions
+            {t('dashboard.quickActions', 'Quick Actions')}
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <a
-              href="/rooms"
+            <button
+              onClick={() => handleQuickAction('rooms')}
               className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-all duration-200 hover:border-blue-300 group"
             >
               <div className="flex items-center space-x-3">
                 <Building className="h-8 w-8 text-blue-600 group-hover:text-blue-700 transition-colors" />
                 <div>
-                  <h3 className="font-medium text-gray-900 group-hover:text-gray-800">Manage Rooms</h3>
-                  <p className="text-sm text-gray-500">Add, edit, or view room details</p>
+                  <h3 className="font-medium text-gray-900 group-hover:text-gray-800">{t('dashboard.manageRooms', 'Manage Rooms')}</h3>
+                  <p className="text-sm text-gray-500">{t('dashboard.addEditViewRooms', 'Add, edit, or view room details')}</p>
                 </div>
               </div>
-            </a>
+            </button>
 
-            <a
-              href="/tenants"
+            <button
+              onClick={() => handleQuickAction('tenants')}
               className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-all duration-200 hover:border-green-300 group"
             >
               <div className="flex items-center space-x-3">
                 <Users className="h-8 w-8 text-green-600 group-hover:text-green-700 transition-colors" />
                 <div>
-                  <h3 className="font-medium text-gray-900 group-hover:text-gray-800">Manage Tenants</h3>
-                  <p className="text-sm text-gray-500">Add, edit, or view tenant information</p>
+                  <h3 className="font-medium text-gray-900 group-hover:text-gray-800">{t('dashboard.manageTenants', 'Manage Tenants')}</h3>
+                  <p className="text-sm text-gray-500">{t('dashboard.addEditViewTenants', 'Add, edit, or view tenant information')}</p>
                 </div>
               </div>
-            </a>
+            </button>
 
-            <a
-              href="/invoices"
+            <button
+              onClick={() => handleQuickAction('invoices')}
               className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-all duration-200 hover:border-purple-300 group"
             >
               <div className="flex items-center space-x-3">
                 <FileText className="h-8 w-8 text-purple-600 group-hover:text-purple-700 transition-colors" />
                 <div>
-                  <h3 className="font-medium text-gray-900 group-hover:text-gray-800">Manage Invoices</h3>
-                  <p className="text-sm text-gray-500">Create and track invoice payments</p>
+                  <h3 className="font-medium text-gray-900 group-hover:text-gray-800">{t('dashboard.manageInvoices', 'Manage Invoices')}</h3>
+                  <p className="text-sm text-gray-500">{t('dashboard.createTrackInvoices', 'Create and track invoice payments')}</p>
                 </div>
               </div>
-            </a>
+            </button>
           </div>
         </CardContent>
       </Card>
