@@ -1,7 +1,7 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { FileText, Calendar, DollarSign, User, Home, Package, Mail, Phone, ArrowLeft, Edit, Printer, Download } from 'lucide-react';
-import { Button, Badge } from '../ui';
+import { Button, Badge, AlertDialog } from '../ui';
 import { formatCurrency, formatDate } from '../../utils';
 import { invoiceService } from '../../services/invoices';
 import { InvoicePrintDialog } from './InvoicePrintDialog';
@@ -11,6 +11,16 @@ export function InvoiceDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [isPrintDialogOpen, setIsPrintDialogOpen] = useState(false);
+  const [alertConfig, setAlertConfig] = useState<{
+    open: boolean;
+    type: 'success' | 'error' | 'warning' | 'info';
+    title?: string;
+    message: string;
+  }>({
+    open: false,
+    type: 'info',
+    message: '',
+  });
 
   const { data: invoice, isLoading, error } = useQuery({
     queryKey: ['invoice', id],
@@ -77,13 +87,27 @@ export function InvoiceDetailPage() {
         throw new Error('Invalid invoice ID');
       }
       
+      // Call the export service
       await invoiceService.exportInvoicePdf(invoiceId.toString());
       
-      // Show success message
-      alert('PDF exported successfully!');
+      // Wait a bit to ensure download has started before showing success message
+      // This gives the browser time to show the save dialog
+      setTimeout(() => {
+        setAlertConfig({
+          open: true,
+          type: 'success',
+          title: 'Success',
+          message: 'PDF export initiated successfully! Please check your downloads folder.',
+        });
+      }, 500);
     } catch (err) {
       console.error('Error exporting PDF:', err);
-      alert('Error exporting PDF: ' + (err instanceof Error ? err.message : 'Unknown error'));
+      setAlertConfig({
+        open: true,
+        type: 'error',
+        title: 'Export Failed',
+        message: err instanceof Error ? err.message : 'An unknown error occurred while exporting the PDF.',
+      });
     }
   };
 
@@ -477,6 +501,15 @@ export function InvoiceDetailPage() {
         onOpenChange={setIsPrintDialogOpen}
         invoice={invoice}
         onExportPdf={handleExport}
+      />
+
+      {/* Custom Alert Dialog */}
+      <AlertDialog
+        open={alertConfig.open}
+        onOpenChange={(open) => setAlertConfig({ ...alertConfig, open })}
+        type={alertConfig.type}
+        title={alertConfig.title}
+        message={alertConfig.message}
       />
     </div>
   );

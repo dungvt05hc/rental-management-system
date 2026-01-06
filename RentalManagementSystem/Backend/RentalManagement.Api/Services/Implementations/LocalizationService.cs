@@ -36,6 +36,15 @@ public class LocalizationService : ILocalizationService
         return _mapper.Map<IEnumerable<LanguageDto>>(languages);
     }
 
+    public async Task<IEnumerable<LanguageDto>> GetAllLanguagesAsync()
+    {
+        var languages = await _context.Languages
+            .OrderBy(l => l.Name)
+            .ToListAsync();
+
+        return _mapper.Map<IEnumerable<LanguageDto>>(languages);
+    }
+
     public async Task<LanguageDto?> GetLanguageByCodeAsync(string code)
     {
         var language = await _context.Languages
@@ -77,6 +86,94 @@ public class LocalizationService : ILocalizationService
         await _context.SaveChangesAsync();
 
         _logger.LogInformation("Created language: {Code} - {Name}", language.Code, language.Name);
+
+        return _mapper.Map<LanguageDto>(language);
+    }
+
+    public async Task<LanguageDto> UpdateLanguageAsync(string code, UpdateLanguageDto updateLanguageDto)
+    {
+        var language = await _context.Languages
+            .FirstOrDefaultAsync(l => l.Code == code);
+
+        if (language is null)
+        {
+            throw new InvalidOperationException($"Language with code '{code}' not found");
+        }
+
+        // If setting as default, unset other defaults
+        if (updateLanguageDto.IsDefault && !language.IsDefault)
+        {
+            var existingDefault = await _context.Languages
+                .FirstOrDefaultAsync(l => l.IsDefault && l.Id != language.Id);
+            
+            if (existingDefault is not null)
+            {
+                existingDefault.IsDefault = false;
+            }
+        }
+
+        language.Name = updateLanguageDto.Name;
+        language.NativeName = updateLanguageDto.NativeName;
+        language.IsDefault = updateLanguageDto.IsDefault;
+        language.IsActive = updateLanguageDto.IsActive;
+
+        await _context.SaveChangesAsync();
+
+        _logger.LogInformation("Updated language: {Code} - {Name}", language.Code, language.Name);
+
+        return _mapper.Map<LanguageDto>(language);
+    }
+
+    public async Task<bool> DeleteLanguageAsync(string code)
+    {
+        var language = await _context.Languages
+            .FirstOrDefaultAsync(l => l.Code == code);
+
+        if (language is null)
+        {
+            return false;
+        }
+
+        // Prevent deleting the default language
+        if (language.IsDefault)
+        {
+            throw new InvalidOperationException("Cannot delete the default language. Please set another language as default first.");
+        }
+
+        // Soft delete by setting IsActive to false
+        language.IsActive = false;
+
+        await _context.SaveChangesAsync();
+
+        _logger.LogInformation("Deleted (soft) language: {Code} - {Name}", language.Code, language.Name);
+
+        return true;
+    }
+
+    public async Task<LanguageDto> SetDefaultLanguageAsync(string code)
+    {
+        var language = await _context.Languages
+            .FirstOrDefaultAsync(l => l.Code == code && l.IsActive);
+
+        if (language is null)
+        {
+            throw new InvalidOperationException($"Language with code '{code}' not found or inactive");
+        }
+
+        // Unset current default
+        var currentDefault = await _context.Languages
+            .FirstOrDefaultAsync(l => l.IsDefault && l.Id != language.Id);
+        
+        if (currentDefault is not null)
+        {
+            currentDefault.IsDefault = false;
+        }
+
+        language.IsDefault = true;
+
+        await _context.SaveChangesAsync();
+
+        _logger.LogInformation("Set default language: {Code} - {Name}", language.Code, language.Name);
 
         return _mapper.Map<LanguageDto>(language);
     }

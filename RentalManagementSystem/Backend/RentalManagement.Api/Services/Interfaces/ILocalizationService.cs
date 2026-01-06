@@ -13,6 +13,11 @@ public interface ILocalizationService
     Task<IEnumerable<LanguageDto>> GetLanguagesAsync();
 
     /// <summary>
+    /// Get all languages including inactive ones
+    /// </summary>
+    Task<IEnumerable<LanguageDto>> GetAllLanguagesAsync();
+
+    /// <summary>
     /// Get language by code
     /// </summary>
     Task<LanguageDto?> GetLanguageByCodeAsync(string code);
@@ -26,6 +31,21 @@ public interface ILocalizationService
     /// Create a new language
     /// </summary>
     Task<LanguageDto> CreateLanguageAsync(CreateLanguageDto createLanguageDto);
+
+    /// <summary>
+    /// Update an existing language
+    /// </summary>
+    Task<LanguageDto> UpdateLanguageAsync(string code, UpdateLanguageDto updateLanguageDto);
+
+    /// <summary>
+    /// Delete a language (soft delete by setting IsActive to false)
+    /// </summary>
+    Task<bool> DeleteLanguageAsync(string code);
+
+    /// <summary>
+    /// Set a language as the default language
+    /// </summary>
+    Task<LanguageDto> SetDefaultLanguageAsync(string code);
 
     /// <summary>
     /// Get all translations for a specific language

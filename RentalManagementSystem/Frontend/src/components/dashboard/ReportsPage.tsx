@@ -27,7 +27,12 @@ export function ReportsPage() {
 
   const { data: revenueResponse, isLoading: revenueLoading } = useQuery({
     queryKey: ['revenue-report'],
-    queryFn: () => reportService.getMonthlyRevenueReport(new Date().getFullYear()),
+    queryFn: () => {
+      const now = new Date();
+      const startOfYear = new Date(now.getFullYear(), 0, 1).toISOString().split('T')[0];
+      const today = now.toISOString().split('T')[0];
+      return reportService.getFinancialSummary(startOfYear, today);
+    },
     enabled: selectedReport === 'revenue'
   });
 
@@ -41,7 +46,16 @@ export function ReportsPage() {
   });
 
   const occupancyData = occupancyResponse?.data as OccupancyReport;
-  const revenueData = revenueResponse?.data as RevenueReport;
+  
+  // Map the financial summary response to the RevenueReport structure
+  const revenueData = revenueResponse?.data ? {
+    totalRevenue: revenueResponse.data.Revenue?.TotalRevenue || 0,
+    paidAmount: revenueResponse.data.Revenue?.TotalPayments || 0,
+    pendingAmount: revenueResponse.data.Revenue?.TotalOutstanding || 0,
+    overdueAmount: 0, // Calculate from pending if needed
+    collectionRate: revenueResponse.data.Revenue?.CollectionRate || 0
+  } as RevenueReport : undefined;
+  
   const monthlyData = monthlyResponse?.data; // Use generic data type since we don't have MonthlyReport[] from service
 
   const reportTypes = [
@@ -231,10 +245,98 @@ export function ReportsPage() {
   const renderMonthlyReport = () => {
     if (!monthlyData) return null;
 
-    // Since the financial summary doesn't return MonthlyReport[], 
-    // let's render a different view for the financial summary data
+    // Extract the nested structure from the financial summary response
+    const reportPeriod = monthlyData.ReportPeriod || {};
+    const revenue = monthlyData.Revenue || {};
+    const deposits = monthlyData.Deposits || {};
+    const summary = monthlyData.Summary || {};
+    const monthlyBreakdown = monthlyData.MonthlyBreakdown || [];
+
     return (
       <div className="space-y-6">
+        {/* Report Period */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <Calendar className="h-5 w-5 mr-2" />
+              Report Period
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="text-center p-4 bg-blue-50 rounded-lg">
+                <h3 className="text-lg font-semibold text-blue-900">From Date</h3>
+                <p className="text-xl font-bold text-blue-600">
+                  {reportPeriod.FromDate ? new Date(reportPeriod.FromDate).toLocaleDateString() : 'N/A'}
+                </p>
+              </div>
+              <div className="text-center p-4 bg-blue-50 rounded-lg">
+                <h3 className="text-lg font-semibold text-blue-900">To Date</h3>
+                <p className="text-xl font-bold text-blue-600">
+                  {reportPeriod.ToDate ? new Date(reportPeriod.ToDate).toLocaleDateString() : 'N/A'}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Revenue Summary */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <DollarSign className="h-5 w-5 mr-2" />
+              Revenue Summary
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <div className="text-center p-4 bg-green-50 rounded-lg">
+                <h3 className="text-lg font-semibold text-green-900">Total Revenue</h3>
+                <p className="text-2xl font-bold text-green-600">
+                  {formatCurrency(revenue.TotalRevenue || 0)}
+                </p>
+              </div>
+              <div className="text-center p-4 bg-blue-50 rounded-lg">
+                <h3 className="text-lg font-semibold text-blue-900">Total Payments</h3>
+                <p className="text-2xl font-bold text-blue-600">
+                  {formatCurrency(revenue.TotalPayments || 0)}
+                </p>
+              </div>
+              <div className="text-center p-4 bg-yellow-50 rounded-lg">
+                <h3 className="text-lg font-semibold text-yellow-900">Outstanding</h3>
+                <p className="text-2xl font-bold text-yellow-600">
+                  {formatCurrency(revenue.TotalOutstanding || 0)}
+                </p>
+              </div>
+              <div className="text-center p-4 bg-purple-50 rounded-lg">
+                <h3 className="text-lg font-semibold text-purple-900">Collection Rate</h3>
+                <p className="text-2xl font-bold text-purple-600">
+                  {formatPercentage(revenue.CollectionRate || 0)}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Deposits */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <Building className="h-5 w-5 mr-2" />
+              Security Deposits
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-center p-4 bg-blue-50 rounded-lg">
+              <h3 className="text-lg font-semibold text-blue-900">Total Security Deposits</h3>
+              <p className="text-3xl font-bold text-blue-600">
+                {formatCurrency(deposits.TotalSecurityDeposits || 0)}
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Financial Summary */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center">
@@ -243,28 +345,89 @@ export function ReportsPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {Object.entries(monthlyData).map(([key, value]) => (
-                <div key={key} className="text-center p-4 bg-gray-50 rounded-lg">
-                  <h3 className="text-lg font-semibold text-gray-900 capitalize">
-                    {key.replace(/([A-Z])/g, ' $1').trim()}
-                  </h3>
-                  <p className="text-2xl font-bold text-blue-600">
-                    {typeof value === 'number' ? 
-                      (key.toLowerCase().includes('amount') || key.toLowerCase().includes('revenue') ? 
-                        formatCurrency(value) : 
-                        key.toLowerCase().includes('rate') || key.toLowerCase().includes('percentage') ?
-                          formatPercentage(value) :
-                          value.toLocaleString()
-                      ) : 
-                      String(value)
-                    }
-                  </p>
-                </div>
-              ))}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="text-center p-4 bg-gray-50 rounded-lg">
+                <h3 className="text-lg font-semibold text-gray-900">Average Monthly Revenue</h3>
+                <p className="text-2xl font-bold text-blue-600">
+                  {formatCurrency(summary.AverageMonthlyRevenue || 0)}
+                </p>
+              </div>
+              <div className="text-center p-4 bg-gray-50 rounded-lg">
+                <h3 className="text-lg font-semibold text-gray-900">Total Invoices</h3>
+                <p className="text-2xl font-bold text-blue-600">
+                  {(summary.TotalInvoices || 0).toLocaleString()}
+                </p>
+              </div>
+              <div className="text-center p-4 bg-gray-50 rounded-lg">
+                <h3 className="text-lg font-semibold text-gray-900">Net Income</h3>
+                <p className="text-2xl font-bold text-blue-600">
+                  {formatCurrency(summary.NetIncome || 0)}
+                </p>
+              </div>
             </div>
           </CardContent>
         </Card>
+
+        {/* Monthly Breakdown */}
+        {monthlyBreakdown.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Monthly Breakdown</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Period
+                      </th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Total Invoiced
+                      </th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Paid Amount
+                      </th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Outstanding
+                      </th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Collection Rate
+                      </th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Invoices
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {monthlyBreakdown.map((month: any, index: number) => (
+                      <tr key={index} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                          {month.Period || `${month.Year}-${String(month.Month).padStart(2, '0')}`}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-gray-900">
+                          {formatCurrency(month.TotalInvoiced || 0)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-green-600 font-semibold">
+                          {formatCurrency(month.PaidAmount || 0)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-yellow-600">
+                          {formatCurrency(month.OutstandingAmount || 0)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-purple-600 font-semibold">
+                          {formatPercentage(month.CollectionRate || 0)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-gray-900">
+                          {(month.InvoiceCount || 0).toLocaleString()}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
     );
   };

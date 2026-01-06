@@ -35,6 +35,17 @@ public class LocalizationController : ControllerBase
     }
 
     /// <summary>
+    /// Get all languages including inactive ones (Admin only)
+    /// </summary>
+    [HttpGet("languages/all")]
+    [ProducesResponseType(typeof(IEnumerable<LanguageDto>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<IEnumerable<LanguageDto>>> GetAllLanguages()
+    {
+        var languages = await _localizationService.GetAllLanguagesAsync();
+        return Ok(languages);
+    }
+
+    /// <summary>
     /// Get language by code
     /// </summary>
     [HttpGet("languages/{code}")]
@@ -87,6 +98,77 @@ public class LocalizationController : ControllerBase
         catch (InvalidOperationException ex)
         {
             return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Update an existing language
+    /// </summary>
+    [HttpPut("languages/{code}")]
+    [Authorize(Policy = "Admin")]
+    [ProducesResponseType(typeof(LanguageDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<LanguageDto>> UpdateLanguage(
+        string code,
+        [FromBody] UpdateLanguageDto updateLanguageDto)
+    {
+        try
+        {
+            var language = await _localizationService.UpdateLanguageAsync(code, updateLanguageDto);
+            return Ok(language);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Delete a language (soft delete by setting IsActive to false)
+    /// </summary>
+    [HttpDelete("languages/{code}")]
+    [Authorize(Policy = "Admin")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> DeleteLanguage(string code)
+    {
+        try
+        {
+            var result = await _localizationService.DeleteLanguageAsync(code);
+            
+            if (!result)
+            {
+                return NotFound(new { message = $"Language with code '{code}' not found" });
+            }
+
+            return NoContent();
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Set a language as the default language
+    /// </summary>
+    [HttpPost("languages/{code}/set-default")]
+    [Authorize(Policy = "Admin")]
+    [ProducesResponseType(typeof(LanguageDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<LanguageDto>> SetDefaultLanguage(string code)
+    {
+        try
+        {
+            var language = await _localizationService.SetDefaultLanguageAsync(code);
+            return Ok(language);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return NotFound(new { message = ex.Message });
         }
     }
 

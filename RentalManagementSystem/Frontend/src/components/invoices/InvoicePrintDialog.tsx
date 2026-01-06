@@ -25,7 +25,6 @@ export function InvoicePrintDialog({ open, onOpenChange, invoice, onExportPdf }:
   const status = invoiceData.statusName || invoice.status;
   
   // Calculate total amount by summing all line items
-  const monthlyRentAmount = invoiceData.monthlyRent || 0;
   const additionalChargesAmount = invoiceData.additionalCharges || 0;
   const invoiceItemsTotal = (invoiceData.invoiceItems || []).reduce(
     (sum: number, item: any) => sum + (item.lineTotalWithTax || item.lineTotal || 0), 
@@ -33,7 +32,7 @@ export function InvoicePrintDialog({ open, onOpenChange, invoice, onExportPdf }:
   );
   const discountAmount = invoiceData.discount || 0;
   
-  const totalAmount = monthlyRentAmount + additionalChargesAmount + invoiceItemsTotal - discountAmount;
+  const totalAmount = additionalChargesAmount + invoiceItemsTotal - discountAmount;
   const paidAmount = invoiceData.paidAmount || 0;
   const remainingBalance = totalAmount - paidAmount;
 
@@ -248,20 +247,6 @@ export function InvoicePrintDialog({ open, onOpenChange, invoice, onExportPdf }:
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
-                    <tr className="no-break hover:bg-gray-50">
-                      <td className="px-2 py-2 text-xs text-gray-900 border-r border-gray-200 print:px-1.5 print:py-1 print:text-[9px]">
-                        <div className="font-medium">Monthly Rent</div>
-                      </td>
-                      <td className="px-2 py-2 text-xs text-gray-900 text-center border-r border-gray-200 print:px-1.5 print:py-1 print:text-[9px]">1</td>
-                      <td className="px-2 py-2 text-xs text-gray-900 text-center border-r border-gray-200 print:px-1.5 print:py-1 print:text-[9px]">month</td>
-                      <td className="px-2 py-2 text-xs text-gray-900 text-right border-r border-gray-200 print:px-1.5 print:py-1 print:text-[9px]">
-                        {formatCurrency(invoiceData.monthlyRent || 0)}
-                      </td>
-                      <td className="px-2 py-2 text-xs text-gray-900 text-right font-medium print:px-1.5 print:py-1 print:text-[9px]">
-                        {formatCurrency(invoiceData.monthlyRent || 0)}
-                      </td>
-                    </tr>
-                    
                     {invoiceData.additionalCharges > 0 && (
                       <tr className="no-break hover:bg-gray-50">
                         <td className="px-2 py-2 text-xs text-gray-900 border-r border-gray-200 print:px-1.5 print:py-1 print:text-[9px]">
@@ -413,9 +398,13 @@ export function InvoicePrintDialog({ open, onOpenChange, invoice, onExportPdf }:
                 <h3 className="text-xs font-bold text-gray-700 mb-1.5 uppercase print:text-[9px] print:mb-1">Payment Instructions</h3>
                 <p className="text-xs text-gray-600 mb-1 print:text-[9px] print:leading-tight print:mb-0.5">Please make payment by the due date to avoid late fees.</p>
                 <p className="text-xs text-gray-600 mb-1 print:text-[9px] print:leading-tight print:mb-0.5">Accepted payment methods: Cash, Bank Transfer, Credit/Debit Card, Check</p>
-                <div className="mt-2 text-[10px] text-gray-600 print:mt-1 print:text-[8px] print:leading-tight">
-                  <p className="font-semibold">Bank Details:</p>
-                  <p>Bank Name: First National Bank | Account: 1234567890 | Routing: 987654321</p>
+                <div className="mt-2 bg-blue-50 border border-blue-200 rounded p-2 print:mt-1 print:p-1.5">
+                  <p className="text-[10px] font-bold text-blue-900 mb-1 print:text-[8px] print:mb-0.5">Bank Details:</p>
+                  <p className="text-[11px] font-semibold text-blue-800 print:text-[9px] print:leading-tight">
+                    Bank Name: <span className="text-gray-900">Vo Thai Dung</span> | 
+                    Account: <span className="text-gray-900">50966332942 TPBank</span> | 
+                    Momo: <span className="text-gray-900">0966332942</span>
+                  </p>
                 </div>
               </div>
 

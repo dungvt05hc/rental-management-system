@@ -15,6 +15,7 @@ import { PaymentsPage } from './components/payments/PaymentsPage';
 import { ReportsPage } from './components/dashboard/ReportsPage';
 import { ItemsPage } from './components/items/ItemsPage';
 import SystemManagement from './components/SystemManagement/SystemManagement';
+import { LanguageManagement } from './components/admin/LanguageManagement';
 import type { ReactNode } from 'react';
 import './index.css'
 import { LocalizationProvider } from './contexts/LocalizationContext'
@@ -141,6 +142,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <SystemManagement />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/languages"
+        element={
+          <ProtectedRoute>
+            <LanguageManagement />
           </ProtectedRoute>
         }
       />

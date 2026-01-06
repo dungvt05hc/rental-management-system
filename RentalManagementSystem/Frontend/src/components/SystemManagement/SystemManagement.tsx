@@ -1,17 +1,20 @@
 import { useState } from 'react';
-import { Settings, Info, Globe } from 'lucide-react';
+import { Settings, Info, Globe, Languages } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui';
 import SystemInfoTab from './SystemInfoTab';
 import SystemSettingsTab from './SystemSettingsTab';
+import LanguageManagement from '../admin/LanguageManagement';
+import TranslationManagement from './TranslationManagement';
 
 const SystemManagement: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'info' | 'settings' | 'languages'>('info');
+  const [activeTab, setActiveTab] = useState<'info' | 'settings' | 'languages' | 'translations'>('info');
   const [error, setError] = useState<string | null>(null);
 
   const tabs = [
     { id: 'info' as const, label: 'System Info', icon: Info },
     { id: 'settings' as const, label: 'Settings', icon: Settings },
     { id: 'languages' as const, label: 'Languages', icon: Globe },
+    { id: 'translations' as const, label: 'Translations', icon: Languages },
   ];
 
   return (
@@ -63,16 +66,8 @@ const SystemManagement: React.FC = () => {
       <div>
         {activeTab === 'info' && <SystemInfoTab />}
         {activeTab === 'settings' && <SystemSettingsTab />}
-        {activeTab === 'languages' && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Language Management</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-gray-600">Language management features coming soon...</p>
-            </CardContent>
-          </Card>
-        )}
+        {activeTab === 'languages' && <LanguageManagement />}
+        {activeTab === 'translations' && <TranslationManagement />}
       </div>
     </div>
   );

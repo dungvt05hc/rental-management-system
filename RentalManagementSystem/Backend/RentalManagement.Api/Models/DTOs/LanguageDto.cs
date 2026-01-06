@@ -25,6 +25,17 @@ public class CreateLanguageDto
 }
 
 /// <summary>
+/// DTO for updating an existing language
+/// </summary>
+public class UpdateLanguageDto
+{
+    public required string Name { get; set; }
+    public required string NativeName { get; set; }
+    public bool IsDefault { get; set; }
+    public bool IsActive { get; set; }
+}
+
+/// <summary>
 /// DTO for translation information
 /// </summary>
 public class TranslationDto

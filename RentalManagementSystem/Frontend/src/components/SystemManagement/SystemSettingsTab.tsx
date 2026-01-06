@@ -323,77 +323,107 @@ const SystemSettingsTab: React.FC = () => {
 
       {/* Create Setting Dialog */}
       <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Create New Setting</DialogTitle>
+            <DialogTitle className="text-2xl">Create New Setting</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 mt-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Key <span className="text-red-500">*</span>
-              </label>
-              <Input
-                value={newSetting.key}
-                onChange={(e) => setNewSetting({ ...newSetting, key: e.target.value })}
-                placeholder="e.g., app.theme"
-              />
+          <div className="px-6 py-6">
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Key Field */}
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Key <span className="text-red-500">*</span>
+                  </label>
+                  <Input
+                    value={newSetting.key}
+                    onChange={(e) => setNewSetting({ ...newSetting, key: e.target.value })}
+                    placeholder="e.g., app.theme"
+                    className="text-base h-11"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">A unique identifier for this setting</p>
+                </div>
+
+                {/* Value Field */}
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Value <span className="text-red-500">*</span>
+                  </label>
+                  <Input
+                    value={newSetting.value}
+                    onChange={(e) => setNewSetting({ ...newSetting, value: e.target.value })}
+                    placeholder="e.g., dark"
+                    className="text-base h-11"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">The value for this setting</p>
+                </div>
+
+                {/* Category Field */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Category <span className="text-red-500">*</span>
+                  </label>
+                  <Input
+                    value={newSetting.category}
+                    onChange={(e) => setNewSetting({ ...newSetting, category: e.target.value })}
+                    placeholder="e.g., General"
+                    className="text-base h-11"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Group similar settings together</p>
+                </div>
+
+                {/* Data Type Field */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Data Type
+                  </label>
+                  <select
+                    value={newSetting.dataType}
+                    onChange={(e) => setNewSetting({ ...newSetting, dataType: e.target.value })}
+                    className="w-full px-4 py-2.5 text-base border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                  >
+                    <option value="string">String</option>
+                    <option value="number">Number</option>
+                    <option value="boolean">Boolean</option>
+                    <option value="json">JSON</option>
+                  </select>
+                  <p className="text-xs text-gray-500 mt-1">The type of data stored</p>
+                </div>
+              </div>
+
+              {/* Description Field */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Description
+                </label>
+                <textarea
+                  value={newSetting.description}
+                  onChange={(e) => setNewSetting({ ...newSetting, description: e.target.value })}
+                  rows={3}
+                  className="w-full px-4 py-3 text-base border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
+                  placeholder="Optional description (explain what this setting does)"
+                />
+                <p className="text-xs text-gray-500 mt-1">Help others understand the purpose of this setting</p>
+              </div>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Value <span className="text-red-500">*</span>
-              </label>
-              <Input
-                value={newSetting.value}
-                onChange={(e) => setNewSetting({ ...newSetting, value: e.target.value })}
-                placeholder="e.g., dark"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Category <span className="text-red-500">*</span>
-              </label>
-              <Input
-                value={newSetting.category}
-                onChange={(e) => setNewSetting({ ...newSetting, category: e.target.value })}
-                placeholder="e.g., General"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Data Type
-              </label>
-              <select
-                value={newSetting.dataType}
-                onChange={(e) => setNewSetting({ ...newSetting, dataType: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          </div>
+          
+          {/* Footer with Actions */}
+          <div className="px-6 py-4 bg-gray-50 border-t rounded-b-lg">
+            <div className="flex justify-end space-x-3">
+              <Button 
+                variant="outline" 
+                onClick={() => setCreateDialogOpen(false)}
+                className="px-6 py-2.5"
               >
-                <option value="string">String</option>
-                <option value="number">Number</option>
-                <option value="boolean">Boolean</option>
-                <option value="json">JSON</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Description
-              </label>
-              <textarea
-                value={newSetting.description}
-                onChange={(e) => setNewSetting({ ...newSetting, description: e.target.value })}
-                rows={2}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="Optional description"
-              />
-            </div>
-            <div className="flex justify-end space-x-2 pt-4">
-              <Button variant="outline" onClick={() => setCreateDialogOpen(false)}>
                 Cancel
               </Button>
               <Button
                 onClick={handleCreateSetting}
-                disabled={!newSetting.key || !newSetting.value || !newSetting.category}
+                disabled={!newSetting.key || !newSetting.value || !newSetting.category || loading}
+                className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white"
               >
-                Create
+                {loading ? 'Creating...' : 'Create Setting'}
               </Button>
             </div>
           </div>
