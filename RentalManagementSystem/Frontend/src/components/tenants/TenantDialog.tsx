@@ -123,16 +123,36 @@ export function TenantDialog({ open, onOpenChange, tenant, onSuccess }: TenantDi
         if (formData.roomId && response.data) {
           const tenantId = tenant?.id || (response.data as any).id;
           const currentRoomId = tenant?.room?.id;
+          
+          // Only assign room if contract dates are provided
           if (tenantId && (!currentRoomId || currentRoomId !== formData.roomId)) {
+            // Validate that contract dates are provided when assigning a room
+            if (!formData.contractStartDate || !formData.contractEndDate) {
+              setError('Contract start date and end date are required when assigning a room');
+              setIsSubmitting(false);
+              return;
+            }
+            
+            // Validate that monthlyRent is a valid positive number
+            const rentAmount = parseFloat(formData.monthlyRent);
+            if (isNaN(rentAmount) || rentAmount <= 0) {
+              setError('Monthly rent must be a valid positive number when assigning a room');
+              setIsSubmitting(false);
+              return;
+            }
+            
             try {
               await tenantService.assignRoom(String(tenantId), {
                 roomId: parseInt(formData.roomId),
                 contractStartDate: formData.contractStartDate,
                 contractEndDate: formData.contractEndDate,
-                monthlyRent: parseFloat(formData.monthlyRent),
+                monthlyRent: rentAmount,
               });
             } catch (err) {
               console.error('Failed to assign room:', err);
+              setError(err instanceof Error ? err.message : 'Failed to assign room');
+              setIsSubmitting(false);
+              return;
             }
           }
         }
