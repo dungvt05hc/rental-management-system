@@ -570,7 +570,7 @@ public class ReportingService : IReportingService
         try
         {
             var now = DateTime.UtcNow;
-            var currentMonth = new DateTime(now.Year, now.Month, 1);
+            var currentMonth = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc);
             var lastMonth = currentMonth.AddMonths(-1);
             var next30Days = now.AddDays(30);
 

@@ -73,6 +73,8 @@ export function DashboardPage() {
       setIsLoading(true);
       setError(null);
 
+      console.log('Loading dashboard data...');
+
       // Load dashboard summary which includes both occupancy and revenue data
       const [occupancyResponse, dashboardResponse, roomsResponse] = await Promise.all([
         reportService.getOccupancyReport(),
@@ -80,39 +82,79 @@ export function DashboardPage() {
         roomService.getRooms({ page: 1, pageSize: 5 }),
       ]);
 
-      if (occupancyResponse.success && dashboardResponse.success) {
-        const occupancy = occupancyResponse.data as OccupancyReport;
-        const dashboard = dashboardResponse.data as any; // Dashboard summary data
+      console.log('Occupancy Response:', occupancyResponse);
+      console.log('Dashboard Response:', dashboardResponse);
+      console.log('Rooms Response:', roomsResponse);
 
-        // Add null checks and fallback values
-        setStats({
-          totalRooms: occupancy?.totalRooms ?? 0,
-          occupiedRooms: occupancy?.occupiedRooms ?? 0,
-          availableRooms: occupancy?.availableRooms ?? 0,
-          totalRevenue: dashboard?.totalRevenue ?? 0,
-          paidAmount: dashboard?.paidAmount ?? 0,
-          pendingAmount: dashboard?.pendingAmount ?? 0,
-          overdueAmount: dashboard?.overdueAmount ?? 0,
-          occupancyRate: occupancy?.occupancyRate ?? 0,
-          collectionRate: dashboard?.collectionRate ?? 0,
-        });
-
-        // Set recent rooms
-        if (roomsResponse.success && roomsResponse.data) {
-          const paginatedData = roomsResponse.data as any;
-          setRecentRooms(paginatedData.items || []);
-        }
-
-        // Generate system alerts based on data - only if data exists
-        if (occupancy && dashboard) {
-          generateSystemAlerts(occupancy, dashboard);
-        }
-        setLastUpdated(new Date());
-      } else {
-        throw new Error('Failed to load dashboard data');
+      // Check if responses are successful
+      if (!occupancyResponse.success) {
+        console.error('Occupancy report failed:', occupancyResponse);
+        throw new Error(occupancyResponse.message || 'Failed to load occupancy data');
       }
+
+      if (!dashboardResponse.success) {
+        console.error('Dashboard summary failed:', dashboardResponse);
+        throw new Error(dashboardResponse.message || 'Failed to load dashboard data');
+      }
+
+      if (!roomsResponse.success) {
+        console.warn('Rooms failed to load:', roomsResponse);
+        // Don't throw error for rooms, just log it
+      }
+
+      const occupancy = occupancyResponse.data as OccupancyReport;
+      const dashboard = dashboardResponse.data as any;
+
+      console.log('Parsed occupancy:', occupancy);
+      console.log('Parsed dashboard:', dashboard);
+
+      // Extract financial data from dashboard.Financials (note the capital F)
+      const financials = dashboard?.Financials || dashboard?.financials || {};
+      const occupancyData = dashboard?.Occupancy || dashboard?.occupancy || {};
+      
+      console.log('Financials:', financials);
+      console.log('Occupancy Data:', occupancyData);
+
+      setStats({
+        totalRooms: occupancy?.totalRooms || occupancyData?.TotalRooms || occupancyData?.totalRooms || 0,
+        occupiedRooms: occupancy?.occupiedRooms || occupancyData?.OccupiedRooms || occupancyData?.occupiedRooms || 0,
+        availableRooms: occupancy?.availableRooms || occupancyData?.VacantRooms || occupancyData?.vacantRooms || 0,
+        totalRevenue: financials?.MonthlyRevenue || financials?.monthlyRevenue || 0,
+        paidAmount: financials?.MonthlyRevenue || financials?.monthlyRevenue || 0,
+        pendingAmount: financials?.PendingPayments || financials?.pendingPayments || 0,
+        overdueAmount: financials?.OverdueInvoices || financials?.overdueInvoices || 0,
+        occupancyRate: occupancy?.occupancyRate || occupancyData?.OccupancyRate || occupancyData?.occupancyRate || 0,
+        collectionRate: financials?.MonthlyRevenue && (financials?.MonthlyRevenue + (financials?.PendingPayments || 0)) > 0
+          ? Math.round((financials.MonthlyRevenue / (financials.MonthlyRevenue + (financials?.PendingPayments || 0))) * 100)
+          : 0,
+      });
+
+      // Set recent rooms
+      if (roomsResponse.success && roomsResponse.data) {
+        const paginatedData = roomsResponse.data as any;
+        setRecentRooms(paginatedData.items || []);
+      }
+
+      // Generate system alerts based on data
+      if (occupancy && dashboard) {
+        generateSystemAlerts(occupancy, {
+          totalRevenue: financials?.MonthlyRevenue || 0,
+          paidAmount: financials?.MonthlyRevenue || 0,
+          pendingAmount: financials?.PendingPayments || 0,
+          overdueAmount: financials?.OverdueInvoices || 0,
+          collectionRate: financials?.MonthlyRevenue && (financials?.MonthlyRevenue + (financials?.PendingPayments || 0)) > 0
+            ? Math.round((financials.MonthlyRevenue / (financials.MonthlyRevenue + (financials?.PendingPayments || 0))) * 100)
+            : 0,
+        } as RevenueReport);
+      }
+      
+      setLastUpdated(new Date());
+      console.log('Dashboard data loaded successfully');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
+      console.error('Dashboard error:', err);
+      const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred';
+      console.error('Error message:', errorMessage);
+      setError(errorMessage);
     } finally {
       setIsLoading(false);
     }

@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Save, Plus, Trash2, X } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle, Button, Input } from '../ui';
+import { Card, CardContent, CardHeader, CardTitle, Button, Input, AlertDialog } from '../ui';
 import { invoiceService, tenantService, roomService, itemService } from '../../services';
 import type { CreateInvoiceRequest, UpdateInvoiceRequest, Tenant, Room, InvoiceItem, Item, InvoiceStatus } from '../../types';
+import { useTranslation } from '../../hooks/useTranslation';
+import { useToast } from '../../contexts/ToastContext';
 
 const statusOptions = [
   { value: 1, label: 'Draft', color: 'gray' },
@@ -34,6 +36,8 @@ const defaultItem: InvoiceItem = {
 };
 
 export function InvoiceFormPage() {
+  const { t } = useTranslation();
+  const { showSuccess, showError } = useToast();
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const isEditMode = !!id;
@@ -55,6 +59,16 @@ export function InvoiceFormPage() {
     status: 'Pending',
     additionalChargesDescription: '',
     notes: '',
+  });
+
+  const [confirmDialog, setConfirmDialog] = useState<{
+    open: boolean;
+    itemIndex: number | null;
+    itemName: string;
+  }>({
+    open: false,
+    itemIndex: null,
+    itemName: '',
   });
 
   useEffect(() => {
@@ -219,15 +233,23 @@ export function InvoiceFormPage() {
     setInvoiceItems(newItems);
   };
 
-  const handleDeleteItem = (index: number) => {
-    if (confirm('Are you sure you want to delete this item?')) {
-      const newItems = invoiceItems.filter((_, i) => i !== index);
-      const renumberedItems = newItems.map((item, i) => ({
-        ...item,
-        lineNumber: i + 1,
-      }));
-      setInvoiceItems(renumberedItems);
-    }
+  const handleDeleteItem = (index: number, itemName: string) => {
+    setConfirmDialog({
+      open: true,
+      itemIndex: index,
+      itemName,
+    });
+  };
+
+  const confirmDeleteItem = () => {
+    if (confirmDialog.itemIndex === null) return;
+    const newItems = invoiceItems.filter((_, i) => i !== confirmDialog.itemIndex);
+    const renumberedItems = newItems.map((item, i) => ({
+      ...item,
+      lineNumber: i + 1,
+    }));
+    setInvoiceItems(renumberedItems);
+    setConfirmDialog({ open: false, itemIndex: null, itemName: '' });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -241,7 +263,6 @@ export function InvoiceFormPage() {
       );
 
       if (isEditMode && id) {
-        // For update, send all editable fields including invoiceItems
         const updateData: any = {
           additionalCharges: parseFloat(formData.additionalCharges),
           discount: parseFloat(formData.discount),
@@ -249,15 +270,16 @@ export function InvoiceFormPage() {
           dueDate: formData.dueDate,
           additionalChargesDescription: formData.additionalChargesDescription,
           notes: formData.notes,
-          invoiceItems: validItems, // Include invoice items in update
+          invoiceItems: validItems,
         };
 
         const response = await invoiceService.updateInvoice(id, updateData);
 
         if (response.success) {
+          showSuccess(t('common.success', 'Success'), t('invoices.updateSuccess', 'Invoice updated successfully'));
           navigate('/invoices');
         } else {
-          setError(response.message || 'Failed to update invoice');
+          showError(t('common.error', 'Error'), response.message || t('invoices.updateError', 'Failed to update invoice'));
         }
       } else {
         const createData: any = {
@@ -275,13 +297,17 @@ export function InvoiceFormPage() {
         const response = await invoiceService.createInvoice(createData as CreateInvoiceRequest);
 
         if (response.success) {
+          showSuccess(t('common.success', 'Success'), t('invoices.createSuccess', 'Invoice created successfully'));
           navigate('/invoices');
         } else {
-          setError(response.message || 'Failed to create invoice');
+          showError(t('common.error', 'Error'), response.message || t('invoices.createError', 'Failed to create invoice'));
         }
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
+      showError(
+        t('common.error', 'Error'),
+        err instanceof Error ? err.message : t('common.unknownError', 'An unknown error occurred')
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -589,7 +615,7 @@ export function InvoiceFormPage() {
                             type="button"
                             variant="outline"
                             size="sm"
-                            onClick={() => handleDeleteItem(index)}
+                            onClick={() => handleDeleteItem(index, item.itemName)}
                             disabled={isSubmitting}
                             className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
                             title="Delete"
@@ -760,6 +786,22 @@ export function InvoiceFormPage() {
           </div>
         </div>
       </form>
+
+      <AlertDialog
+        open={confirmDialog.open}
+        onOpenChange={(open) =>
+          setConfirmDialog({ open, itemIndex: null, itemName: '' })
+        }
+        title={t('invoices.deleteItemTitle', 'Delete Item')}
+        description={t(
+          'invoices.deleteItemMessage',
+          `Are you sure you want to remove "${confirmDialog.itemName}" from this invoice?`
+        )}
+        confirmText={t('common.delete', 'Delete')}
+        cancelText={t('common.cancel', 'Cancel')}
+        onConfirm={confirmDeleteItem}
+        variant="warning"
+      />
     </div>
   );
 }

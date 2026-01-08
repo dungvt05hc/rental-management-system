@@ -1,110 +1,147 @@
-import React from 'react';
-import { CheckCircle, XCircle, AlertTriangle, Info } from 'lucide-react';
-
-export type AlertType = 'success' | 'error' | 'warning' | 'info';
+import * as React from 'react';
+import { AlertCircle, CheckCircle, Info, XCircle, X } from 'lucide-react';
 
 interface AlertDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  type?: AlertType;
-  title?: string;
-  message: string;
+  title: string;
+  description: string;
   confirmText?: string;
-  onConfirm?: () => void;
+  cancelText?: string;
+  onConfirm: () => void | Promise<void>;
+  variant?: 'default' | 'destructive' | 'warning' | 'success' | 'info';
 }
-
-const typeConfig: Record<AlertType, { icon: React.ReactNode; bgColor: string; iconColor: string; buttonColor: string }> = {
-  success: {
-    icon: <CheckCircle className="h-12 w-12" />,
-    bgColor: 'bg-green-50',
-    iconColor: 'text-green-600',
-    buttonColor: 'bg-green-600 hover:bg-green-700 focus:ring-green-500',
-  },
-  error: {
-    icon: <XCircle className="h-12 w-12" />,
-    bgColor: 'bg-red-50',
-    iconColor: 'text-red-600',
-    buttonColor: 'bg-red-600 hover:bg-red-700 focus:ring-red-500',
-  },
-  warning: {
-    icon: <AlertTriangle className="h-12 w-12" />,
-    bgColor: 'bg-yellow-50',
-    iconColor: 'text-yellow-600',
-    buttonColor: 'bg-yellow-600 hover:bg-yellow-700 focus:ring-yellow-500',
-  },
-  info: {
-    icon: <Info className="h-12 w-12" />,
-    bgColor: 'bg-blue-50',
-    iconColor: 'text-blue-600',
-    buttonColor: 'bg-blue-600 hover:bg-blue-700 focus:ring-blue-500',
-  },
-};
 
 export function AlertDialog({
   open,
   onOpenChange,
-  type = 'info',
   title,
-  message,
+  description,
   confirmText = 'OK',
+  cancelText = 'Cancel',
   onConfirm,
+  variant = 'default',
 }: AlertDialogProps) {
+  const [isLoading, setIsLoading] = React.useState(false);
+
   if (!open) return null;
 
-  const config = typeConfig[type];
-
-  const handleConfirm = () => {
-    onConfirm?.();
-    onOpenChange(false);
+  const handleConfirm = async () => {
+    setIsLoading(true);
+    try {
+      await onConfirm();
+      onOpenChange(false);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleBackdropClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (e.target === e.currentTarget) {
-      onOpenChange(false);
+  const getIcon = () => {
+    switch (variant) {
+      case 'destructive':
+        return <XCircle className="h-6 w-6 text-red-600" />;
+      case 'warning':
+        return <AlertCircle className="h-6 w-6 text-yellow-600" />;
+      case 'success':
+        return <CheckCircle className="h-6 w-6 text-green-600" />;
+      case 'info':
+        return <Info className="h-6 w-6 text-blue-600" />;
+      default:
+        return <AlertCircle className="h-6 w-6 text-gray-600" />;
+    }
+  };
+
+  const getButtonColor = () => {
+    switch (variant) {
+      case 'destructive':
+        return 'bg-red-600 hover:bg-red-700 focus:ring-red-500';
+      case 'warning':
+        return 'bg-yellow-600 hover:bg-yellow-700 focus:ring-yellow-500';
+      case 'success':
+        return 'bg-green-600 hover:bg-green-700 focus:ring-green-500';
+      case 'info':
+        return 'bg-blue-600 hover:bg-blue-700 focus:ring-blue-500';
+      default:
+        return 'bg-gray-600 hover:bg-gray-700 focus:ring-gray-500';
     }
   };
 
   return (
-    <div
-      className="fixed inset-0 z-[9999] flex items-center justify-center"
-      onClick={handleBackdropClick}
-    >
+    <>
       {/* Backdrop */}
-      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200" />
-      
+      <div
+        className="fixed inset-0 bg-black bg-opacity-50 transition-opacity z-40"
+        onClick={() => onOpenChange(false)}
+      />
+
       {/* Dialog */}
-      <div className="relative z-[10000] w-full max-w-md mx-4 animate-in zoom-in-95 duration-200">
-        <div className="bg-white rounded-2xl shadow-2xl overflow-hidden">
-          {/* Icon Section */}
-          <div className={`${config.bgColor} px-6 py-8 flex justify-center`}>
-            <div className={config.iconColor}>
-              {config.icon}
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-lg shadow-xl max-w-md w-full animate-in fade-in-0 zoom-in-95 duration-200">
+          {/* Header with Icon */}
+          <div className="flex items-start p-6 pb-4">
+            <div className="flex-shrink-0">{getIcon()}</div>
+            <div className="ml-4 flex-1">
+              <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
+              <button
+                onClick={() => onOpenChange(false)}
+                className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
+                disabled={isLoading}
+              >
+                <X className="h-5 w-5" />
+              </button>
             </div>
           </div>
 
-          {/* Content Section */}
-          <div className="px-6 py-6 text-center">
-            {title && (
-              <h3 className="text-xl font-bold text-gray-900 mb-3">
-                {title}
-              </h3>
-            )}
-            <p className="text-base text-gray-600 leading-relaxed">
-              {message}
-            </p>
+          {/* Content */}
+          <div className="px-6 pb-4">
+            <p className="text-sm text-gray-600 leading-relaxed">{description}</p>
           </div>
 
-          {/* Action Section */}
-          <div className="px-6 pb-6 flex justify-center">
+          {/* Footer with Actions */}
+          <div className="flex items-center justify-end gap-3 px-6 py-4 bg-gray-50 rounded-b-lg">
+            <button
+              onClick={() => onOpenChange(false)}
+              disabled={isLoading}
+              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {cancelText}
+            </button>
             <button
               onClick={handleConfirm}
-              className={`${config.buttonColor} text-white px-8 py-2.5 rounded-lg font-medium transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 min-w-[120px]`}
+              disabled={isLoading}
+              className={`px-4 py-2 text-sm font-medium text-white rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${getButtonColor()}`}
             >
-              {confirmText}
+              {isLoading ? (
+                <span className="flex items-center">
+                  <svg
+                    className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    />
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    />
+                  </svg>
+                  Loading...
+                </span>
+              ) : (
+                confirmText
+              )}
             </button>
           </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }

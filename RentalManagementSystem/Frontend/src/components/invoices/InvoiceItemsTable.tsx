@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Plus, Trash2, Edit2, Save, X } from 'lucide-react';
-import { Button, Input } from '../ui';
+import { Button, Input, AlertDialog } from '../ui';
 import type { InvoiceItem } from '../../types';
 
 interface InvoiceItemsTableProps {
@@ -30,6 +30,15 @@ const defaultItem: InvoiceItem = {
 export function InvoiceItemsTable({ items, onChange, disabled = false }: InvoiceItemsTableProps) {
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editingItem, setEditingItem] = useState<InvoiceItem | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    open: boolean;
+    itemIndex: number | null;
+    itemName: string;
+  }>({
+    open: false,
+    itemIndex: null,
+    itemName: '',
+  });
 
   const calculateItemTotals = (item: InvoiceItem): InvoiceItem => {
     const subtotal = item.quantity * item.unitPrice;
@@ -89,16 +98,24 @@ export function InvoiceItemsTable({ items, onChange, disabled = false }: Invoice
     setEditingItem(null);
   };
 
-  const handleDeleteRow = (index: number) => {
-    if (confirm('Are you sure you want to delete this item?')) {
-      const newItems = items.filter((_, i) => i !== index);
-      // Renumber lines
-      const renumberedItems = newItems.map((item, i) => ({
-        ...item,
-        lineNumber: i + 1,
-      }));
-      onChange(renumberedItems);
-    }
+  const handleDeleteRow = (index: number, itemName: string) => {
+    setConfirmDialog({
+      open: true,
+      itemIndex: index,
+      itemName,
+    });
+  };
+
+  const confirmDeleteItem = () => {
+    if (confirmDialog.itemIndex === null) return;
+    const newItems = items.filter((_, i) => i !== confirmDialog.itemIndex);
+    // Renumber lines
+    const renumberedItems = newItems.map((item, i) => ({
+      ...item,
+      lineNumber: i + 1,
+    }));
+    onChange(renumberedItems);
+    setConfirmDialog({ open: false, itemIndex: null, itemName: '' });
   };
 
   const handleFieldChange = (field: keyof InvoiceItem, value: any) => {
@@ -304,7 +321,7 @@ export function InvoiceItemsTable({ items, onChange, disabled = false }: Invoice
                               type="button"
                               variant="outline"
                               size="sm"
-                              onClick={() => handleDeleteRow(index)}
+                              onClick={() => handleDeleteRow(index, item.itemName)}
                               disabled={disabled || editingIndex !== null}
                               className="h-7 w-7 p-0 text-red-600 hover:text-red-700"
                               title="Delete"
@@ -361,6 +378,20 @@ export function InvoiceItemsTable({ items, onChange, disabled = false }: Invoice
           <p>• Line Total = (Quantity × Unit Price) - Discount + Tax</p>
         </div>
       )}
+
+      {/* Confirmation Dialog */}
+      <AlertDialog
+        open={confirmDialog.open}
+        onOpenChange={(open) =>
+          setConfirmDialog({ open, itemIndex: null, itemName: '' })
+        }
+        title="Delete Item"
+        description={`Are you sure you want to remove "${confirmDialog.itemName}" from this invoice?`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        onConfirm={confirmDeleteItem}
+        variant="warning"
+      />
     </div>
   );
 }

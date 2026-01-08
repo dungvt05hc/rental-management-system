@@ -3,12 +3,17 @@ import { Plus, Edit, Trash2, Star, Check, X, RefreshCw } from 'lucide-react';
 import { localizationService } from '../../services/localizationService';
 import type { CreateLanguageDto, UpdateLanguageDto } from '../../services/localizationService';
 import type { Language } from '../../types/localization';
+import { AlertDialog } from '../ui';
+import { useTranslation } from '../../hooks/useTranslation';
+import { useToast } from '../../contexts/ToastContext';
 
 /**
  * Language Management Component
  * Provides full CRUD operations for managing languages
  */
 export const LanguageManagement: React.FC = () => {
+  const { t } = useTranslation();
+  const { showSuccess, showError } = useToast();
   const [languages, setLanguages] = useState<Language[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -19,6 +24,15 @@ export const LanguageManagement: React.FC = () => {
     name: '',
     nativeName: '',
     isDefault: false,
+  });
+  const [confirmDialog, setConfirmDialog] = useState<{
+    open: boolean;
+    languageCode: string;
+    languageName: string;
+  }>({
+    open: false,
+    languageCode: '',
+    languageName: '',
   });
 
   /**
@@ -50,8 +64,9 @@ export const LanguageManagement: React.FC = () => {
       await localizationService.createLanguage(formData as CreateLanguageDto);
       await loadLanguages();
       handleCloseModal();
+      showSuccess(t('common.success', 'Success'), t('languages.createSuccess', 'Language created successfully'));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create language');
+      showError(t('common.error', 'Error'), t('languages.createError', 'Failed to create language'));
     }
   };
 
@@ -69,24 +84,32 @@ export const LanguageManagement: React.FC = () => {
       );
       await loadLanguages();
       handleCloseModal();
+      showSuccess(t('common.success', 'Success'), t('languages.updateSuccess', 'Language updated successfully'));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update language');
+      showError(t('common.error', 'Error'), t('languages.updateError', 'Failed to update language'));
     }
   };
 
   /**
    * Handle delete language
    */
-  const handleDelete = async (code: string) => {
-    if (!confirm(`Are you sure you want to delete the language with code "${code}"?`)) {
-      return;
-    }
+  const handleDeleteLanguage = (code: string, name: string) => {
+    setConfirmDialog({
+      open: true,
+      languageCode: code,
+      languageName: name,
+    });
+  };
+
+  const confirmDeleteLanguage = async () => {
+    if (!confirmDialog.languageCode) return;
 
     try {
-      await localizationService.deleteLanguage(code);
-      await loadLanguages();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete language');
+      await localizationService.deleteLanguage(confirmDialog.languageCode);
+      showSuccess(t('common.success', 'Success'), t('languages.deleteSuccess', 'Language deleted successfully'));
+      loadLanguages();
+    } catch (error) {
+      showError(t('common.error', 'Error'), t('languages.deleteError', 'Failed to delete language'));
     }
   };
 
@@ -97,8 +120,9 @@ export const LanguageManagement: React.FC = () => {
     try {
       await localizationService.setDefaultLanguage(code);
       await loadLanguages();
+      showSuccess(t('common.success', 'Success'), t('languages.setDefaultSuccess', 'Default language set successfully'));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to set default language');
+      showError(t('common.error', 'Error'), t('languages.setDefaultError', 'Failed to set default language'));
     }
   };
 
@@ -267,7 +291,7 @@ export const LanguageManagement: React.FC = () => {
                       <Edit className="h-4 w-4" />
                     </button>
                     <button
-                      onClick={() => handleDelete(language.code)}
+                      onClick={() => handleDeleteLanguage(language.code, language.name)}
                       className="text-red-600 hover:text-red-900 transition disabled:opacity-50 disabled:cursor-not-allowed"
                       title="Delete"
                       disabled={language.isDefault}
@@ -397,6 +421,23 @@ export const LanguageManagement: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Confirmation Dialog */}
+      <AlertDialog
+        open={confirmDialog.open}
+        onOpenChange={(open) =>
+          setConfirmDialog({ open, languageCode: '', languageName: '' })
+        }
+        title={t('languages.deleteTitle', 'Delete Language')}
+        description={t(
+          'languages.deleteMessage',
+          `Are you sure you want to delete the language "${confirmDialog.languageName}" (${confirmDialog.languageCode})? This will also delete all associated translations.`
+        )}
+        confirmText={t('common.delete', 'Delete')}
+        cancelText={t('common.cancel', 'Cancel')}
+        onConfirm={confirmDeleteLanguage}
+        variant="destructive"
+      />
     </div>
   );
 };

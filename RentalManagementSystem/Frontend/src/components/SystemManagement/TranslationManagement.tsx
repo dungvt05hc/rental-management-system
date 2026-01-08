@@ -3,12 +3,17 @@ import { Plus, Edit, Trash2, Search, Download, Upload, RefreshCw, X, Check, Filt
 import { localizationService } from '../../services/localizationService';
 import type { UpsertTranslationDto } from '../../services/localizationService';
 import type { Language, Translation } from '../../types/localization';
+import { AlertDialog } from '../ui';
+import { useToast } from '../../contexts/ToastContext';
+import { useTranslation } from '../../hooks/useTranslation';
 
 /**
  * Translation Management Component
  * Provides full CRUD operations for managing translations across languages
  */
 export const TranslationManagement: React.FC = () => {
+  const { t } = useTranslation();
+  const { showSuccess, showError } = useToast();
   const [languages, setLanguages] = useState<Language[]>([]);
   const [selectedLanguage, setSelectedLanguage] = useState<string>('');
   const [translations, setTranslations] = useState<Translation[]>([]);
@@ -23,6 +28,13 @@ export const TranslationManagement: React.FC = () => {
     value: '',
     category: 'common',
     description: '',
+  });
+  const [confirmDialog, setConfirmDialog] = useState<{
+    open: boolean;
+    translationKey: string;
+  }>({
+    open: false,
+    translationKey: '',
   });
 
   /**
@@ -119,26 +131,33 @@ export const TranslationManagement: React.FC = () => {
       await localizationService.upsertTranslation(selectedLanguage, formData);
       await loadTranslations(selectedLanguage);
       handleCloseModal();
+      showSuccess(t('common.success', 'Success'), t('translations.saveSuccess', 'Translation saved successfully'));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save translation');
+      showError(t('common.error', 'Error'), t('translations.saveError', 'Failed to save translation'));
     }
   };
 
   /**
    * Handle delete translation
    */
-  const handleDelete = async (key: string) => {
-    if (!confirm(`Are you sure you want to delete the translation "${key}"?`)) {
-      return;
-    }
+  const handleDeleteTranslation = (key: string) => {
+    setConfirmDialog({
+      open: true,
+      translationKey: key,
+    });
+  };
 
-    if (!selectedLanguage) return;
+  const confirmDeleteTranslation = async () => {
+    if (!confirmDialog.translationKey) return;
 
     try {
-      await localizationService.deleteTranslation(selectedLanguage, key);
+      await localizationService.deleteTranslation(selectedLanguage, confirmDialog.translationKey);
       await loadTranslations(selectedLanguage);
+      showSuccess(t('common.success', 'Success'), t('translations.deleteSuccess', 'Translation deleted successfully'));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete translation');
+      showError(t('common.error', 'Error'), t('translations.deleteError', 'Failed to delete translation'));
+    } finally {
+      setConfirmDialog({ open: false, translationKey: '' });
     }
   };
 
@@ -251,9 +270,9 @@ export const TranslationManagement: React.FC = () => {
 
         await localizationService.bulkUpsertTranslations(bulkData);
         await loadTranslations(selectedLanguage);
-        setError(null);
+        showSuccess(t('common.success', 'Success'), t('translations.importSuccess', 'Translations imported successfully'));
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to import translations');
+        showError(t('common.error', 'Error'), t('translations.importError', 'Failed to import translations'));
       }
     };
     reader.readAsText(file);
@@ -435,7 +454,7 @@ export const TranslationManagement: React.FC = () => {
                               <Edit className="h-4 w-4" />
                             </button>
                             <button
-                              onClick={() => handleDelete(translation.key)}
+                              onClick={() => handleDeleteTranslation(translation.key)}
                               className="text-red-600 hover:text-red-900 transition"
                               title="Delete"
                             >
@@ -567,6 +586,23 @@ export const TranslationManagement: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Confirmation Dialog */}
+      <AlertDialog
+        open={confirmDialog.open}
+        onOpenChange={(open) =>
+          setConfirmDialog({ open, translationKey: '' })
+        }
+        title={t('translations.deleteTitle', 'Delete Translation')}
+        description={t(
+          'translations.deleteMessage',
+          `Are you sure you want to delete the translation "${confirmDialog.translationKey}"?`
+        )}
+        confirmText={t('common.delete', 'Delete')}
+        cancelText={t('common.cancel', 'Cancel')}
+        onConfirm={confirmDeleteTranslation}
+        variant="destructive"
+      />
     </div>
   );
 };

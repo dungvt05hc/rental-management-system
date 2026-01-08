@@ -658,3 +658,64 @@ Client    API    Orchestrator    Provider    Webhook    Database
 ---
 
 **Next Steps**: Database schema and persistence layer implementation.
+
+---
+
+## 5. MoMo Payment Provider Implementation
+
+```csharp
+using System;
+using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
+
+namespace RentalManagement.Api.PaymentCore.Providers
+{
+    public class MomoPaymentProvider : IPaymentProvider
+    {
+        public string ProviderName => "MoMo";
+
+        public IReadOnlyCollection<PaymentMethodType> SupportedMethods => new[]
+        {
+            PaymentMethodType.MobileWallet
+        };
+
+        public async Task<PaymentProviderResult> CreatePaymentAsync(CreatePaymentRequest request, CancellationToken cancellationToken = default)
+        {
+            // Simulate API call to MoMo
+            await Task.Delay(100, cancellationToken);
+
+            return new PaymentProviderResult(
+                Success: true,
+                ExternalTransactionId: Guid.NewGuid().ToString(),
+                RedirectUrl: "https://momo.vn/redirect",
+                QrCodeData: null,
+                Status: PaymentProviderStatus.Pending
+            );
+        }
+
+        public async Task<PaymentStatusResult> GetPaymentStatusAsync(string externalTransactionId, CancellationToken cancellationToken = default)
+        {
+            // Simulate querying MoMo for payment status
+            await Task.Delay(100, cancellationToken);
+
+            return new PaymentStatusResult(
+                ExternalTransactionId: externalTransactionId,
+                Status: PaymentProviderStatus.Succeeded,
+                Amount: new Money(100, "VND"),
+                CompletedAt: DateTime.UtcNow
+            );
+        }
+
+        public async Task<CancelPaymentResult> CancelPaymentAsync(string externalTransactionId, CancellationToken cancellationToken = default)
+        {
+            // Simulate canceling a payment with MoMo
+            await Task.Delay(100, cancellationToken);
+
+            return new CancelPaymentResult(
+                Success: true
+            );
+        }
+    }
+}
+```
