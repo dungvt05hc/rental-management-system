@@ -12,6 +12,7 @@ import { InvoicesPage } from './components/invoices/InvoicesPage';
 import { InvoiceFormPage } from './components/invoices/InvoiceFormPage';
 import { InvoiceDetailPage } from './components/invoices/InvoiceDetailPage';
 import { PaymentsPage } from './components/payments/PaymentsPage';
+import { PaymentFormPage } from './components/payments/PaymentFormPage';
 import { ReportsPage } from './components/dashboard/ReportsPage';
 import { ItemsPage } from './components/items/ItemsPage';
 import SystemManagement from './components/SystemManagement/SystemManagement';
@@ -19,6 +20,7 @@ import { LanguageManagement } from './components/admin/LanguageManagement';
 import type { ReactNode } from 'react';
 import './index.css'
 import { LocalizationProvider } from './contexts/LocalizationContext'
+import { ToastProvider } from './contexts/ToastContext';
 
 // Create a client
 const queryClient = new QueryClient({
@@ -130,6 +132,22 @@ function AppRoutes() {
         }
       />
       <Route
+        path="/payments/new"
+        element={
+          <ProtectedRoute>
+            <PaymentFormPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/payments/:id/edit"
+        element={
+          <ProtectedRoute>
+            <PaymentFormPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/reports"
         element={
           <ProtectedRoute>
@@ -164,12 +182,14 @@ function App() {
       <QueryClientProvider client={queryClient}>
         <Router>
           <AuthProvider>
-            <NotificationProvider>
-              <div className="App">
-                <AppRoutes />
-                <NotificationContainer />
-              </div>
-            </NotificationProvider>
+            <ToastProvider>
+              <NotificationProvider>
+                <div className="App">
+                  <AppRoutes />
+                  <NotificationContainer />
+                </div>
+              </NotificationProvider>
+            </ToastProvider>
           </AuthProvider>
         </Router>
       </QueryClientProvider>

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Save, RefreshCw, Plus, Trash2, Download, Upload } from 'lucide-react';
-import { Button, Input, Card, CardContent, CardHeader, CardTitle } from '../ui';
+import { Button, Input, Card, CardContent, CardHeader, CardTitle, AlertDialog } from '../ui';
 import {
   systemManagementApi,
   type SystemSettingsByCategory,
@@ -8,8 +8,12 @@ import {
   type CreateSystemSettingDto,
 } from '../../services/systemManagementApi';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/Dialog';
+import { useTranslation } from '../../hooks/useTranslation';
+import { useToast } from '../../contexts/ToastContext';
 
 const SystemSettingsTab: React.FC = () => {
+  const { t } = useTranslation();
+  const { showSuccess, showError, showInfo } = useToast();
   const [settingsByCategory, setSettingsByCategory] = useState<SystemSettingsByCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -24,6 +28,15 @@ const SystemSettingsTab: React.FC = () => {
     dataType: 'string',
     description: '',
   });
+  const [confirmDialog, setConfirmDialog] = useState<{
+    open: boolean;
+    action: 'delete' | 'seed' | null;
+    settingKey: string;
+  }>({
+    open: false,
+    action: null,
+    settingKey: '',
+  });
 
   useEffect(() => {
     loadSettings();
@@ -36,7 +49,6 @@ const SystemSettingsTab: React.FC = () => {
       const data = await systemManagementApi.getSettingsByCategory();
       setSettingsByCategory(data);
       setEditedSettings({});
-      // Expand all categories by default
       setExpandedCategories(new Set(data.map(c => c.category)));
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to load settings');
@@ -58,17 +70,18 @@ const SystemSettingsTab: React.FC = () => {
       }));
 
       if (settingsToUpdate.length === 0) {
-        setSuccessMessage('No changes to save');
-        setTimeout(() => setSuccessMessage(null), 3000);
+        showInfo(t('common.info', 'Info'), t('system.noChanges', 'No changes to save'));
         return;
       }
 
       await systemManagementApi.bulkUpdateSettings({ settings: settingsToUpdate });
-      setSuccessMessage(`Successfully updated ${settingsToUpdate.length} settings`);
-      setTimeout(() => setSuccessMessage(null), 3000);
+      showSuccess(
+        t('common.success', 'Success'),
+        t('system.settingsUpdated', `Successfully updated ${settingsToUpdate.length} settings`)
+      );
       await loadSettings();
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to save settings');
+      showError(t('common.error', 'Error'), t('system.saveError', 'Failed to save settings'));
     } finally {
       setLoading(false);
     }
@@ -78,8 +91,7 @@ const SystemSettingsTab: React.FC = () => {
     try {
       setLoading(true);
       await systemManagementApi.createSetting(newSetting);
-      setSuccessMessage('Setting created successfully');
-      setTimeout(() => setSuccessMessage(null), 3000);
+      showSuccess(t('common.success', 'Success'), t('system.settingCreated', 'Setting created successfully'));
       setCreateDialogOpen(false);
       setNewSetting({
         key: '',
@@ -90,46 +102,47 @@ const SystemSettingsTab: React.FC = () => {
       });
       await loadSettings();
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to create setting');
+      showError(t('common.error', 'Error'), t('system.createError', 'Failed to create setting'));
     } finally {
       setLoading(false);
     }
   };
 
-  const handleDeleteSetting = async (key: string) => {
-    if (!window.confirm(`Are you sure you want to delete setting "${key}"?`)) {
-      return;
-    }
-
-    try {
-      setLoading(true);
-      await systemManagementApi.deleteSetting(key);
-      setSuccessMessage('Setting deleted successfully');
-      setTimeout(() => setSuccessMessage(null), 3000);
-      await loadSettings();
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to delete setting');
-    } finally {
-      setLoading(false);
-    }
+  const handleDeleteSetting = (key: string) => {
+    setConfirmDialog({
+      open: true,
+      action: 'delete',
+      settingKey: key,
+    });
   };
 
-  const handleSeedSettings = async () => {
-    if (!window.confirm('This will seed default system settings. Continue?')) {
-      return;
-    }
+  const handleSeedSettings = () => {
+    setConfirmDialog({
+      open: true,
+      action: 'seed',
+      settingKey: '',
+    });
+  };
 
-    try {
-      setLoading(true);
-      await systemManagementApi.seedDefaultSettings();
-      setSuccessMessage('Default settings seeded successfully');
-      setTimeout(() => setSuccessMessage(null), 3000);
-      await loadSettings();
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to seed settings');
-    } finally {
-      setLoading(false);
+  const confirmAction = async () => {
+    if (confirmDialog.action === 'delete' && confirmDialog.settingKey) {
+      try {
+        await systemManagementApi.deleteSetting(confirmDialog.settingKey);
+        showSuccess(t('common.success', 'Success'), t('system.settingDeleted', 'Setting deleted successfully'));
+        await loadSettings();
+      } catch (err: any) {
+        showError(t('common.error', 'Error'), t('system.deleteError', 'Failed to delete setting'));
+      }
+    } else if (confirmDialog.action === 'seed') {
+      try {
+        await systemManagementApi.seedDefaultSettings();
+        showSuccess(t('common.success', 'Success'), t('system.settingsSeeded', 'Default settings seeded successfully'));
+        await loadSettings();
+      } catch (err: any) {
+        showError(t('common.error', 'Error'), t('system.seedError', 'Failed to seed settings'));
+      }
     }
+    setConfirmDialog({ open: false, action: null, settingKey: '' });
   };
 
   const handleExportSettings = async () => {
@@ -143,10 +156,9 @@ const SystemSettingsTab: React.FC = () => {
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
-      setSuccessMessage('Settings exported successfully');
-      setTimeout(() => setSuccessMessage(null), 3000);
+      showSuccess(t('common.success', 'Success'), t('system.settingsExported', 'Settings exported successfully'));
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to export settings');
+      showError(t('common.error', 'Error'), t('system.exportError', 'Failed to export settings'));
     }
   };
 
@@ -212,23 +224,6 @@ const SystemSettingsTab: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Success Message */}
-      {successMessage && (
-        <div className="bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-md">
-          {successMessage}
-        </div>
-      )}
-
-      {/* Error Message */}
-      {error && (
-        <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-md flex justify-between items-center">
-          <span>{error}</span>
-          <button onClick={() => setError(null)} className="text-red-600 hover:text-red-800">
-            ×
-          </button>
-        </div>
-      )}
-
       {/* Action Buttons */}
       <Card>
         <CardContent className="p-4">
@@ -429,6 +424,34 @@ const SystemSettingsTab: React.FC = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Confirmation Dialog */}
+      <AlertDialog
+        open={confirmDialog.open}
+        onOpenChange={(open) =>
+          setConfirmDialog({ open, action: null, settingKey: '' })
+        }
+        title={
+          confirmDialog.action === 'delete'
+            ? t('system.deleteSettingTitle', 'Delete Setting')
+            : t('system.seedSettingsTitle', 'Seed Default Settings')
+        }
+        description={
+          confirmDialog.action === 'delete'
+            ? t(
+                'system.deleteSettingMessage',
+                `Are you sure you want to delete setting "${confirmDialog.settingKey}"?`
+              )
+            : t(
+                'system.seedSettingsMessage',
+                'This will create default system settings. Existing settings will not be overwritten. Continue?'
+              )
+        }
+        confirmText={confirmDialog.action === 'delete' ? t('common.delete', 'Delete') : t('common.continue', 'Continue')}
+        cancelText={t('common.cancel', 'Cancel')}
+        onConfirm={confirmAction}
+        variant={confirmDialog.action === 'delete' ? 'destructive' : 'info'}
+      />
     </div>
   );
 };

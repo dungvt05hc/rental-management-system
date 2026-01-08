@@ -1,17 +1,22 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Edit, Trash2, Filter, X } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, X } from 'lucide-react';
 import { itemService } from '../../services';
 import type { Item, ItemSearchRequest } from '../../types';
+import { AlertDialog } from '../ui';
+import { ItemDialog } from './ItemDialog';
+import { useToast } from '../../contexts/ToastContext';
+import { useTranslation } from '../../hooks/useTranslation';
 
 export const ItemsPage: React.FC = () => {
+  const { t } = useTranslation();
+  const { showSuccess, showError } = useToast();
+
   const [items, setItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [categories, setCategories] = useState<string[]>([]);
   const [showActiveOnly, setShowActiveOnly] = useState(true);
-  const [showDialog, setShowDialog] = useState(false);
-  const [editingItem, setEditingItem] = useState<Item | null>(null);
   const [pagination, setPagination] = useState({
     page: 1,
     pageSize: 10,
@@ -19,16 +24,17 @@ export const ItemsPage: React.FC = () => {
     totalPages: 0
   });
 
-  const [formData, setFormData] = useState({
-    itemCode: '',
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [selectedItem, setSelectedItem] = useState<Item | null>(null);
+
+  const [confirmDialog, setConfirmDialog] = useState<{
+    open: boolean;
+    itemId: string | null;
+    itemName: string;
+  }>({
+    open: false,
+    itemId: null,
     itemName: '',
-    description: '',
-    unitOfMeasure: 'pcs',
-    unitPrice: 0,
-    taxPercent: 0,
-    category: '',
-    isActive: true,
-    notes: ''
   });
 
   useEffect(() => {
@@ -52,11 +58,12 @@ export const ItemsPage: React.FC = () => {
       const response = await itemService.getItems(params);
       
       if (response.success && response.data) {
-        setItems(response.data.items || response.data.data || []);
+        const paginatedData = response.data as any;
+        setItems(paginatedData.items || paginatedData.data || []);
         setPagination(prev => ({
           ...prev,
-          totalItems: response.data.totalItems || response.data.totalCount || 0,
-          totalPages: response.data.totalPages || Math.ceil((response.data.totalCount || 0) / prev.pageSize)
+          totalItems: paginatedData.totalItems || paginatedData.totalCount || 0,
+          totalPages: paginatedData.totalPages || Math.ceil((paginatedData.totalCount || 0) / prev.pageSize)
         }));
       }
     } catch (error) {
@@ -77,63 +84,42 @@ export const ItemsPage: React.FC = () => {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      if (editingItem) {
-        await itemService.updateItem(editingItem.id, formData);
-      } else {
-        await itemService.createItem(formData);
-      }
-      setShowDialog(false);
-      resetForm();
-      loadItems();
-      loadCategories();
-    } catch (error) {
-      console.error('Error saving item:', error);
-    }
+  const handleDialogSuccess = () => {
+    setDialogOpen(false);
+    loadItems();
+    loadCategories();
   };
 
   const handleEdit = (item: Item) => {
-    setEditingItem(item);
-    setFormData({
-      itemCode: item.itemCode,
-      itemName: item.itemName,
-      description: item.description || '',
-      unitOfMeasure: item.unitOfMeasure,
-      unitPrice: item.unitPrice,
-      taxPercent: item.taxPercent,
-      category: item.category || '',
-      isActive: item.isActive,
-      notes: item.notes || ''
-    });
-    setShowDialog(true);
+    setSelectedItem(item);
+    setDialogOpen(true);
   };
 
-  const handleDelete = async (id: string) => {
-    if (window.confirm('Are you sure you want to delete this item?')) {
-      try {
-        await itemService.deleteItem(id);
-        loadItems();
-      } catch (error) {
-        console.error('Error deleting item:', error);
+  const handleDeleteItem = (itemId: string, itemName: string) => {
+    setConfirmDialog({
+      open: true,
+      itemId,
+      itemName,
+    });
+  };
+
+  const confirmDeleteItem = async () => {
+    if (!confirmDialog.itemId) return;
+
+    try {
+      const response = await itemService.deleteItem(confirmDialog.itemId);
+      if (response.success) {
+        showSuccess(t('common.success', 'Success'), t('items.deleteSuccess', 'Item deleted successfully'));
+        await loadItems();
+      } else {
+        showError(t('common.error', 'Error'), response.message || t('items.deleteError', 'Failed to delete item'));
       }
+    } catch (err) {
+      showError(
+        t('common.error', 'Error'),
+        err instanceof Error ? err.message : t('common.unknownError', 'An unknown error occurred')
+      );
     }
-  };
-
-  const resetForm = () => {
-    setEditingItem(null);
-    setFormData({
-      itemCode: '',
-      itemName: '',
-      description: '',
-      unitOfMeasure: 'pcs',
-      unitPrice: 0,
-      taxPercent: 0,
-      category: '',
-      isActive: true,
-      notes: ''
-    });
   };
 
   return (
@@ -142,8 +128,8 @@ export const ItemsPage: React.FC = () => {
         <h1 className="text-3xl font-bold text-gray-800">Item Management</h1>
         <button
           onClick={() => {
-            resetForm();
-            setShowDialog(true);
+            setSelectedItem(null);
+            setDialogOpen(true);
           }}
           className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2"
         >
@@ -290,7 +276,7 @@ export const ItemsPage: React.FC = () => {
                           <Edit size={18} />
                         </button>
                         <button
-                          onClick={() => handleDelete(item.id)}
+                          onClick={() => handleDeleteItem(item.id, item.itemName)}
                           className="text-red-600 hover:text-red-900"
                         >
                           <Trash2 size={18} />
@@ -330,163 +316,30 @@ export const ItemsPage: React.FC = () => {
         )}
       </div>
 
-      {/* Dialog */}
-      {showDialog && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6">
-              <h2 className="text-2xl font-bold mb-4">
-                {editingItem ? 'Edit Item' : 'Add New Item'}
-              </h2>
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Item Code *
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={formData.itemCode}
-                      onChange={(e) => setFormData({ ...formData, itemCode: e.target.value })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Item Name *
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={formData.itemName}
-                      onChange={(e) => setFormData({ ...formData, itemName: e.target.value })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                </div>
+      {/* Item Dialog */}
+      <ItemDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        item={selectedItem}
+        onSuccess={handleDialogSuccess}
+      />
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Description
-                  </label>
-                  <textarea
-                    value={formData.description}
-                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    rows={2}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Unit Price *
-                    </label>
-                    <input
-                      type="number"
-                      required
-                      min="0"
-                      step="0.01"
-                      value={formData.unitPrice}
-                      onChange={(e) => setFormData({ ...formData, unitPrice: parseFloat(e.target.value) })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Unit of Measure *
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={formData.unitOfMeasure}
-                      onChange={(e) => setFormData({ ...formData, unitOfMeasure: e.target.value })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Tax % 
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      max="100"
-                      step="0.01"
-                      value={formData.taxPercent}
-                      onChange={(e) => setFormData({ ...formData, taxPercent: parseFloat(e.target.value) })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Category
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.category}
-                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                    list="categories-list"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  />
-                  <datalist id="categories-list">
-                    {categories.map((cat) => (
-                      <option key={cat} value={cat} />
-                    ))}
-                  </datalist>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Notes
-                  </label>
-                  <textarea
-                    value={formData.notes}
-                    onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                    rows={2}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    id="isActive"
-                    checked={formData.isActive}
-                    onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
-                    className="w-4 h-4 text-blue-600"
-                  />
-                  <label htmlFor="isActive" className="text-sm font-medium text-gray-700">
-                    Active
-                  </label>
-                </div>
-
-                <div className="flex justify-end gap-3 mt-6">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowDialog(false);
-                      resetForm();
-                    }}
-                    className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                  >
-                    {editingItem ? 'Update' : 'Create'} Item
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Confirmation Dialog */}
+      <AlertDialog
+        open={confirmDialog.open}
+        onOpenChange={(open) =>
+          setConfirmDialog({ open, itemId: null, itemName: '' })
+        }
+        title={t('items.deleteConfirmTitle', 'Delete Item')}
+        description={t(
+          'items.deleteConfirmMessage',
+          `Are you sure you want to delete item "${confirmDialog.itemName}"? This action cannot be undone.`
+        )}
+        confirmText={t('common.delete', 'Delete')}
+        cancelText={t('common.cancel', 'Cancel')}
+        onConfirm={confirmDeleteItem}
+        variant="destructive"
+      />
     </div>
   );
 };

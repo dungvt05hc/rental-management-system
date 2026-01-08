@@ -1,14 +1,16 @@
 import { useState, useEffect } from 'react';
 import { Plus, Search, Edit, Trash2, MapPin, DollarSign } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle, Button, Input, Badge } from '../ui';
+import { Card, CardContent, CardHeader, CardTitle, Button, Input, Badge, AlertDialog } from '../ui';
 import { RoomDialog } from './RoomDialog';
 import { roomService } from '../../services';
 import { formatCurrency } from '../../utils';
 import type { Room, RoomSearchRequest, RoomStatus } from '../../types';
 import { useTranslation } from '../../hooks/useTranslation';
+import { useToast } from '../../contexts/ToastContext';
 
 export function RoomsPage() {
   const { t } = useTranslation();
+  const { showSuccess, showError } = useToast();
   const [rooms, setRooms] = useState<Room[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -22,6 +24,17 @@ export function RoomsPage() {
   });
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
+  
+  // Add confirmation dialog state
+  const [confirmDialog, setConfirmDialog] = useState<{
+    open: boolean;
+    roomId: string | null;
+    roomNumber: string;
+  }>({
+    open: false,
+    roomId: null,
+    roomNumber: '',
+  });
 
   useEffect(() => {
     loadRooms();
@@ -71,20 +84,31 @@ export function RoomsPage() {
     setDialogOpen(true);
   };
 
-  const handleDeleteRoom = async (roomId: string) => {
-    if (!confirm(t('common.confirm', 'Are you sure you want to delete this room? This action cannot be undone.'))) return;
+  const handleDeleteRoom = async (roomId: string, roomNumber: string) => {
+    // Open confirmation dialog instead of browser confirm
+    setConfirmDialog({
+      open: true,
+      roomId,
+      roomNumber,
+    });
+  };
+
+  const confirmDeleteRoom = async () => {
+    if (!confirmDialog.roomId) return;
 
     try {
-      const response = await roomService.deleteRoom(roomId);
+      const response = await roomService.deleteRoom(confirmDialog.roomId);
       if (response.success) {
-        // Show success message
-        alert(t('common.success', 'Room deleted successfully'));
+        showSuccess(t('common.success', 'Success'), t('rooms.deleteSuccess', 'Room deleted successfully'));
         await loadRooms();
       } else {
-        alert(t('common.error', 'Failed to delete room: ') + response.message);
+        showError(t('common.error', 'Error'), response.message || t('rooms.deleteError', 'Failed to delete room'));
       }
     } catch (err) {
-      alert(t('common.error', 'Error deleting room: ') + (err instanceof Error ? err.message : 'Unknown error'));
+      showError(
+        t('common.error', 'Error'),
+        err instanceof Error ? err.message : t('common.unknownError', 'An unknown error occurred')
+      );
     }
   };
 
@@ -301,7 +325,7 @@ export function RoomsPage() {
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => handleDeleteRoom(String(room.id))}
+                              onClick={() => handleDeleteRoom(String(room.id), room.roomNumber)}
                               className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
                               title={t('common.delete', 'Delete Room')}
                             >
@@ -367,6 +391,23 @@ export function RoomsPage() {
         onOpenChange={setDialogOpen}
         room={selectedRoom}
         onSuccess={handleDialogSuccess}
+      />
+
+      {/* Confirmation Dialog */}
+      <AlertDialog
+        open={confirmDialog.open}
+        onOpenChange={(open) =>
+          setConfirmDialog({ open, roomId: null, roomNumber: '' })
+        }
+        title={t('rooms.deleteConfirmTitle', 'Delete Room')}
+        description={t(
+          'rooms.deleteConfirmMessage',
+          `Are you sure you want to delete room ${confirmDialog.roomNumber}? This action cannot be undone and will remove all associated data.`
+        )}
+        confirmText={t('common.delete', 'Delete')}
+        cancelText={t('common.cancel', 'Cancel')}
+        onConfirm={confirmDeleteRoom}
+        variant="destructive"
       />
     </div>
   );

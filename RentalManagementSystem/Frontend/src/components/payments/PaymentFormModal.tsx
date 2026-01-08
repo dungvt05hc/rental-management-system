@@ -4,6 +4,7 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { paymentService, invoiceService } from '../../services';
 import type { Payment, CreatePaymentRequest, UpdatePaymentRequest, Invoice } from '../../types';
 import { formatCurrency, formatDate } from '../../utils';
+import { useToast } from '../../contexts/ToastContext';
 
 interface PaymentFormModalProps {
   payment?: Payment | null;
@@ -22,6 +23,7 @@ export function PaymentFormModal({ payment, onClose, onSuccess }: PaymentFormMod
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const { showSuccess, showError } = useToast();
 
   // Fetch unpaid invoices for the dropdown
   const { data: invoicesResponse } = useQuery({
@@ -38,11 +40,11 @@ export function PaymentFormModal({ payment, onClose, onSuccess }: PaymentFormMod
   const createMutation = useMutation({
     mutationFn: (data: CreatePaymentRequest) => paymentService.createPayment(data),
     onSuccess: () => {
-      alert('Payment recorded successfully!');
+      showSuccess('Success', 'Payment recorded successfully!');
       onSuccess();
     },
     onError: (error: any) => {
-      alert('Failed to record payment: ' + error.message);
+      showError('Error', 'Failed to record payment: ' + error.message);
     }
   });
 
@@ -50,11 +52,11 @@ export function PaymentFormModal({ payment, onClose, onSuccess }: PaymentFormMod
     mutationFn: (data: { id: string; payment: UpdatePaymentRequest }) => 
       paymentService.updatePayment(data.id, data.payment),
     onSuccess: () => {
-      alert('Payment updated successfully!');
+      showSuccess('Success', 'Payment updated successfully!');
       onSuccess();
     },
     onError: (error: any) => {
-      alert('Failed to update payment: ' + error.message);
+      showError('Error', 'Failed to update payment: ' + error.message);
     }
   });
 

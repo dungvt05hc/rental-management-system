@@ -23,9 +23,9 @@ Log.Logger = new LoggerConfiguration()
 
 builder.Host.UseSerilog();
 
-// Add Entity Framework
+// Add Entity Framework with PostgreSQL
 builder.Services.AddDbContext<RentalManagementContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 // Add Identity
 builder.Services.AddIdentity<User, IdentityRole>(options =>

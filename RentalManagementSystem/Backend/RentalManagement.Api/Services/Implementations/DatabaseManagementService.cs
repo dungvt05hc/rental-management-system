@@ -3,7 +3,7 @@ using RentalManagement.Api.Data;
 using RentalManagement.Api.Services.Interfaces;
 using RentalManagement.Api.Models.DTOs;
 using System.Data;
-using Microsoft.Data.SqlClient;
+using Npgsql;
 
 namespace RentalManagement.Api.Services.Implementations
 {
@@ -58,7 +58,7 @@ namespace RentalManagement.Api.Services.Implementations
         {
             try
             {
-                var builder = new SqlConnectionStringBuilder(_connectionString);
+                var builder = new NpgsqlConnectionStringBuilder(_connectionString);
                 // Remove password for security
                 builder.Password = "";
                 return Task.FromResult(builder.ConnectionString);
@@ -162,33 +162,35 @@ namespace RentalManagement.Api.Services.Implementations
         {
             try
             {
-                var connectionStringBuilder = new SqlConnectionStringBuilder(_connectionString);
+                var connectionStringBuilder = new NpgsqlConnectionStringBuilder(_connectionString);
                 
-                using var connection = new SqlConnection(_connectionString);
+                using var connection = new NpgsqlConnection(_connectionString);
                 await connection.OpenAsync();
 
                 var info = new DatabaseInfo
                 {
-                    ServerName = connectionStringBuilder.DataSource,
-                    DatabaseName = connectionStringBuilder.InitialCatalog,
+                    ServerName = connectionStringBuilder.Host ?? "localhost",
+                    DatabaseName = connectionStringBuilder.Database ?? "unknown",
                     IsOnline = connection.State == ConnectionState.Open,
                     Version = connection.ServerVersion
                 };
 
-                // Get database size
+                // Get database size (PostgreSQL)
                 var sizeQuery = @"
-                    SELECT 
-                        SUM(CAST(FILEPROPERTY(name, 'SpaceUsed') AS bigint) * 8192.) / 1024 / 1024 AS SizeMB
-                    FROM sys.database_files 
-                    WHERE type = 0";
+                    SELECT pg_database_size(current_database()) / 1024.0 / 1024.0 AS size_mb";
 
-                using var command = new SqlCommand(sizeQuery, connection);
+                using var command = new NpgsqlCommand(sizeQuery, connection);
                 var size = await command.ExecuteScalarAsync();
                 info.SizeInMB = size != DBNull.Value ? Convert.ToInt64(size) : 0;
 
-                // Get table count
-                var tableCountQuery = "SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE'";
-                using var tableCommand = new SqlCommand(tableCountQuery, connection);
+                // Get table count (PostgreSQL)
+                var tableCountQuery = @"
+                    SELECT COUNT(*) 
+                    FROM information_schema.tables 
+                    WHERE table_schema = 'public' 
+                    AND table_type = 'BASE TABLE'";
+                
+                using var tableCommand = new NpgsqlCommand(tableCountQuery, connection);
                 var tableCount = await tableCommand.ExecuteScalarAsync();
                 info.TotalTables = tableCount != null ? Convert.ToInt32(tableCount) : 0;
 
@@ -199,12 +201,9 @@ namespace RentalManagement.Api.Services.Implementations
                 var pendingMigrations = await _context.Database.GetPendingMigrationsAsync();
                 info.PendingMigrations = pendingMigrations.ToList();
 
-                // Get database creation date
-                var creationDateQuery = "SELECT create_date FROM sys.databases WHERE name = @dbName";
-                using var dateCommand = new SqlCommand(creationDateQuery, connection);
-                dateCommand.Parameters.AddWithValue("@dbName", connectionStringBuilder.InitialCatalog);
-                var creationDate = await dateCommand.ExecuteScalarAsync();
-                info.CreatedDate = creationDate != DBNull.Value ? Convert.ToDateTime(creationDate) : DateTime.MinValue;
+                // PostgreSQL doesn't have a direct equivalent to sys.databases creation date
+                // We'll use the current timestamp as a placeholder
+                info.CreatedDate = DateTime.UtcNow;
 
                 return info;
             }
@@ -240,27 +239,23 @@ namespace RentalManagement.Api.Services.Implementations
         {
             try
             {
-                using var connection = new SqlConnection(_connectionString);
+                using var connection = new NpgsqlConnection(_connectionString);
                 await connection.OpenAsync();
 
+                // PostgreSQL query for table information
                 var query = @"
                     SELECT 
-                        t.TABLE_NAME,
-                        t.TABLE_SCHEMA,
-                        p.rows as RowCount
-                    FROM INFORMATION_SCHEMA.TABLES t
-                    LEFT JOIN (
-                        SELECT 
-                            OBJECT_NAME(OBJECT_ID) AS TableName,
-                            SUM(rows) AS rows
-                        FROM sys.partitions 
-                        WHERE index_id < 2 
-                        GROUP BY OBJECT_ID
-                    ) p ON t.TABLE_NAME = p.TableName
-                    WHERE t.TABLE_TYPE = 'BASE TABLE'
-                    ORDER BY t.TABLE_NAME";
+                        t.table_name,
+                        t.table_schema,
+                        COALESCE(s.n_live_tup, 0) as row_count,
+                        pg_total_relation_size(quote_ident(t.table_schema)||'.'||quote_ident(t.table_name))::bigint / 1024 as size_kb
+                    FROM information_schema.tables t
+                    LEFT JOIN pg_stat_user_tables s ON t.table_name = s.relname
+                    WHERE t.table_schema = 'public' 
+                    AND t.table_type = 'BASE TABLE'
+                    ORDER BY t.table_name";
 
-                using var command = new SqlCommand(query, connection);
+                using var command = new NpgsqlCommand(query, connection);
                 using var reader = await command.ExecuteReaderAsync();
 
                 var tables = new List<TableInfo>();
@@ -268,11 +263,11 @@ namespace RentalManagement.Api.Services.Implementations
                 {
                     tables.Add(new TableInfo
                     {
-                        TableName = reader.GetString("TABLE_NAME"),
-                        Schema = reader.GetString("TABLE_SCHEMA"),
-                        RowCount = reader.IsDBNull("RowCount") ? 0 : Convert.ToInt32(reader["RowCount"]),
-                        CreatedDate = DateTime.Now, // Placeholder - would need more complex query for actual creation date
-                        SizeInKB = 0 // Placeholder - would need more complex query for table size
+                        TableName = reader.GetString(0),
+                        Schema = reader.GetString(1),
+                        RowCount = reader.IsDBNull(2) ? 0 : Convert.ToInt32(reader.GetInt64(2)),
+                        CreatedDate = DateTime.UtcNow, // PostgreSQL doesn't track table creation date by default
+                        SizeInKB = reader.IsDBNull(3) ? 0 : reader.GetInt64(3)
                     });
                 }
 
@@ -286,30 +281,54 @@ namespace RentalManagement.Api.Services.Implementations
         }
 
         /// <summary>
-        /// Backup database to specified path
+        /// Backup database to specified path (PostgreSQL pg_dump)
+        /// Note: This requires pg_dump to be installed and accessible in the system PATH
         /// </summary>
         public async Task<bool> BackupDatabaseAsync(string backupPath)
         {
             try
             {
-                var connectionStringBuilder = new SqlConnectionStringBuilder(_connectionString);
-                var databaseName = connectionStringBuilder.InitialCatalog;
+                var connectionStringBuilder = new NpgsqlConnectionStringBuilder(_connectionString);
+                var databaseName = connectionStringBuilder.Database;
+                var host = connectionStringBuilder.Host;
+                var port = connectionStringBuilder.Port;
+                var username = connectionStringBuilder.Username;
+                var password = connectionStringBuilder.Password;
 
-                using var connection = new SqlConnection(_connectionString);
-                await connection.OpenAsync();
+                // Use pg_dump for PostgreSQL backup
+                var processStartInfo = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = "pg_dump",
+                    Arguments = $"-h {host} -p {port} -U {username} -F c -f \"{backupPath}\" {databaseName}",
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
 
-                var backupQuery = $@"
-                    BACKUP DATABASE [{databaseName}] 
-                    TO DISK = @backupPath 
-                    WITH FORMAT, COMPRESSION";
+                // Set password as environment variable
+                processStartInfo.EnvironmentVariables["PGPASSWORD"] = password;
 
-                using var command = new SqlCommand(backupQuery, connection);
-                command.Parameters.AddWithValue("@backupPath", backupPath);
-                command.CommandTimeout = 300; // 5 minutes timeout
+                using var process = System.Diagnostics.Process.Start(processStartInfo);
+                if (process is null)
+                {
+                    _logger.LogError("Failed to start pg_dump process");
+                    return false;
+                }
 
-                await command.ExecuteNonQueryAsync();
-                _logger.LogInformation("Database backup completed: {BackupPath}", backupPath);
-                return true;
+                await process.WaitForExitAsync();
+
+                if (process.ExitCode == 0)
+                {
+                    _logger.LogInformation("Database backup completed: {BackupPath}", backupPath);
+                    return true;
+                }
+                else
+                {
+                    var error = await process.StandardError.ReadToEndAsync();
+                    _logger.LogError("Database backup failed: {Error}", error);
+                    return false;
+                }
             }
             catch (Exception ex)
             {
@@ -319,44 +338,54 @@ namespace RentalManagement.Api.Services.Implementations
         }
 
         /// <summary>
-        /// Restore database from backup
+        /// Restore database from backup (PostgreSQL pg_restore)
+        /// Note: This requires pg_restore to be installed and accessible in the system PATH
         /// </summary>
         public async Task<bool> RestoreDatabaseAsync(string backupPath)
         {
             try
             {
-                var connectionStringBuilder = new SqlConnectionStringBuilder(_connectionString);
-                var databaseName = connectionStringBuilder.InitialCatalog;
+                var connectionStringBuilder = new NpgsqlConnectionStringBuilder(_connectionString);
+                var databaseName = connectionStringBuilder.Database;
+                var host = connectionStringBuilder.Host;
+                var port = connectionStringBuilder.Port;
+                var username = connectionStringBuilder.Username;
+                var password = connectionStringBuilder.Password;
 
-                // Connect to master database to restore
-                connectionStringBuilder.InitialCatalog = "master";
-                using var connection = new SqlConnection(connectionStringBuilder.ConnectionString);
-                await connection.OpenAsync();
+                // Use pg_restore for PostgreSQL restore
+                var processStartInfo = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = "pg_restore",
+                    Arguments = $"-h {host} -p {port} -U {username} -d {databaseName} -c \"{backupPath}\"",
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
 
-                // Set database to single user mode
-                var singleUserQuery = $"ALTER DATABASE [{databaseName}] SET SINGLE_USER WITH ROLLBACK IMMEDIATE";
-                using var singleUserCommand = new SqlCommand(singleUserQuery, connection);
-                await singleUserCommand.ExecuteNonQueryAsync();
+                // Set password as environment variable
+                processStartInfo.EnvironmentVariables["PGPASSWORD"] = password;
 
-                // Restore database
-                var restoreQuery = $@"
-                    RESTORE DATABASE [{databaseName}] 
-                    FROM DISK = @backupPath 
-                    WITH REPLACE";
+                using var process = System.Diagnostics.Process.Start(processStartInfo);
+                if (process is null)
+                {
+                    _logger.LogError("Failed to start pg_restore process");
+                    return false;
+                }
 
-                using var command = new SqlCommand(restoreQuery, connection);
-                command.Parameters.AddWithValue("@backupPath", backupPath);
-                command.CommandTimeout = 600; // 10 minutes timeout
+                await process.WaitForExitAsync();
 
-                await command.ExecuteNonQueryAsync();
-
-                // Set database back to multi user mode
-                var multiUserQuery = $"ALTER DATABASE [{databaseName}] SET MULTI_USER";
-                using var multiUserCommand = new SqlCommand(multiUserQuery, connection);
-                await multiUserCommand.ExecuteNonQueryAsync();
-
-                _logger.LogInformation("Database restored from: {BackupPath}", backupPath);
-                return true;
+                if (process.ExitCode == 0)
+                {
+                    _logger.LogInformation("Database restored from: {BackupPath}", backupPath);
+                    return true;
+                }
+                else
+                {
+                    var error = await process.StandardError.ReadToEndAsync();
+                    _logger.LogError("Database restore failed: {Error}", error);
+                    return false;
+                }
             }
             catch (Exception ex)
             {

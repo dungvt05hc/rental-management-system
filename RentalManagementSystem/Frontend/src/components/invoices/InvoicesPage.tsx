@@ -1,15 +1,17 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Search, Edit, Trash2, FileText, DollarSign, Calendar, AlertCircle, Clock, CheckCircle, XCircle, TrendingUp, Download, Printer, Eye, Info } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle, Button, Input, Badge, Tooltip } from '../ui';
+import { Card, CardContent, CardHeader, CardTitle, Button, Input, Badge, Tooltip, AlertDialog } from '../ui';
 import { invoiceService } from '../../services';
 import { formatCurrency, formatDate } from '../../utils';
 import type { Invoice, InvoiceSearchRequest, InvoiceStatus } from '../../types';
 import { InvoicePrintDialog } from './InvoicePrintDialog';
 import { useTranslation } from '../../hooks/useTranslation';
+import { useToast } from '../../contexts/ToastContext';
 
 export function InvoicesPage() {
   const { t } = useTranslation();
+  const { showSuccess, showError } = useToast();
   const navigate = useNavigate();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -23,6 +25,15 @@ export function InvoicesPage() {
     pageSize: 10,
     totalCount: 0,
     totalPages: 0,
+  });
+  const [confirmDialog, setConfirmDialog] = useState<{
+    open: boolean;
+    invoiceId: string | null;
+    invoiceNumber: string;
+  }>({
+    open: false,
+    invoiceId: null,
+    invoiceNumber: '',
   });
 
   useEffect(() => {
@@ -71,19 +82,30 @@ export function InvoicesPage() {
     navigate(`/invoices/${invoice.id}/edit`);
   };
 
-  const handleDeleteInvoice = async (invoiceId: string) => {
-    if (!confirm(t('common.confirm', 'Are you sure you want to delete this invoice? This action cannot be undone.'))) return;
+  const handleDeleteInvoice = (invoiceId: string, invoiceNumber: string) => {
+    setConfirmDialog({
+      open: true,
+      invoiceId,
+      invoiceNumber,
+    });
+  };
+
+  const confirmDeleteInvoice = async () => {
+    if (!confirmDialog.invoiceId) return;
 
     try {
-      const response = await invoiceService.deleteInvoice(invoiceId);
+      const response = await invoiceService.deleteInvoice(confirmDialog.invoiceId);
       if (response.success) {
-        alert(t('common.success', 'Invoice deleted successfully'));
+        showSuccess(t('common.success', 'Success'), t('invoices.deleteSuccess', 'Invoice deleted successfully'));
         await loadInvoices();
       } else {
-        alert(t('common.error', 'Failed to delete invoice: ') + response.message);
+        showError(t('common.error', 'Error'), response.message || t('invoices.deleteError', 'Failed to delete invoice'));
       }
     } catch (err) {
-      alert(t('common.error', 'Error deleting invoice: ') + (err instanceof Error ? err.message : 'Unknown error'));
+      showError(
+        t('common.error', 'Error'),
+        err instanceof Error ? err.message : t('common.unknownError', 'An unknown error occurred')
+      );
     }
   };
 
@@ -99,10 +121,13 @@ export function InvoicesPage() {
       await invoiceService.exportInvoicePdf(invoiceId.toString());
       
       // Show success message
-      alert(t('common.success', 'PDF exported successfully!'));
+      showSuccess(t('common.success', 'Success'), t('invoices.exportSuccess', 'Invoice exported successfully'));
     } catch (err) {
       console.error('Error exporting PDF:', err);
-      alert(t('common.error', 'Error exporting PDF: ') + (err instanceof Error ? err.message : 'Unknown error'));
+      showError(
+        t('common.error', 'Error'),
+        err instanceof Error ? err.message : t('invoices.exportError', 'Failed to export invoice')
+      );
     }
   };
 
@@ -548,7 +573,7 @@ export function InvoicesPage() {
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => handleDeleteInvoice(String(invoice.id))}
+                              onClick={() => handleDeleteInvoice(String(invoice.id), invoice.invoiceNumber || '')}
                               className="h-9 w-9 p-0 hover:bg-red-50 hover:text-red-600 hover:border-red-300"
                               title={t('common.delete', 'Delete Invoice')}
                             >
@@ -619,6 +644,23 @@ export function InvoicesPage() {
         onOpenChange={setIsPrintDialogOpen}
         invoice={selectedInvoice}
         onExportPdf={() => selectedInvoice && handleExportPdf(selectedInvoice)}
+      />
+
+      {/* Confirmation Dialog */}
+      <AlertDialog
+        open={confirmDialog.open}
+        onOpenChange={(open) =>
+          setConfirmDialog({ open, invoiceId: null, invoiceNumber: '' })
+        }
+        title={t('invoices.deleteConfirmTitle', 'Delete Invoice')}
+        description={t(
+          'invoices.deleteConfirmMessage',
+          `Are you sure you want to delete invoice ${confirmDialog.invoiceNumber}? This action cannot be undone and will remove all associated payment records.`
+        )}
+        confirmText={t('common.delete', 'Delete')}
+        cancelText={t('common.cancel', 'Cancel')}
+        onConfirm={confirmDeleteInvoice}
+        variant="destructive"
       />
     </div>
   );

@@ -38,6 +38,7 @@ public class LocalizationController : ControllerBase
     /// Get all languages including inactive ones (Admin only)
     /// </summary>
     [HttpGet("languages/all")]
+    [Authorize(Policy = "Admin")]
     [ProducesResponseType(typeof(IEnumerable<LanguageDto>), StatusCodes.Status200OK)]
     public async Task<ActionResult<IEnumerable<LanguageDto>>> GetAllLanguages()
     {
@@ -82,7 +83,7 @@ public class LocalizationController : ControllerBase
     }
 
     /// <summary>
-    /// Create a new language
+    /// Create a new language (Admin only)
     /// </summary>
     [HttpPost("languages")]
     [Authorize(Policy = "Admin")]

@@ -78,10 +78,10 @@ public class RentalManagementContext : IdentityDbContext<User>
                   .HasPrecision(10, 2);
 
             entity.Property(r => r.CreatedAt)
-                  .HasDefaultValueSql("GETUTCDATE()");
+                  .HasDefaultValueSql("NOW() AT TIME ZONE 'UTC'");
 
             entity.Property(r => r.UpdatedAt)
-                  .HasDefaultValueSql("GETUTCDATE()");
+                  .HasDefaultValueSql("NOW() AT TIME ZONE 'UTC'");
         });
 
         // Configure Tenant entity
@@ -94,7 +94,7 @@ public class RentalManagementContext : IdentityDbContext<User>
             entity.HasIndex(t => t.IdentificationNumber)
                   .IsUnique()
                   .HasDatabaseName("IX_Tenants_IdentificationNumber")
-                  .HasFilter("[IdentificationNumber] IS NOT NULL AND [IdentificationNumber] != ''");
+                  .HasFilter("\"IdentificationNumber\" IS NOT NULL AND \"IdentificationNumber\" != ''");
 
             entity.Property(t => t.SecurityDeposit)
                   .HasPrecision(18, 2);
@@ -103,10 +103,10 @@ public class RentalManagementContext : IdentityDbContext<User>
                   .HasPrecision(18, 2);
 
             entity.Property(t => t.CreatedAt)
-                  .HasDefaultValueSql("GETUTCDATE()");
+                  .HasDefaultValueSql("NOW() AT TIME ZONE 'UTC'");
 
             entity.Property(t => t.UpdatedAt)
-                  .HasDefaultValueSql("GETUTCDATE()");
+                  .HasDefaultValueSql("NOW() AT TIME ZONE 'UTC'");
 
             // Configure relationship with Room
             entity.HasOne(t => t.Room)
@@ -144,10 +144,10 @@ public class RentalManagementContext : IdentityDbContext<User>
                   .HasPrecision(18, 2);
 
             entity.Property(i => i.CreatedAt)
-                  .HasDefaultValueSql("GETUTCDATE()");
+                  .HasDefaultValueSql("NOW() AT TIME ZONE 'UTC'");
 
             entity.Property(i => i.UpdatedAt)
-                  .HasDefaultValueSql("GETUTCDATE()");
+                  .HasDefaultValueSql("NOW() AT TIME ZONE 'UTC'");
 
             // Configure relationships
             entity.HasOne(i => i.Tenant)
@@ -166,16 +166,16 @@ public class RentalManagementContext : IdentityDbContext<User>
         {
             entity.HasIndex(p => p.ReferenceNumber)
                   .HasDatabaseName("IX_Payments_ReferenceNumber")
-                  .HasFilter("[ReferenceNumber] IS NOT NULL AND [ReferenceNumber] != ''");
+                  .HasFilter("\"ReferenceNumber\" IS NOT NULL AND \"ReferenceNumber\" != ''");
 
             entity.Property(p => p.Amount)
                   .HasPrecision(18, 2);
 
             entity.Property(p => p.CreatedAt)
-                  .HasDefaultValueSql("GETUTCDATE()");
+                  .HasDefaultValueSql("NOW() AT TIME ZONE 'UTC'");
 
             entity.Property(p => p.UpdatedAt)
-                  .HasDefaultValueSql("GETUTCDATE()");
+                  .HasDefaultValueSql("NOW() AT TIME ZONE 'UTC'");
 
             // Configure relationship with Invoice
             entity.HasOne(p => p.Invoice)
@@ -215,10 +215,10 @@ public class RentalManagementContext : IdentityDbContext<User>
                   .HasPrecision(18, 2);
 
             entity.Property(ii => ii.CreatedAt)
-                  .HasDefaultValueSql("GETUTCDATE()");
+                  .HasDefaultValueSql("NOW() AT TIME ZONE 'UTC'");
 
             entity.Property(ii => ii.UpdatedAt)
-                  .HasDefaultValueSql("GETUTCDATE()");
+                  .HasDefaultValueSql("NOW() AT TIME ZONE 'UTC'");
 
             // Configure relationship with Invoice
             entity.HasOne(ii => ii.Invoice)
@@ -244,10 +244,10 @@ public class RentalManagementContext : IdentityDbContext<User>
                   .HasPrecision(5, 2);
 
             entity.Property(i => i.CreatedAt)
-                  .HasDefaultValueSql("GETUTCDATE()");
+                  .HasDefaultValueSql("NOW() AT TIME ZONE 'UTC'");
 
             entity.Property(i => i.UpdatedAt)
-                  .HasDefaultValueSql("GETUTCDATE()");
+                  .HasDefaultValueSql("NOW() AT TIME ZONE 'UTC'");
         });
 
         // Configure Language entity
@@ -267,7 +267,7 @@ public class RentalManagementContext : IdentityDbContext<User>
                   .HasMaxLength(100);
 
             entity.Property(l => l.CreatedAt)
-                  .HasDefaultValueSql("GETUTCDATE()");
+                  .HasDefaultValueSql("NOW() AT TIME ZONE 'UTC'");
         });
 
         // Configure Translation entity
@@ -287,10 +287,10 @@ public class RentalManagementContext : IdentityDbContext<User>
                   .HasMaxLength(50);
 
             entity.Property(t => t.CreatedAt)
-                  .HasDefaultValueSql("GETUTCDATE()");
+                  .HasDefaultValueSql("NOW() AT TIME ZONE 'UTC'");
 
             entity.Property(t => t.UpdatedAt)
-                  .HasDefaultValueSql("GETUTCDATE()");
+                  .HasDefaultValueSql("NOW() AT TIME ZONE 'UTC'");
 
             // Configure relationship with Language
             entity.HasOne(t => t.Language)
@@ -319,10 +319,10 @@ public class RentalManagementContext : IdentityDbContext<User>
                   .HasMaxLength(50);
 
             entity.Property(s => s.CreatedAt)
-                  .HasDefaultValueSql("GETUTCDATE()");
+                  .HasDefaultValueSql("NOW() AT TIME ZONE 'UTC'");
 
             entity.Property(s => s.UpdatedAt)
-                  .HasDefaultValueSql("GETUTCDATE()");
+                  .HasDefaultValueSql("NOW() AT TIME ZONE 'UTC'");
         });
 
         // Seed data for room types and statuses (if needed)

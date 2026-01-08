@@ -1,14 +1,16 @@
 import { useState, useEffect } from 'react';
 import { Plus, Search, Edit, Trash2, User, Phone, Mail, Calendar } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle, Button, Input, Badge } from '../ui';
+import { Card, CardContent, CardHeader, CardTitle, Button, Input, Badge, AlertDialog } from '../ui';
 import { TenantDialog } from './TenantDialog';
 import { tenantService } from '../../services';
 import { formatDate } from '../../utils';
 import type { Tenant, TenantSearchRequest } from '../../types';
 import { useTranslation } from '../../hooks/useTranslation';
+import { useToast } from '../../contexts/ToastContext';
 
 export function TenantsPage() {
   const { t } = useTranslation();
+  const { showSuccess, showError } = useToast();
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -21,6 +23,15 @@ export function TenantsPage() {
     pageSize: 10,
     totalCount: 0,
     totalPages: 0,
+  });
+  const [confirmDialog, setConfirmDialog] = useState<{
+    open: boolean;
+    tenantId: string | null;
+    tenantName: string;
+  }>({
+    open: false,
+    tenantId: null,
+    tenantName: '',
   });
 
   useEffect(() => {
@@ -73,19 +84,30 @@ export function TenantsPage() {
     setDialogOpen(true);
   };
 
-  const handleDeleteTenant = async (tenantId: string) => {
-    if (!confirm(t('common.confirm', 'Are you sure you want to delete this tenant? This action cannot be undone.'))) return;
+  const handleDeleteTenant = (tenantId: string, tenantName: string) => {
+    setConfirmDialog({
+      open: true,
+      tenantId,
+      tenantName,
+    });
+  };
+
+  const confirmDeleteTenant = async () => {
+    if (!confirmDialog.tenantId) return;
 
     try {
-      const response = await tenantService.deleteTenant(tenantId);
+      const response = await tenantService.deleteTenant(confirmDialog.tenantId);
       if (response.success) {
-        alert(t('common.success', 'Tenant deleted successfully'));
+        showSuccess(t('common.success', 'Success'), t('tenants.deleteSuccess', 'Tenant deleted successfully'));
         await loadTenants();
       } else {
-        alert(t('common.error', 'Failed to delete tenant: ') + response.message);
+        showError(t('common.error', 'Error'), response.message || t('tenants.deleteError', 'Failed to delete tenant'));
       }
     } catch (err) {
-      alert(t('common.error', 'Error deleting tenant: ') + (err instanceof Error ? err.message : 'Unknown error'));
+      showError(
+        t('common.error', 'Error'),
+        err instanceof Error ? err.message : t('common.unknownError', 'An unknown error occurred')
+      );
     }
   };
 
@@ -334,7 +356,7 @@ export function TenantsPage() {
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => handleDeleteTenant(String(tenant.id))}
+                              onClick={() => handleDeleteTenant(String(tenant.id), (tenant as any).fullName || `${tenant.firstName} ${tenant.lastName}`)}
                               className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
                               title={t('common.delete', 'Delete Tenant')}
                             >
@@ -400,6 +422,23 @@ export function TenantsPage() {
         onOpenChange={setDialogOpen}
         tenant={selectedTenant}
         onSuccess={handleDialogSuccess}
+      />
+
+      {/* Confirmation Dialog */}
+      <AlertDialog
+        open={confirmDialog.open}
+        onOpenChange={(open) =>
+          setConfirmDialog({ open, tenantId: null, tenantName: '' })
+        }
+        title={t('tenants.deleteConfirmTitle', 'Delete Tenant')}
+        description={t(
+          'tenants.deleteConfirmMessage',
+          `Are you sure you want to delete tenant "${confirmDialog.tenantName}"? This action cannot be undone and will remove all associated data including invoices and payments.`
+        )}
+        confirmText={t('common.delete', 'Delete')}
+        cancelText={t('common.cancel', 'Cancel')}
+        onConfirm={confirmDeleteTenant}
+        variant="destructive"
       />
     </div>
   );
