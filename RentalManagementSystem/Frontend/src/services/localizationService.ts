@@ -50,7 +50,7 @@ class LocalizationService {
    * Get authentication token from localStorage
    */
   private getAuthToken(): string | null {
-    return localStorage.getItem('token');
+    return localStorage.getItem('authToken'); // Changed from 'token' to 'authToken'
   }
 
   /**

@@ -563,18 +563,42 @@ export function InvoiceFormPage() {
                           />
                         </td>
                         <td className="px-4 py-3">
-                          <select
+                          <input
+                            type="text"
+                            list="uom-options-form"
                             value={item.unitOfMeasure}
                             onChange={(e) => handleEditItem(index, 'unitOfMeasure', e.target.value)}
-                            className="h-9 text-sm border border-gray-300 rounded px-2 w-full"
-                          >
+                            className="h-9 text-sm border border-gray-300 rounded px-2 w-full focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            placeholder="UoM"
+                          />
+                          <datalist id="uom-options-form">
                             <option value="pcs">pcs</option>
+                            <option value="pc">pc</option>
+                            <option value="piece">piece</option>
                             <option value="kg">kg</option>
+                            <option value="gram">gram</option>
+                            <option value="ton">ton</option>
                             <option value="m">m</option>
+                            <option value="cm">cm</option>
+                            <option value="km">km</option>
+                            <option value="sqm">sqm (square meter)</option>
                             <option value="hrs">hrs</option>
+                            <option value="hour">hour</option>
+                            <option value="day">day</option>
                             <option value="days">days</option>
+                            <option value="week">week</option>
+                            <option value="weeks">weeks</option>
+                            <option value="month">month</option>
                             <option value="months">months</option>
-                          </select>
+                            <option value="year">year</option>
+                            <option value="years">years</option>
+                            <option value="unit">unit</option>
+                            <option value="box">box</option>
+                            <option value="package">package</option>
+                            <option value="set">set</option>
+                            <option value="liter">liter</option>
+                            <option value="gallon">gallon</option>
+                          </datalist>
                         </td>
                         <td className="px-4 py-3">
                           <Input
