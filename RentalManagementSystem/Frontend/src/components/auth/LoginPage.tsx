@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate, Navigate } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { Button, Input, Card, CardHeader, CardTitle, CardContent } from '../ui';
 import { useForm } from '../../hooks';
@@ -14,7 +14,6 @@ interface LoginFormData {
 export function LoginPage() {
   const { t } = useTranslation();
   const { login, isAuthenticated, isLoading } = useAuth();
-  const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   const {
@@ -65,7 +64,6 @@ export function LoginPage() {
 
     try {
       await login(values.email, values.password);
-      navigate('/', { replace: true });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Login failed';
       setError('password', errorMessage);

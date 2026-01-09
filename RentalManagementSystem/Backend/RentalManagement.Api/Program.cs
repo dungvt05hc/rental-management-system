@@ -23,9 +23,35 @@ Log.Logger = new LoggerConfiguration()
 
 builder.Host.UseSerilog();
 
-// Add Entity Framework with PostgreSQL
-builder.Services.AddDbContext<RentalManagementContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+// Get connection string - support environment variable override
+var connectionString = Environment.GetEnvironmentVariable("DATABASE_URL") 
+    ?? builder.Configuration.GetConnectionString("DefaultConnection");
+
+// Validate connection string is not empty
+if (string.IsNullOrWhiteSpace(connectionString))
+{
+    Log.Fatal("Database connection string is empty. Set DATABASE_URL environment variable or add ConnectionStrings:DefaultConnection to appsettings.json");
+    throw new InvalidOperationException("Database connection string not configured");
+}
+
+Log.Information("==> Using DATABASE_URL from environment: {HasEnvVar}", !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("DATABASE_URL")));
+Log.Information("==> Connection string length: {Length}", connectionString.Length);
+Log.Information("==> Database connection configured. Host: {Host}", 
+    connectionString.Contains("@") ? connectionString.Split('@').LastOrDefault()?.Split('/').FirstOrDefault() : "unknown");
+
+// Store in a static variable to ensure it's never lost
+StaticConnectionString.Value = connectionString;
+
+// Add Entity Framework with PostgreSQL using factory
+builder.Services.AddDbContext<RentalManagementContext>((serviceProvider, options) =>
+{
+    var connStr = StaticConnectionString.Value;
+    if (string.IsNullOrWhiteSpace(connStr))
+    {
+        throw new InvalidOperationException("Connection string is null or empty in DbContext factory");
+    }
+    options.UseNpgsql(connStr);
+});
 
 // Add Identity
 builder.Services.AddIdentity<User, IdentityRole>(options =>
@@ -49,9 +75,11 @@ builder.Services.AddIdentity<User, IdentityRole>(options =>
 .AddEntityFrameworkStores<RentalManagementContext>()
 .AddDefaultTokenProviders();
 
-// Add JWT Authentication
+// Add JWT Authentication - support environment variable override
 var jwtSettings = builder.Configuration.GetSection("JwtSettings");
-var secretKey = jwtSettings["SecretKey"] ?? throw new InvalidOperationException("JWT SecretKey not configured");
+var secretKey = Environment.GetEnvironmentVariable("JWT_SECRET_KEY")
+    ?? jwtSettings["SecretKey"] 
+    ?? throw new InvalidOperationException("JWT SecretKey not configured");
 
 builder.Services.AddAuthentication(options =>
 {
@@ -87,16 +115,32 @@ builder.Services.AddAutoMapper(typeof(MappingProfile));
 // Add FluentValidation
 builder.Services.AddFluentValidationAutoValidation();
 
-// Add CORS
+// Add CORS - support production origins
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend", policy =>
     {
-        policy.WithOrigins(
-                "http://localhost:3000",  // React dev server
-                "http://localhost:5173",  // Vite dev server
-                "http://localhost:5174"   // Alternative Vite port
-              )
+        var allowedOrigins = new List<string>
+        {
+            "http://localhost:3000",
+            "http://localhost:5173",
+            "http://localhost:5174"
+        };
+
+        // Add production frontend URLs from environment variable (comma-separated)
+        var frontendUrl = Environment.GetEnvironmentVariable("FRONTEND_URL");
+        if (!string.IsNullOrEmpty(frontendUrl))
+        {
+            // Split by comma to support multiple frontend URLs
+            var frontendUrls = frontendUrl.Split(',', StringSplitOptions.RemoveEmptyEntries)
+                                          .Select(url => url.Trim())
+                                          .Where(url => !string.IsNullOrEmpty(url));
+            allowedOrigins.AddRange(frontendUrls);
+            
+            Log.Information("CORS configured for origins: {Origins}", string.Join(", ", allowedOrigins));
+        }
+
+        policy.WithOrigins(allowedOrigins.ToArray())
               .AllowAnyMethod()
               .AllowAnyHeader()
               .AllowCredentials();
@@ -184,6 +228,14 @@ if (app.Environment.IsDevelopment())
 }
 else
 {
+    // Enable Swagger in production for testing (optional - remove if not needed)
+    app.UseSwagger();
+    app.UseSwaggerUI(c =>
+    {
+        c.SwaggerEndpoint("/swagger/v1/swagger.json", "Rental Management System API v1");
+        c.RoutePrefix = "swagger";
+    });
+
     // Only use HTTPS redirection in production
     app.UseHttpsRedirection();
 }
@@ -209,8 +261,8 @@ using (var scope = app.Services.CreateScope())
         var userManager = services.GetRequiredService<UserManager<User>>();
         var roleManager = services.GetRequiredService<RoleManager<IdentityRole>>();
         
-        // Ensure database is created
-        await context.Database.EnsureCreatedAsync();
+        // Apply pending migrations
+        await context.Database.MigrateAsync();
         
         // Seed roles
         await SeedRolesAsync(roleManager);
@@ -278,4 +330,12 @@ static async Task SeedAdminUserAsync(UserManager<User> userManager)
             Log.Error("Failed to create admin user: {Errors}", string.Join(", ", result.Errors.Select(e => e.Description)));
         }
     }
+}
+
+/// <summary>
+/// Static storage for connection string
+/// </summary>
+public static class StaticConnectionString
+{
+    public static string Value { get; set; } = string.Empty;
 }
