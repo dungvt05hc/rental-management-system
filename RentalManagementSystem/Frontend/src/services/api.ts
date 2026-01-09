@@ -19,6 +19,9 @@ apiClient.interceptors.request.use(
     const token = localStorage.getItem('authToken');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
+      console.log('Authorization header added, token length:', token.length);
+    } else {
+      console.warn('No auth token found in localStorage for request:', config.url);
     }
     return config;
   },

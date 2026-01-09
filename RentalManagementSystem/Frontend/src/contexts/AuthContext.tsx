@@ -112,9 +112,21 @@ export function AuthProvider({ children }: AuthProviderProps) {
       if (response.success && response.data) {
         const { user, token } = response.data;
         
-        // Store in localStorage
+        // Store in localStorage first
         tokenStorage.setToken(token);
         tokenStorage.setUser(user);
+        
+        // Add a small delay to ensure localStorage is written
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        // Verify token was stored
+        const storedToken = tokenStorage.getToken();
+        if (!storedToken) {
+          console.error('Token was not stored in localStorage');
+          throw new Error('Failed to store authentication token');
+        }
+        
+        console.log('Token stored successfully, length:', storedToken.length);
         
         dispatch({
           type: 'LOGIN_SUCCESS',

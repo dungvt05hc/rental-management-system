@@ -1,17 +1,15 @@
 import { useState } from 'react';
-import { Settings, Info, Globe, Languages } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '../ui';
-import SystemInfoTab from './SystemInfoTab';
+import { Settings, Globe, Languages } from 'lucide-react';
+import { Card, CardContent } from '../ui';
 import SystemSettingsTab from './SystemSettingsTab';
 import LanguageManagement from '../admin/LanguageManagement';
 import TranslationManagement from './TranslationManagement';
 
 const SystemManagement: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'info' | 'settings' | 'languages' | 'translations'>('info');
+  const [activeTab, setActiveTab] = useState<'settings' | 'languages' | 'translations'>('settings');
   const [error, setError] = useState<string | null>(null);
 
   const tabs = [
-    { id: 'info' as const, label: 'System Info', icon: Info },
     { id: 'settings' as const, label: 'Settings', icon: Settings },
     { id: 'languages' as const, label: 'Languages', icon: Globe },
     { id: 'translations' as const, label: 'Translations', icon: Languages },
@@ -21,7 +19,7 @@ const SystemManagement: React.FC = () => {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">System Management</h1>
-        <p className="text-gray-600 mt-1">Manage system settings, languages, and view system information</p>
+        <p className="text-gray-600 mt-1">Manage system settings, languages, and translations</p>
       </div>
 
       {error && (
@@ -64,7 +62,6 @@ const SystemManagement: React.FC = () => {
 
       {/* Tab Content */}
       <div>
-        {activeTab === 'info' && <SystemInfoTab />}
         {activeTab === 'settings' && <SystemSettingsTab />}
         {activeTab === 'languages' && <LanguageManagement />}
         {activeTab === 'translations' && <TranslationManagement />}
