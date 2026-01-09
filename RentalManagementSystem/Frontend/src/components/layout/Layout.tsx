@@ -100,7 +100,7 @@ export function Layout({ children }: LayoutProps) {
                   <p className="text-sm font-medium text-gray-700">
                     {user?.firstName} {user?.lastName}
                   </p>
-                  <p className="text-xs font-medium text-gray-500">{user?.role}</p>
+                  <p className="text-xs font-medium text-gray-500">{user?.roles?.[0] || 'User'}</p>
                 </div>
               </div>
             </div>
@@ -147,7 +147,7 @@ export function Layout({ children }: LayoutProps) {
                   <p className="text-sm font-medium text-gray-700">
                     {user?.firstName} {user?.lastName}
                   </p>
-                  <p className="text-xs font-medium text-gray-500">{user?.role}</p>
+                  <p className="text-xs font-medium text-gray-500">{user?.roles?.[0] || 'User'}</p>
                 </div>
                 <Button
                   variant="ghost"

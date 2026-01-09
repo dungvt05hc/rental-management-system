@@ -9,15 +9,19 @@ export interface ApiResponse<T = any> {
 // Authentication Types
 export interface User {
   id: string;
-  userName: string;
+  userName?: string;
   email: string;
   firstName: string;
   lastName: string;
-  role: UserRole;
+  fullName?: string;
+  phoneNumber?: string;
+  roles: string[] | IList<string>; // Changed from role to roles (array)
   isActive: boolean;
   createdAt: string;
-  updatedAt: string;
+  updatedAt?: string;
 }
+
+export type IList<T> = T[];
 
 export enum UserRole {
   Admin = 'Admin',
