@@ -1,0 +1,6 @@
+name = "rental-management-frontend"
+compatibility_date = "2024-01-08"
+pages_build_output_dir = "dist"
+
+# Environment variables (set these in Cloudflare Pages UI)
+# VITE_API_BASE_URL = "https://rental-management-api-lfgedmy2ua-uc.a.run.app/api"

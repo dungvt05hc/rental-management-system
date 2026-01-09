@@ -1,103 +1,226 @@
 # PostgreSQL Migration Guide
 
-**Rental Management System - SQL Server to PostgreSQL Migration**
-
-*Last Updated: January 7, 2026*
-
----
-
-## Table of Contents
-
-1. [Overview](#overview)
-2. [Prerequisites](#prerequisites)
-3. [Step-by-Step Migration](#step-by-step-migration)
-4. [Code Changes Required](#code-changes-required)
-5. [Database Differences](#database-differences)
-6. [Testing the Migration](#testing-the-migration)
-7. [Troubleshooting](#troubleshooting)
-8. [PostgreSQL Best Practices](#postgresql-best-practices)
-9. [Rollback Strategy](#rollback-strategy)
-
----
+This guide covers migrating from SQL Server to PostgreSQL for the Rental Management System.
 
 ## Overview
 
-This guide documents the complete migration process from Microsoft SQL Server to PostgreSQL for the Rental Management System backend API. PostgreSQL offers several advantages including:
-
-- **Open Source**: No licensing costs
-- **Cross-Platform**: Runs on Windows, macOS, Linux
-- **Performance**: Excellent for read-heavy workloads
-- **Standards Compliance**: Better ANSI SQL compliance
-- **Advanced Features**: JSON support, full-text search, GIS capabilities
-- **Active Community**: Large ecosystem and regular updates
-
-### Migration Scope
-
-- Database engine change from SQL Server to PostgreSQL 15
-- Entity Framework Core provider change from `Microsoft.EntityFrameworkCore.SqlServer` to `Npgsql.EntityFrameworkCore.PostgreSQL`
-- Connection string updates
-- SQL syntax adjustments (T-SQL → PostgreSQL SQL)
-- Query optimization for PostgreSQL
+We're migrating from Microsoft SQL Server to PostgreSQL to:
+- Reduce hosting costs (use free tier PostgreSQL services like Supabase)
+- Improve cross-platform compatibility
+- Enable cloud deployment (Google Cloud Run, Azure, etc.)
+- Use open-source database solution
 
 ---
 
-## Prerequisites
+## 🚨 Important: Supabase & Cloud Run Connection Issues
 
-### Required Software
+### Problem Overview
 
-1. **Docker** (for running PostgreSQL)
-   ```bash
-   # Verify Docker installation
-   docker --version
-   ```
+When deploying a .NET application to serverless platforms (like Google Cloud Run) with Supabase PostgreSQL, you may encounter connection string issues where Entity Framework Core receives an empty or corrupted connection string, resulting in:
 
-2. **.NET 9.0 SDK**
-   ```bash
-   # Verify .NET installation
-   dotnet --version
-   ```
-
-3. **Entity Framework Core Tools**
-   ```bash
-   # Install or update EF Core tools
-   dotnet tool install --global dotnet-ef
-   # OR update if already installed
-   dotnet tool update --global dotnet-ef
-   ```
-
-4. **PostgreSQL Client Tools** (Optional, for direct database access)
-   ```bash
-   # macOS
-   brew install postgresql@15
-   
-   # Ubuntu/Debian
-   sudo apt-get install postgresql-client-15
-   
-   # Windows
-   # Download from: https://www.postgresql.org/download/windows/
-   ```
-
-### Knowledge Requirements
-
-- Basic understanding of Entity Framework Core
-- Familiarity with SQL databases
-- Understanding of connection strings
-- Knowledge of .NET Core dependency injection
-
----
-
-## Step-by-Step Migration
-
-### Step 1: Backup Existing Data (If Applicable)
-
-If you have existing data in SQL Server that needs to be migrated:
-
-```bash
-# Export data from SQL Server
-# Use your preferred method (SQL Server Management Studio, Azure Data Studio, etc.)
+```
+System.ArgumentException: Format of the initialization string does not conform to specification starting at index 0.
 ```
 
-### Step 2: Update NuGet Packages
+### Root Cause
+
+The issue occurs due to several factors:
+
+1. **Transaction Pooler Timeouts**: Supabase's Transaction Pooler (port 6543) is optimized for short-lived serverless connections but can timeout during longer operations like EF Core migrations
+2. **Environment Variable Handling**: Connection strings from environment variables may not be properly captured in the DbContext registration lifecycle
+3. **URI Format Compatibility**: PostgreSQL URI format (`postgresql://...`) may not be directly compatible with Npgsql connection string format
+
+### ✅ Solutions
+
+#### Solution 1: Use Direct Connection for Migrations (Recommended)
+
+For running Entity Framework migrations, always use the **Direct Connection** (Session mode, port 5432) instead of the Transaction Pooler:
+
+```bash
+# Direct Connection Format (for migrations)
+Host=db.[project-ref].supabase.co;Port=5432;Database=postgres;Username=postgres;Password=[password];SSL Mode=Require;Trust Server Certificate=true
+
+# Transaction Pooler Format (for runtime)
+Host=aws-0-[region].pooler.supabase.com;Port=6543;Database=postgres;Username=postgres.[project-ref];Password=[password];SSL Mode=Require;Trust Server Certificate=true
+```
+
+**Why this works:**
+- Direct connection (port 5432) has longer timeouts suitable for migrations
+- Transaction Pooler (port 6543) is better for serverless runtime API calls
+
+**Running migrations with direct connection:**
+
+```bash
+# Set environment variable
+export DATABASE_URL="Host=db.fpvgtejnkxkushmzkstu.supabase.co;Port=5432;Database=postgres;Username=postgres;Password=qijfiw-qetqof-paJmo4;SSL Mode=Require;Trust Server Certificate=true"
+
+# Navigate to API project
+cd RentalManagementSystem/Backend/RentalManagement.Api
+
+# Run migrations
+dotnet ef database update
+```
+
+#### Solution 2: Use Design-Time DbContext Factory
+
+Create a design-time factory to ensure EF Core tools can properly access the connection string:
+
+```csharp
+// Data/RentalManagementContextFactory.cs
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Design;
+
+namespace RentalManagement.Api.Data;
+
+public class RentalManagementContextFactory : IDesignTimeDbContextFactory<RentalManagementContext>
+{
+    public RentalManagementContext CreateDbContext(string[] args)
+    {
+        var optionsBuilder = new DbContextOptionsBuilder<RentalManagementContext>();
+        
+        // Read from environment variable
+        var connectionString = Environment.GetEnvironmentVariable("DATABASE_URL")
+            ?? "Host=localhost;Port=5432;Database=rental_management;Username=admin;Password=123456aA;Include Error Detail=true";
+        
+        optionsBuilder.UseNpgsql(connectionString);
+        
+        return new RentalManagementContext(optionsBuilder.Options);
+    }
+}
+```
+
+#### Solution 3: Static Connection String Storage (For Cloud Run)
+
+In `Program.cs`, use static storage to prevent connection string loss during dependency injection:
+
+```csharp
+// At the end of Program.cs
+public static class StaticConnectionString
+{
+    public static string Value { get; set; } = string.Empty;
+}
+
+// In startup configuration
+var connectionString = Environment.GetEnvironmentVariable("DATABASE_URL") 
+    ?? builder.Configuration.GetConnectionString("DefaultConnection");
+
+// Validate and store
+if (string.IsNullOrWhiteSpace(connectionString))
+{
+    throw new InvalidOperationException("Database connection string not configured");
+}
+
+StaticConnectionString.Value = connectionString;
+
+// Register DbContext with factory
+builder.Services.AddDbContext<RentalManagementContext>((serviceProvider, options) =>
+{
+    var connStr = StaticConnectionString.Value;
+    if (string.IsNullOrWhiteSpace(connStr))
+    {
+        throw new InvalidOperationException("Connection string is null in DbContext factory");
+    }
+    options.UseNpgsql(connStr);
+});
+```
+
+#### Solution 4: Add Connection String to appsettings.Production.json
+
+As a fallback, include the properly formatted connection string in `appsettings.Production.json`:
+
+```json
+{
+  "ConnectionStrings": {
+    "DefaultConnection": "Host=db.fpvgtejnkxkushmzkstu.supabase.co;Port=5432;Database=postgres;Username=postgres;Password=qijfiw-qetqof-paJmo4;SSL Mode=Require;Trust Server Certificate=true"
+  }
+}
+```
+
+**Note:** For production, always prefer environment variables over hardcoded strings.
+
+### Connection String Format Comparison
+
+| Format | Use Case | Port | Example |
+|--------|----------|------|---------|
+| **Npgsql Format** | .NET EF Core | 5432/6543 | `Host=db.xxx.supabase.co;Port=5432;Database=postgres;Username=postgres;Password=xxx;SSL Mode=Require` |
+| **PostgreSQL URI** | Node.js, Python | 5432/6543 | `postgresql://postgres:password@db.xxx.supabase.co:5432/postgres` |
+
+### Deployment Configuration
+
+For **Cloud Run deployment**, update your `deploy-backend.sh`:
+
+```bash
+# Use Direct Connection (Session mode) - More reliable for EF Core
+DATABASE_URL="Host=db.fpvgtejnkxkushmzkstu.supabase.co;Port=5432;Database=postgres;Username=postgres;Password=qijfiw-qetqof-paJmo4;SSL Mode=Require;Trust Server Certificate=true"
+
+# Deploy with environment variable
+gcloud run deploy rental-management-api \
+  --set-env-vars "DATABASE_URL=${DATABASE_URL}" \
+  --region us-central1
+```
+
+### Debugging Steps
+
+If you encounter connection issues:
+
+1. **Verify connection string format:**
+```bash
+# Test connection locally
+export DATABASE_URL="your-connection-string"
+cd RentalManagementSystem/Backend/RentalManagement.Api
+dotnet run
+```
+
+2. **Check Cloud Run logs:**
+```bash
+gcloud run services logs read rental-management-api --region us-central1 --limit 50
+```
+
+Look for:
+- `Database connection configured. Host: db.xxx.supabase.co:5432` (should show correct host/port)
+- Connection string length (should be > 0)
+- Any "Format of the initialization string" errors
+
+3. **Verify environment variables in Cloud Run:**
+```bash
+gcloud run services describe rental-management-api \
+  --region us-central1 \
+  --format="value(spec.template.spec.containers[0].env)"
+```
+
+4. **Test Supabase connection directly:**
+```bash
+psql "Host=db.fpvgtejnkxkushmzkstu.supabase.co;Port=5432;Database=postgres;Username=postgres;Password=qijfiw-qetqof-paJmo4;sslmode=require"
+```
+
+### Best Practices
+
+✅ **DO:**
+- Use **Direct Connection (port 5432)** for EF Core migrations
+- Use **Direct Connection (port 5432)** for Cloud Run runtime (more reliable)
+- Store connection strings in environment variables
+- Use static storage pattern in serverless environments
+- Create a design-time DbContext factory
+- Add detailed logging for connection string validation
+
+❌ **DON'T:**
+- Use Transaction Pooler (port 6543) for long-running operations like migrations
+- Hardcode connection strings in source code
+- Use PostgreSQL URI format directly with Npgsql (convert first)
+- Assume connection strings persist through dependency injection in serverless
+
+### When to Use Each Connection Type
+
+| Connection Type | Port | Best For | Avoid For |
+|----------------|------|----------|-----------|
+| **Direct (Session)** | 5432 | Migrations, Cloud Run apps, long queries | Very high concurrency scenarios |
+| **Transaction Pooler** | 6543 | Serverless functions, short API calls | Migrations, long-running queries |
+
+---
+
+## Migration Steps
+
+### 1. Update NuGet Packages
 
 **File**: `RentalManagement.Api/RentalManagement.Api.csproj`
 
@@ -151,7 +274,7 @@ cd RentalManagementSystem/Backend/RentalManagement.Api
 dotnet restore
 ```
 
-### Step 3: Update Connection Strings
+### 2. Update Connection Strings
 
 **File**: `RentalManagement.Api/appsettings.json`
 
@@ -207,7 +330,7 @@ Create `appsettings.Production.json`:
 }
 ```
 
-### Step 4: Update DbContext Configuration
+### 3. Update DbContext Configuration
 
 **File**: `RentalManagement.Api/Program.cs`
 
@@ -259,7 +382,7 @@ builder.Services.AddDbContext<RentalManagementContext>(options =>
 });
 ```
 
-### Step 5: Update Database Context Functions
+### 4. Update Database Context Functions
 
 **File**: `RentalManagement.Api/Data/RentalManagementContext.cs`
 
@@ -345,7 +468,7 @@ protected override void OnModelCreating(ModelBuilder modelBuilder)
 }
 ```
 
-### Step 6: Update Database Management Service
+### 5. Update Database Management Service
 
 **File**: `RentalManagement.Api/Services/Implementations/DatabaseManagementService.cs`
 
@@ -565,7 +688,7 @@ public async Task<bool> RestoreDatabaseAsync(string backupPath)
 }
 ```
 
-### Step 7: Setup PostgreSQL Container
+### 6. Setup PostgreSQL Container
 
 **File**: `docker-compose.yml` (in project root)
 
@@ -613,7 +736,7 @@ docker-compose down
 docker-compose down -v
 ```
 
-### Step 8: Remove Old Migrations
+### 7. Remove Old Migrations
 
 If you have existing SQL Server migrations, remove them:
 
@@ -624,7 +747,7 @@ cd RentalManagementSystem/Backend/RentalManagement.Api
 rm -rf Migrations/
 ```
 
-### Step 9: Create New PostgreSQL Migrations
+### 8. Create New PostgreSQL Migrations
 
 ```bash
 cd RentalManagementSystem/Backend/RentalManagement.Api
@@ -640,7 +763,7 @@ dotnet ef migrations add InitialPostgreSQLMigration
 - `YYYYMMDDHHMMSS_InitialPostgreSQLMigration.Designer.cs` - Migration metadata
 - `RentalManagementContextModelSnapshot.cs` - Current model snapshot
 
-### Step 10: Apply Migrations
+### 9. Apply Migrations
 
 ```bash
 # Apply migrations to create database schema
@@ -657,7 +780,7 @@ Build succeeded.
 Done.
 ```
 
-### Step 11: Build and Run Application
+### 10. Build and Run Application
 
 ```bash
 # Build the project

@@ -89,24 +89,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
       const user = tokenStorage.getUser();
 
       if (token && user) {
-        // Verify token is still valid
-        try {
-          const response = await authService.verifyToken();
-          if (response.success && response.data) {
-            dispatch({
-              type: 'LOGIN_SUCCESS',
-              payload: { user: response.data, token },
-            });
-          } else {
-            // Token is invalid, clear storage
-            tokenStorage.clear();
-            dispatch({ type: 'LOGIN_FAILURE' });
-          }
-        } catch (error) {
-          // Token verification failed, clear storage
-          tokenStorage.clear();
-          dispatch({ type: 'LOGIN_FAILURE' });
-        }
+        // Set the user from localStorage
+        // We trust the stored token unless the API returns 401
+        dispatch({
+          type: 'LOGIN_SUCCESS',
+          payload: { user, token },
+        });
       } else {
         dispatch({ type: 'SET_LOADING', payload: false });
       }
