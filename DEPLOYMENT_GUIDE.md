@@ -1,6 +1,24 @@
 # 🚀 Deployment Guide - Rental Management System
 
-Complete guide to deploy your Rental Management System to production.
+Complete guide to deploy your Rental Management System to production with multiple deployment options.
+
+---
+
+## 🎯 DEPLOYMENT OPTIONS
+
+Choose your preferred deployment platform:
+
+### **Option 1: Render + Netlify (Recommended for Beginners)**
+- **Backend**: Render Free Web Service
+- **Frontend**: Netlify (existing)
+- **Pros**: Simple setup, Git-based auto-deploy, free tier
+- **Cons**: Cold starts (1 min), 750 hours/month limit
+
+### **Option 2: Google Cloud Run + Netlify (Current)**
+- **Backend**: Google Cloud Run
+- **Frontend**: Netlify  
+- **Pros**: Fast cold starts, pay-per-use, enterprise-grade
+- **Cons**: More complex setup, potential costs
 
 ---
 
@@ -47,6 +65,7 @@ gcloud services enable containerregistry.googleapis.com
 - **Netlify**: https://netlify.com (Free tier available)
 - **Cloudflare Pages**: https://pages.cloudflare.com (Free tier available)
 - **Google Cloud**: https://cloud.google.com (Free credits available)
+- **Render**: https://render.com (Free tier available)
 
 ---
 
@@ -90,7 +109,109 @@ dotnet ef database update --connection "$DATABASE_URL"
 
 ## ☁️ BACKEND DEPLOYMENT - Step by Step
 
-### **Prerequisites**
+### **Option 1: Render Deployment**
+
+#### **Step 1: Prepare Render Configuration**
+
+Your project already has these Render-ready files:
+- ✅ `render.yaml` - Service configuration
+- ✅ `Dockerfile` - Optimized for Render (port 10000)
+- ✅ `deploy-render.sh` - Automated deployment script
+- ✅ Health check endpoint at `/api/health`
+
+#### **Step 2: Deploy to Render**
+
+**Option A: Manual Setup (Recommended First Time)**
+
+1. **Create Render Account**
+   - Go to: https://dashboard.render.com
+   - Sign up with GitHub (recommended for auto-deploy)
+
+2. **Create Web Service**
+   - Click **"New +"** → **"Web Service"**
+   - Connect your Git repository
+   - Configure these settings:
+     ```
+     Name: rental-management-api
+     Runtime: Docker
+     Dockerfile Path: ./RentalManagementSystem/Backend/RentalManagement.Api/Dockerfile
+     Docker Context: ./RentalManagementSystem/Backend/RentalManagement.Api
+     Branch: main
+     Plan: Free
+     Region: Oregon (free regions: Oregon, Frankfurt, Singapore)
+     ```
+
+3. **Add Environment Variables**
+   ```bash
+   ASPNETCORE_ENVIRONMENT=Production
+   ASPNETCORE_URLS=http://0.0.0.0:10000
+   DATABASE_URL=Host=db.fpvgtejnkxkushmzkstu.supabase.co;Port=5432;Database=postgres;Username=postgres;Password=qijfiw-qetqof-paJmo4;SSL Mode=Require;Trust Server Certificate=true
+   JWT_SECRET_KEY=Nw6OuBAYTsjMpAvDW1r7xo62KAa8/7eTjS/+a9jO0h4=
+   FRONTEND_URL=https://rental-management-fresh-2026.netlify.app
+   ```
+
+4. **Deploy**
+   - Click **"Create Web Service"**
+   - Wait 3-5 minutes for initial deployment
+   - Your API will be at: `https://rental-management-api.onrender.com`
+
+**Option B: Automated Setup**
+
+```bash
+# Navigate to project root
+cd /Users/dungvt/Projects/rental-management-system
+
+# Run deployment script
+./deploy-render.sh
+```
+
+#### **Step 3: Update Frontend for Render Backend**
+
+```bash
+# Update frontend to use Render backend URL
+./update-frontend-for-render.sh https://your-render-service.onrender.com
+
+# The script will:
+# 1. Find and update API configuration files
+# 2. Update environment variables
+# 3. Provide instructions for Netlify rebuild
+```
+
+#### **Step 4: Update Netlify Environment Variables**
+
+1. **Go to Netlify Dashboard**
+   - Visit: https://app.netlify.com → Your Site → Site Settings → Environment Variables
+
+2. **Update/Add Variables**
+   ```
+   VITE_API_URL=https://your-render-service.onrender.com/api
+   REACT_APP_API_URL=https://your-render-service.onrender.com/api
+   ```
+
+3. **Trigger Redeploy**
+   - Go to **Deploys** → **Trigger deploy** → **Deploy site**
+
+#### **Step 5: Test Render Deployment**
+
+```bash
+# Test health check
+curl https://your-render-service.onrender.com/api/health
+
+# Test authentication
+curl -X POST 'https://your-render-service.onrender.com/api/auth/login' \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"admin@rentalmanagement.com","password":"Admin123!"}'
+
+# Test protected endpoint (use token from login)
+curl 'https://your-render-service.onrender.com/api/rooms' \
+  -H 'Authorization: Bearer YOUR_TOKEN_HERE'
+```
+
+---
+
+### **Option 2: Google Cloud Run Deployment**
+
+#### **Prerequisites**
 ```bash
 # Install Google Cloud CLI (macOS)
 brew install google-cloud-sdk
@@ -102,7 +223,7 @@ gcloud auth login
 gcloud config set project quantum-conduit-483508-c0
 ```
 
-### **Step 1: Prepare Your Configuration**
+#### **Step 1: Prepare Your Configuration**
 
 Your deployment script (`deploy-backend.sh`) should have these values:
 
@@ -124,7 +245,7 @@ JWT_SECRET_KEY="$(openssl rand -base64 32)"
 FRONTEND_URL="https://your-frontend-url.netlify.app"
 ```
 
-### **Step 2: Deploy Backend**
+#### **Step 2: Deploy Backend**
 
 ```bash
 # Navigate to project root
@@ -152,7 +273,7 @@ API URL: https://rental-management-api-lfgedmy2ua-uc.a.run.app
 Swagger: https://rental-management-api-lfgedmy2ua-uc.a.run.app/swagger
 ```
 
-### **Step 3: Test Backend API**
+#### **Step 3: Test Backend API**
 
 ```bash
 # Test health check
@@ -342,6 +463,13 @@ gcloud run services logs tail rental-management-api \
   --region us-central1
 ```
 
+### **Backend Logs (Render)**
+
+```bash
+# View logs in Render dashboard
+# Navigate to: https://dashboard.render.com
+```
+
 ### **Frontend Logs (Netlify)**
 
 ```bash
@@ -386,6 +514,7 @@ netlify logs:function
 | Service | Free Tier | Expected Monthly Cost |
 |---------|-----------|----------------------|
 | **Google Cloud Run** | 2M requests, 360k GB-seconds | $0-5 (low traffic) |
+| **Render** | 750 hours/month | $0 (within limits) |
 | **Netlify** | 100 GB bandwidth, 300 build minutes | $0 (within limits) |
 | **Supabase** | 500 MB database, 2 GB bandwidth | $0 (within limits) |
 | **Total** | | **$0-10/month** |
@@ -472,6 +601,12 @@ dotnet run
 ./deploy-backend.sh
 ```
 
+### **deploy-render.sh**
+```bash
+# Deploy backend to Render
+./deploy-render.sh
+```
+
 ### **deploy-frontend-netlify.sh**
 ```bash
 # Interactive deployment with options
@@ -496,7 +631,7 @@ dotnet run
 
 ### **Before Going Live**
 
-- [x] Backend deployed to Cloud Run
+- [x] Backend deployed to Cloud Run or Render
 - [x] Frontend deployed to Netlify
 - [x] Database on Supabase (Transaction pooler)
 - [ ] Environment variables configured in Netlify
@@ -526,35 +661,52 @@ dotnet run
 ## 📞 USEFUL LINKS
 
 ### **Your Deployment URLs**
-- **Frontend**: https://candid-beijinho-543419.netlify.app
-- **Backend API**: https://rental-management-api-lfgedmy2ua-uc.a.run.app
-- **Swagger Docs**: https://rental-management-api-lfgedmy2ua-uc.a.run.app/swagger
-- **Netlify Dashboard**: https://app.netlify.com/projects/candid-beijinho-543419
-- **Google Cloud Console**: https://console.cloud.google.com/run?project=quantum-conduit-483508-c0
+- **Frontend (Netlify)**: https://candid-beijinho-543419.netlify.app
+- **Backend (Cloud Run)**: https://rental-management-api-lfgedmy2ua-uc.a.run.app
+- **Backend (Render)**: https://your-render-service.onrender.com
+- **Swagger Docs**: Available on both backend URLs + `/swagger`
+
+### **Dashboards**
+- **Netlify**: https://app.netlify.com/sites/rental-management-fresh-2026
+- **Google Cloud**: https://console.cloud.google.com/run?project=quantum-conduit-483508-c0
+- **Render**: https://dashboard.render.com
+- **Supabase**: https://supabase.com/dashboard
 
 ### **Documentation**
+- **Render**: https://render.com/docs
 - **Supabase**: https://supabase.com/docs
 - **Google Cloud Run**: https://cloud.google.com/run/docs
 - **Netlify**: https://docs.netlify.com
-- **.NET 8**: https://learn.microsoft.com/en-us/dotnet
-- **React + Vite**: https://vitejs.dev/guide
 
 ---
 
-## 🎓 LEARNING RESOURCES
+## 🎯 RECOMMENDED DEPLOYMENT PATH
 
-### **For DevOps/Deployment**
-- [Google Cloud Run Tutorial](https://cloud.google.com/run/docs/quickstarts)
-- [Netlify Deployment Guide](https://docs.netlify.com/site-deploys/overview/)
-- [Supabase Connection Pooling](https://supabase.com/docs/guides/database/connecting-to-postgres)
+### **For Learning/Portfolio Projects**
+```
+1. Start with: Render + Netlify
+2. Pros: Simple, free, Git-based
+3. Cons: Cold starts, usage limits
+```
 
-### **For Monitoring**
-- [Cloud Run Metrics](https://cloud.google.com/run/docs/monitoring)
-- [Netlify Analytics](https://docs.netlify.com/monitor-sites/analytics/)
+### **For Production Applications**
+```
+1. Start with: Google Cloud Run + Netlify
+2. Pros: Fast, scalable, enterprise-grade
+3. Cons: More complex, potential costs
+```
+
+### **Hybrid Approach**
+```
+1. Development: Render (simple, free)
+2. Staging: Render (cost-effective testing)
+3. Production: Google Cloud Run (performance, reliability)
+```
 
 ---
 
 **Happy Deploying! 🎉**
 
 **Last Updated**: January 12, 2026  
-**Deployment Status**: ✅ Backend & Frontend Live
+**New**: Render deployment option added  
+**Status**: ✅ Multiple deployment options available

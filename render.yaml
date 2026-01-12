@@ -1,0 +1,29 @@
+services:
+  - type: web
+    name: rental-management-api
+    runtime: docker
+    plan: free
+    dockerfilePath: ./RentalManagementSystem/Backend/RentalManagement.Api/Dockerfile
+    dockerContext: ./RentalManagementSystem/Backend/RentalManagement.Api
+    region: oregon # Free plan regions: oregon, frankfurt, singapore
+    branch: main
+    healthCheckPath: /api/health
+    envVars:
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production
+      - key: ASPNETCORE_URLS
+        value: http://0.0.0.0:10000
+      - key: DATABASE_URL
+        value: Host=db.fpvgtejnkxkushmzkstu.supabase.co;Port=5432;Database=postgres;Username=postgres;Password=qijfiw-qetqof-paJmo4;SSL Mode=Require;Trust Server Certificate=true
+      - key: JWT_SECRET_KEY
+        value: Nw6OuBAYTsjMpAvDW1r7xo62KAa8/7eTjS/+a9jO0h4=
+      - key: FRONTEND_URL
+        value: https://rental-management-fresh-2026.netlify.app
+    
+# Health check endpoint configuration
+healthCheck:
+  path: /api/health
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
