@@ -13,7 +13,8 @@ import {
   Menu,
   X,
   Package,
-  Settings
+  Settings,
+  UserCog
 } from 'lucide-react';
 import { useState } from 'react';
 import { LanguageSwitcher, LanguageSwitcherCompact } from '../LanguageSwitcher';
@@ -43,6 +44,7 @@ export function Layout({ children }: LayoutProps) {
     { name: t('items.title', 'Items'), href: '/items', icon: Package },
     { name: t('payments.title', 'Payments'), href: '/payments', icon: CreditCard },
     { name: t('reports.title', 'Reports'), href: '/reports', icon: BarChart3 },
+    { name: t('users.title', 'User Management'), href: '/users', icon: UserCog },
     { name: t('system.title', 'System'), href: '/system', icon: Settings },
   ];
 

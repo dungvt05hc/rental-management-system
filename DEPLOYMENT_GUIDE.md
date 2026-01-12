@@ -1,12 +1,23 @@
-# 🚀 Deployment Guide
+# 🚀 Deployment Guide - Rental Management System
 
 Complete guide to deploy your Rental Management System to production.
 
-## Architecture Overview
+---
 
-- **Frontend**: Netlify or Cloudflare Pages (React + Vite)
-- **Backend**: Google Cloud Run (.NET 8 API)
-- **Database**: Supabase PostgreSQL (Transaction Pooler for serverless)
+## ✅ YOUR CURRENT DEPLOYMENT
+
+### **Backend (Google Cloud Run)**
+- **API URL**: https://rental-management-api-lfgedmy2ua-uc.a.run.app
+- **Swagger UI**: https://rental-management-api-lfgedmy2ua-uc.a.run.app/swagger
+- **Status**: ✅ Live and Running
+
+### **Frontend (Netlify)**
+- **Production URL**: https://candid-beijinho-543419.netlify.app
+- **Status**: ✅ Deployed (Needs environment variable configuration)
+
+### **Database (Supabase)**
+- **Connection**: Transaction Pooler (Serverless)
+- **Status**: ✅ Connected
 
 ---
 
@@ -77,28 +88,48 @@ dotnet ef database update --connection "$DATABASE_URL"
 
 ---
 
-## ☁️ Phase 2: Backend Deployment (Google Cloud Run)
+## ☁️ BACKEND DEPLOYMENT - Step by Step
 
-### Step 1: Prepare Configuration
-Edit `deploy-backend.sh` and update these values:
+### **Prerequisites**
+```bash
+# Install Google Cloud CLI (macOS)
+brew install google-cloud-sdk
+
+# Login to Google Cloud
+gcloud auth login
+
+# Set your project
+gcloud config set project quantum-conduit-483508-c0
+```
+
+### **Step 1: Prepare Your Configuration**
+
+Your deployment script (`deploy-backend.sh`) should have these values:
 
 ```bash
-PROJECT_ID="your-gcp-project-id"  # Your GCP project ID
-REGION="us-central1"               # Choose: us-central1, europe-west1, asia-east1, etc.
+#!/bin/bash
+
+# Google Cloud Configuration
+PROJECT_ID="quantum-conduit-483508-c0"
+REGION="us-central1"
 SERVICE_NAME="rental-management-api"
 
-# From Supabase (Step 1.2)
-DATABASE_URL="postgresql://postgres.xxxx:password@aws-0-region.pooler.supabase.com:6543/postgres"
+# Database Configuration (from Supabase)
+DATABASE_URL="your-supabase-transaction-pooler-connection-string"
 
-# Generate a secure random string (at least 32 characters)
+# JWT Secret (Generate a secure key)
 JWT_SECRET_KEY="$(openssl rand -base64 32)"
 
-# Will update after deploying frontend
+# Frontend URL (Will update after deploying frontend)
 FRONTEND_URL="https://your-frontend-url.netlify.app"
 ```
 
-### Step 2: Build and Deploy
+### **Step 2: Deploy Backend**
+
 ```bash
+# Navigate to project root
+cd /Users/dungvt/Projects/rental-management-system
+
 # Make script executable
 chmod +x deploy-backend.sh
 
@@ -106,542 +137,424 @@ chmod +x deploy-backend.sh
 ./deploy-backend.sh
 ```
 
-This will:
-1. Build Docker image
-2. Push to Google Container Registry
-3. Deploy to Cloud Run
-4. Output your API URL
+**What happens during deployment:**
+1. ✅ Builds Docker image from your .NET 8 API
+2. ✅ Pushes image to Google Container Registry
+3. ✅ Deploys to Cloud Run with environment variables
+4. ✅ Configures CORS, memory, CPU, and timeout settings
+5. ✅ Outputs your API URL
 
-### Step 3: Test Your API
-```bash
-# Your API URL will be something like:
-# https://rental-management-api-xxxx-uc.a.run.app
-
-# Test health
-curl https://your-api-url.run.app/swagger
-
-# Should return Swagger UI
+**Expected Output:**
 ```
+✅ Backend deployed successfully!
 
-### Step 4: Configure Custom Domain (Optional)
-```bash
-# Map custom domain
-gcloud run domain-mappings create \
-  --service rental-management-api \
-  --domain api.yourdomain.com \
-  --region us-central1
-```
-After deploy:
-Backend Deployed
 API URL: https://rental-management-api-lfgedmy2ua-uc.a.run.app
 Swagger: https://rental-management-api-lfgedmy2ua-uc.a.run.app/swagger
----
-
-## 🎨 Phase 3: Frontend Deployment
-
-### Option A: Netlify (Recommended)
-
-#### Step 1: Prepare Environment Variables
-Create `.env.production` in `RentalManagementSystem/Frontend/`:
-
-```bash
-VITE_API_URL=https://your-cloud-run-url.run.app
 ```
 
-#### Step 2: Deploy via Git (Recommended)
-1. Push your code to GitHub
-2. Go to https://app.netlify.com
-3. Click **"Add new site"** → **"Import an existing project"**
-4. Connect your GitHub repository
-5. Configure build settings:
-   - **Base directory**: `RentalManagementSystem/Frontend`
-   - **Build command**: `npm run build`
-   - **Publish directory**: `dist`
-6. Add environment variable:
-   - Key: `VITE_API_URL`
-   - Value: `https://your-cloud-run-url.run.app`
-7. Click **"Deploy site"**
-
-#### Step 3: Deploy via CLI
-```bash
-# Install Netlify CLI
-npm install -g netlify-cli
-
-# Login
-netlify login
-
-# Deploy from frontend directory
-cd RentalManagementSystem/Frontend
-
-# Build first
-npm run build
-
-# Deploy
-netlify deploy --prod
-```
-
-#### Step 4: Configure Custom Domain (Optional)
-1. In Netlify dashboard, go to **Domain settings**
-2. Click **"Add custom domain"**
-3. Follow DNS configuration instructions
-
----
-
-### Option B: Cloudflare Pages
-
-#### Step 1: Deploy via Git
-1. Push code to GitHub
-2. Go to https://dash.cloudflare.com
-3. Navigate to **Workers & Pages** → **Create application** → **Pages**
-4. Connect your GitHub repository
-5. Configure build settings:
-   - **Framework preset**: Vite
-   - **Build command**: `npm run build`
-   - **Build output directory**: `dist`
-   - **Root directory**: `RentalManagementSystem/Frontend`
-6. Add environment variable:
-   - `VITE_API_URL` = `https://your-cloud-run-url.run.app`
-7. Click **"Save and Deploy"**
-
-#### Step 2: Deploy via CLI
-```bash
-# Install Wrangler
-npm install -g wrangler
-
-# Login
-wrangler login
-
-# Deploy
-cd RentalManagementSystem/Frontend
-npm run build
-wrangler pages deploy dist --project-name rental-management
-```
-
----
-
-## 🔄 Phase 4: Connect Everything
-
-### Step 1: Update Backend CORS
-Once you have your frontend URL, update the backend:
+### **Step 3: Test Backend API**
 
 ```bash
-# Update Cloud Run environment variables
-gcloud run services update rental-management-api \
-  --set-env-vars "FRONTEND_URL=https://your-actual-frontend-url.netlify.app" \
-  --region us-central1
-```
+# Test health check
+curl https://rental-management-api-lfgedmy2ua-uc.a.run.app/swagger
 
-### Step 2: Update Frontend API URL
-Update environment variable in Netlify/Cloudflare:
-- **Netlify**: Site settings → Environment variables
-- **Cloudflare**: Pages project → Settings → Environment variables
-
-Set: `VITE_API_URL=https://your-cloud-run-url.run.app`
-
----
-
-## 🧪 Phase 5: Testing
-
-### Test Backend
-```bash
-# Health check
-curl https://your-api-url.run.app/swagger
-
-# Test auth endpoint
-curl -X POST https://your-api-url.run.app/api/auth/login \
+# Test login endpoint
+curl -X POST https://rental-management-api-lfgedmy2ua-uc.a.run.app/api/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email":"admin@rentalmanagement.com","password":"Admin123!"}'
 ```
 
-### Test Frontend
-1. Visit your frontend URL
+---
+
+## 🎨 FRONTEND DEPLOYMENT - Step by Step
+
+### **Prerequisites**
+```bash
+# Install Netlify CLI
+npm install -g netlify-cli
+
+# Login to Netlify
+netlify login
+```
+
+### **Step 1: Build Frontend**
+
+```bash
+# Navigate to frontend directory
+cd /Users/dungvt/Projects/rental-management-system/RentalManagementSystem/Frontend
+
+# Install dependencies
+npm install
+
+# Build for production
+npm run build
+```
+
+**Expected Output:**
+```
+✓ 2301 modules transformed.
+dist/index.html                   0.47 kB │ gzip:   0.31 kB
+dist/assets/index-gh9kAUHO.css   60.45 kB │ gzip:  10.53 kB
+dist/assets/index-RIHcJYIm.js   847.82 kB │ gzip: 232.59 kB
+✓ built in 1.91s
+```
+
+### **Step 2: Deploy to Netlify**
+
+```bash
+# Deploy to production
+netlify deploy --prod --dir=dist
+```
+
+**During deployment:**
+1. ✅ Uploads all build files to Netlify CDN
+2. ✅ Configures automatic HTTPS
+3. ✅ Sets up continuous deployment from Git (if connected)
+
+**Expected Output:**
+```
+✔ Deploy is live!
+
+Production URL: https://candid-beijinho-543419.netlify.app
+```
+
+### **Step 3: Configure Environment Variables in Netlify**
+
+**Option A: Via Netlify Dashboard (Recommended)**
+
+1. Go to: https://app.netlify.com/projects/candid-beijinho-543419/configuration/env
+2. Click **"Add a variable"**
+3. Add:
+   - **Key**: `VITE_API_BASE_URL`
+   - **Value**: `https://rental-management-api-lfgedmy2ua-uc.a.run.app/api`
+   - **Scopes**: Production ✅
+4. Click **"Save"**
+5. Go to **Deploys** → **Trigger deploy** → **Deploy site**
+
+**Option B: Via Netlify CLI**
+
+```bash
+# Set environment variable
+netlify env:set VITE_API_BASE_URL "https://rental-management-api-lfgedmy2ua-uc.a.run.app/api"
+
+# Trigger redeploy
+netlify deploy --prod --dir=dist
+```
+
+### **Step 4: Update Backend CORS**
+
+Your backend needs to accept requests from your Netlify domain:
+
+```bash
+# Navigate to project root
+cd /Users/dungvt/Projects/rental-management-system
+
+# Run CORS update script
+./update-backend-cors.sh
+```
+
+**When prompted, enter:**
+```
+https://candid-beijinho-543419.netlify.app
+```
+
+**Press Enter, then type** `done` **and press Enter again**
+
+**Expected Output:**
+```
+✅ CORS configuration updated successfully!
+
+Allowed Origins:
+  - https://candid-beijinho-543419.netlify.app
+  - http://localhost:3000
+  - http://localhost:5173
+```
+
+---
+
+## 🧪 TESTING YOUR DEPLOYMENT
+
+### **1. Test Backend Directly**
+
+```bash
+# Open Swagger UI in browser
+open https://rental-management-api-lfgedmy2ua-uc.a.run.app/swagger
+
+# Or test with curl
+curl -X POST https://rental-management-api-lfgedmy2ua-uc.a.run.app/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@rentalmanagement.com","password":"Admin123!"}'
+```
+
+### **2. Test Frontend**
+
+1. Open: https://candid-beijinho-543419.netlify.app
 2. Try to login with:
    - **Email**: admin@rentalmanagement.com
    - **Password**: Admin123!
 
+### **3. Check Browser Console**
+
+Open Developer Tools (F12) and check:
+- **Console**: No CORS errors
+- **Network**: API calls should return 200 status
+- **Application**: JWT token stored in localStorage
+
 ---
 
-## 📊 Monitoring & Logs
+## 🔄 UPDATING YOUR DEPLOYMENT
 
-### Google Cloud Run Logs
+### **Update Backend**
+
 ```bash
-# View logs
+# Navigate to project root
+cd /Users/dungvt/Projects/rental-management-system
+
+# Make changes to your code, then redeploy
+./deploy-backend.sh
+```
+
+### **Update Frontend**
+
+```bash
+# Navigate to frontend
+cd RentalManagementSystem/Frontend
+
+# Make changes, then rebuild and redeploy
+npm run build
+netlify deploy --prod --dir=dist
+```
+
+---
+
+## 📊 MONITORING & LOGS
+
+### **Backend Logs (Google Cloud Run)**
+
+```bash
+# View recent logs
 gcloud run services logs read rental-management-api \
   --region us-central1 \
   --limit 50
 
-# Stream logs
-gcloud run services logs tail rental-management-api --region us-central1
+# Stream live logs
+gcloud run services logs tail rental-management-api \
+  --region us-central1
 ```
 
-### Supabase Monitoring
-- Go to Supabase Dashboard → **Database** → **Reports**
-- Monitor active connections, query performance
+### **Frontend Logs (Netlify)**
 
-### Netlify/Cloudflare Logs
-- Check deploy logs in respective dashboards
-- Monitor analytics and performance
-
----
-
-## 💰 Cost Estimates (Free Tiers)
-
-| Service | Free Tier | Expected Cost |
-|---------|-----------|---------------|
-| **Supabase** | 500 MB database, 2 GB bandwidth | $0/month (within limits) |
-| **Cloud Run** | 2M requests, 360k GB-seconds | $0-5/month (low traffic) |
-| **Netlify** | 100 GB bandwidth, 300 build minutes | $0/month (small sites) |
-| **Cloudflare Pages** | Unlimited requests, 500 builds/month | $0/month |
-
-**Total**: ~$0-10/month for low-medium traffic
-
----
-
-## 🔐 Security Checklist
-
-- [ ] Changed default JWT secret key
-- [ ] Updated Supabase database password
-- [ ] Configured CORS properly
-- [ ] Enabled HTTPS (automatic on all platforms)
-- [ ] Set up environment variables (not in code)
-- [ ] Configured rate limiting (TODO)
-- [ ] Set up monitoring and alerts
-- [ ] Backed up Supabase database
-
----
-
-## 🚨 Troubleshooting
-
-### Backend Issues
-
-**Problem**: Cloud Run deployment fails
 ```bash
-# Check logs
-gcloud run services logs read rental-management-api --region us-central1 --limit 100
+# View deploy logs
+netlify logs:deploy
 
-# Common issues:
-# 1. Wrong connection string format
-# 2. Missing environment variables
-# 3. Port configuration (must be 8080)
+# View function logs (if using serverless functions)
+netlify logs:function
 ```
 
-**Problem**: Database connection fails
+**Or view in dashboard:**
+- https://app.netlify.com/projects/candid-beijinho-543419/deploys
+
+### **Database Monitoring (Supabase)**
+
+1. Go to: https://supabase.com/dashboard
+2. Select your project
+3. Navigate to **Database** → **Reports**
+4. Monitor:
+   - Active connections
+   - Query performance
+   - Disk usage
+
+---
+
+## 🔐 SECURITY CHECKLIST
+
+- [x] JWT secret is randomly generated (not default)
+- [x] HTTPS enabled on all services (automatic)
+- [x] CORS configured properly
+- [x] Database uses connection pooling (Supabase Transaction mode)
+- [ ] Change default admin password after first login
+- [ ] Set up monitoring alerts
+- [ ] Configure rate limiting
+- [ ] Regular database backups
+- [ ] Review and rotate secrets every 90 days
+
+---
+
+## 💰 COST ESTIMATES
+
+| Service | Free Tier | Expected Monthly Cost |
+|---------|-----------|----------------------|
+| **Google Cloud Run** | 2M requests, 360k GB-seconds | $0-5 (low traffic) |
+| **Netlify** | 100 GB bandwidth, 300 build minutes | $0 (within limits) |
+| **Supabase** | 500 MB database, 2 GB bandwidth | $0 (within limits) |
+| **Total** | | **$0-10/month** |
+
+---
+
+## 🚨 TROUBLESHOOTING
+
+### **Problem: CORS Errors in Browser**
+
+**Symptoms:**
+```
+Access to XMLHttpRequest has been blocked by CORS policy
+```
+
+**Solution:**
 ```bash
-# Test connection locally
-export DATABASE_URL="your-supabase-connection-string"
+# Update backend CORS configuration
+cd /Users/dungvt/Projects/rental-management-system
+./update-backend-cors.sh
+
+# Enter your Netlify URL when prompted:
+# https://candid-beijinho-543419.netlify.app
+```
+
+### **Problem: Frontend Can't Connect to API**
+
+**Check:**
+1. Environment variable is set in Netlify:
+   - Go to: https://app.netlify.com/projects/candid-beijinho-543419/configuration/env
+   - Verify `VITE_API_BASE_URL` exists
+   - Value should be: `https://rental-management-api-lfgedmy2ua-uc.a.run.app/api`
+
+2. Trigger a redeploy after adding environment variable
+
+**Solution:**
+```bash
+# Redeploy frontend with correct environment variable
+cd RentalManagementSystem/Frontend
+netlify deploy --prod --dir=dist
+```
+
+### **Problem: Backend Returns 500 Errors**
+
+**Check Logs:**
+```bash
+gcloud run services logs read rental-management-api \
+  --region us-central1 \
+  --limit 100
+```
+
+**Common Issues:**
+- Database connection string is incorrect
+- Database migrations not applied
+- JWT secret not configured
+
+### **Problem: Database Connection Fails**
+
+**Verify:**
+1. Using **Transaction** pooler (not Session)
+2. Connection string format:
+   ```
+   postgresql://postgres.[ref]:[password]@aws-0-[region].pooler.supabase.com:6543/postgres
+   ```
+3. Password is correct (check Supabase dashboard)
+
+**Test Connection:**
+```bash
+# Set connection string
+export DATABASE_URL="your-connection-string"
+
+# Test locally
 cd RentalManagementSystem/Backend/RentalManagement.Api
 dotnet run
-
-# Check Supabase pooler status in dashboard
 ```
 
-### Frontend Issues
+---
 
-**Problem**: API calls fail (CORS errors)
-- Verify `FRONTEND_URL` is set in Cloud Run
-- Check browser console for exact error
-- Ensure API URL is correct in frontend env vars
+## 📝 DEPLOYMENT SCRIPTS REFERENCE
 
-**Problem**: Build fails
+### **deploy-backend.sh**
 ```bash
-# Clear cache and rebuild
-cd RentalManagementSystem/Frontend
-rm -rf node_modules dist
-npm install
-npm run build
+# Deploy backend to Google Cloud Run
+./deploy-backend.sh
+```
+
+### **deploy-frontend-netlify.sh**
+```bash
+# Interactive deployment with options
+./deploy-frontend-netlify.sh
+```
+
+### **update-backend-cors.sh**
+```bash
+# Update CORS configuration
+./update-backend-cors.sh
+```
+
+### **generate-jwt-secret.sh**
+```bash
+# Generate a secure JWT secret
+./generate-jwt-secret.sh
 ```
 
 ---
 
-## 🔄 CI/CD Setup (Optional)
+## 🎯 PRODUCTION CHECKLIST
 
-### GitHub Actions for Backend
-Create `.github/workflows/deploy-backend.yml`:
+### **Before Going Live**
 
-```yaml
-name: Deploy Backend to Cloud Run
+- [x] Backend deployed to Cloud Run
+- [x] Frontend deployed to Netlify
+- [x] Database on Supabase (Transaction pooler)
+- [ ] Environment variables configured in Netlify
+- [ ] CORS updated with Netlify URL
+- [ ] Test login/logout functionality
+- [ ] Test all major features
+- [ ] Change default admin password
+- [ ] Set up custom domain (optional)
+- [ ] Configure monitoring alerts
+- [ ] Set up automated backups
+- [ ] Review security settings
+- [ ] Document deployment process for team
 
-on:
-  push:
-    branches: [main]
-    paths:
-      - 'RentalManagementSystem/Backend/**'
+### **After Going Live**
 
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      
-      - name: Setup Cloud SDK
-        uses: google-github-actions/setup-gcloud@v1
-        with:
-          service_account_key: ${{ secrets.GCP_SA_KEY }}
-          project_id: ${{ secrets.GCP_PROJECT_ID }}
-      
-      - name: Build and Push
-        run: |
-          gcloud builds submit \
-            --tag gcr.io/${{ secrets.GCP_PROJECT_ID }}/rental-management-api \
-            RentalManagementSystem/Backend
-      
-      - name: Deploy to Cloud Run
-        run: |
-          gcloud run deploy rental-management-api \
-            --image gcr.io/${{ secrets.GCP_PROJECT_ID }}/rental-management-api \
-            --region us-central1 \
-            --platform managed
-```
+- [ ] Monitor error logs daily (first week)
+- [ ] Check performance metrics
+- [ ] Verify database connection pooling
+- [ ] Test from different locations/devices
+- [ ] Set up uptime monitoring (e.g., UptimeRobot)
+- [ ] Configure error tracking (e.g., Sentry)
+- [ ] Plan for scaling if needed
+- [ ] Schedule regular security audits
 
 ---
 
-## 📝 Environment Variables Reference
+## 📞 USEFUL LINKS
 
-### Backend (Cloud Run)
-| Variable | Description | Example |
-|----------|-------------|---------|
-| `DATABASE_URL` | Supabase transaction pooler connection | `postgresql://postgres.xxx...` |
-| `JWT_SECRET_KEY` | JWT signing key (32+ chars) | Generated via `openssl rand -base64 32` |
-| `FRONTEND_URL` | Frontend URL for CORS | `https://app.netlify.app` |
-| `ASPNETCORE_ENVIRONMENT` | Environment name | `Production` |
+### **Your Deployment URLs**
+- **Frontend**: https://candid-beijinho-543419.netlify.app
+- **Backend API**: https://rental-management-api-lfgedmy2ua-uc.a.run.app
+- **Swagger Docs**: https://rental-management-api-lfgedmy2ua-uc.a.run.app/swagger
+- **Netlify Dashboard**: https://app.netlify.com/projects/candid-beijinho-543419
+- **Google Cloud Console**: https://console.cloud.google.com/run?project=quantum-conduit-483508-c0
 
-### Frontend (Netlify/Cloudflare)
-| Variable | Description | Example |
-|----------|-------------|---------|
-| `VITE_API_URL` | Backend API URL | `https://api.run.app` |
-
----
-
-## 🎯 Next Steps
-
-1. ✅ Deploy database (Supabase)
-2. ✅ Deploy backend (Cloud Run)
-3. ✅ Deploy frontend (Netlify/Cloudflare)
-4. ⬜ Set up custom domains
-5. ⬜ Configure CI/CD pipelines
-6. ⬜ Set up monitoring and alerts
-7. ⬜ Configure backups
-8. ⬜ Set up rate limiting
-9. ⬜ Add application monitoring (e.g., Sentry)
-10. ⬜ Performance optimization
+### **Documentation**
+- **Supabase**: https://supabase.com/docs
+- **Google Cloud Run**: https://cloud.google.com/run/docs
+- **Netlify**: https://docs.netlify.com
+- **.NET 8**: https://learn.microsoft.com/en-us/dotnet
+- **React + Vite**: https://vitejs.dev/guide
 
 ---
 
-## 📞 Support
+## 🎓 LEARNING RESOURCES
 
-- **Supabase Docs**: https://supabase.com/docs
-- **Cloud Run Docs**: https://cloud.google.com/run/docs
-- **Netlify Docs**: https://docs.netlify.com
-- **Cloudflare Pages Docs**: https://developers.cloudflare.com/pages
+### **For DevOps/Deployment**
+- [Google Cloud Run Tutorial](https://cloud.google.com/run/docs/quickstarts)
+- [Netlify Deployment Guide](https://docs.netlify.com/site-deploys/overview/)
+- [Supabase Connection Pooling](https://supabase.com/docs/guides/database/connecting-to-postgres)
+
+### **For Monitoring**
+- [Cloud Run Metrics](https://cloud.google.com/run/docs/monitoring)
+- [Netlify Analytics](https://docs.netlify.com/monitor-sites/analytics/)
 
 ---
 
 **Happy Deploying! 🎉**
 
-# 🚀 Frontend Deployment Guide
-
-Your frontend has been successfully built and is ready for deployment!
-
-**Build Output Location:** `RentalManagementSystem/Frontend/dist/`
-
----
-
-## 📦 Option 1: Deploy to Netlify
-
-### Method A: Drag & Drop Deployment (Easiest)
-
-1. **Go to Netlify:**
-   - Visit: https://app.netlify.com/drop
-   - Login with your Netlify account
-
-2. **Drag & Drop:**
-   - Drag the entire `RentalManagementSystem/Frontend/dist` folder into the upload zone
-   - Wait for deployment to complete (~1 minute)
-
-3. **Configure Environment Variables:**
-   - Go to your site's dashboard
-   - Navigate to: **Site configuration** → **Environment variables**
-   - Add the following variable:
-     - **Key:** `VITE_API_BASE_URL`
-     - **Value:** `https://rental-management-api-lfgedmy2ua-uc.a.run.app/api`
-   - Click **Save**
-
-4. **Redeploy:**
-   - Go to **Deploys** tab
-   - Click **Trigger deploy** → **Clear cache and deploy site**
-
-### Method B: Git-based Deployment (Recommended for Production)
-
-1. **Push your code to GitHub** (if not already done):
-   ```bash
-   git add .
-   git commit -m "Add frontend deployment configuration"
-   git push origin main
-   ```
-
-2. **Go to Netlify:**
-   - Visit: https://app.netlify.com
-   - Click **Add new site** → **Import an existing project**
-
-3. **Connect to GitHub:**
-   - Click **GitHub** and authorize Netlify
-   - Select your repository
-
-4. **Configure Build Settings:**
-   - **Base directory:** `RentalManagementSystem/Frontend`
-   - **Build command:** `npm run build`
-   - **Publish directory:** `dist`
-
-5. **Add Environment Variable:**
-   - Click **Add environment variables**
-   - **Key:** `VITE_API_BASE_URL`
-   - **Value:** `https://rental-management-api-lfgedmy2ua-uc.a.run.app/api`
-
-6. **Deploy:**
-   - Click **Deploy site**
-   - Wait for deployment (~2-3 minutes)
-
----
-
-## 🌐 Option 2: Deploy to Cloudflare Pages
-
-### Method A: Drag & Drop Deployment via Wrangler CLI
-
-1. **Install Wrangler (if not installed):**
-   ```bash
-   npm install -g wrangler
-   ```
-
-2. **Login to Cloudflare:**
-   ```bash
-   wrangler login
-   ```
-
-3. **Deploy:**
-   ```bash
-   cd RentalManagementSystem/Frontend
-   wrangler pages deploy dist --project-name rental-management
-   ```
-
-4. **Add Environment Variable:**
-   - Go to https://dash.cloudflare.com
-   - Navigate to **Workers & Pages** → Your project
-   - Go to **Settings** → **Environment variables**
-   - Add:
-     - **Variable name:** `VITE_API_BASE_URL`
-     - **Value:** `https://rental-management-api-lfgedmy2ua-uc.a.run.app/api`
-   - Save and redeploy
-
-### Method B: Git-based Deployment
-
-1. **Push your code to GitHub** (if not already done):
-   ```bash
-   git add .
-   git commit -m "Add frontend deployment configuration"
-   git push origin main
-   ```
-
-2. **Go to Cloudflare Dashboard:**
-   - Visit: https://dash.cloudflare.com
-   - Navigate to **Workers & Pages**
-   - Click **Create application** → **Pages** → **Connect to Git**
-
-3. **Connect to GitHub:**
-   - Select your repository
-   - Click **Begin setup**
-
-4. **Configure Build Settings:**
-   - **Project name:** rental-management
-   - **Production branch:** main
-   - **Framework preset:** Vite
-   - **Build command:** `npm run build`
-   - **Build output directory:** `dist`
-   - **Root directory:** `RentalManagementSystem/Frontend`
-
-5. **Add Environment Variable:**
-   - Click **Add environment variable**
-   - **Variable name:** `VITE_API_BASE_URL`
-   - **Value:** `https://rental-management-api-lfgedmy2ua-uc.a.run.app/api`
-
-6. **Deploy:**
-   - Click **Save and Deploy**
-   - Wait for deployment (~2-3 minutes)
-
----
-
-## 🔄 After Deployment - Update Backend CORS
-
-Once you have your frontend URL(s) from Netlify and/or Cloudflare Pages, you need to update the backend CORS settings:
-
-### Run the update script:
-
-```bash
-cd /Users/dungvt/Projects/rental-management-system
-./update-backend-cors.sh
-```
-
-**Enter your frontend URLs when prompted. For example:**
-- `https://your-app-name.netlify.app`
-- `https://rental-management.pages.dev`
-
-The script will update your Cloud Run backend to accept requests from these origins.
-
----
-
-## ✅ Testing Your Deployment
-
-After deploying and updating CORS:
-
-1. **Visit your frontend URL**
-2. **Test the login:**
-   - Email: `admin@rentalmanagement.com`
-   - Password: `Admin123!`
-3. **Verify API connectivity** by navigating through the dashboard
-
----
-
-## 🎯 Current Status
-
-- ✅ **Backend API:** Deployed and running at https://rental-management-api-lfgedmy2ua-uc.a.run.app
-- ✅ **Database:** Connected to Supabase, all tables created
-- ✅ **Frontend Build:** Ready in `RentalManagementSystem/Frontend/dist/`
-- ⏳ **Frontend Deploy:** Choose your platform and follow the steps above
-- ⏳ **CORS Update:** Run after getting frontend URL
-
----
-
-## 📝 Quick Reference
-
-**API Base URL:**
-```
-https://rental-management-api-lfgedmy2ua-uc.a.run.app/api
-```
-
-**Admin Credentials:**
-- Email: `admin@rentalmanagement.com`
-- Password: `Admin123!`
-
-**Swagger Documentation:**
-```
-https://rental-management-api-lfgedmy2ua-uc.a.run.app/swagger
-```
-
----
-
-## 🆘 Troubleshooting
-
-### CORS Errors
-If you see CORS errors in the browser console:
-1. Make sure you ran `./update-backend-cors.sh`
-2. Verify the frontend URL was added correctly
-3. Clear browser cache and try again
-
-### Environment Variables Not Working
-- Make sure you redeploy after adding environment variables
-- Check the variable name is exactly: `VITE_API_BASE_URL` (case-sensitive)
-- Verify the API URL ends with `/api`
-
-### Login Not Working
-- Check browser console for errors
-- Verify API URL is correct
-- Test API directly: https://rental-management-api-lfgedmy2ua-uc.a.run.app/swagger
+**Last Updated**: January 12, 2026  
+**Deployment Status**: ✅ Backend & Frontend Live

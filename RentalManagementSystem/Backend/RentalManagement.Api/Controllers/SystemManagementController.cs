@@ -14,13 +14,16 @@ namespace RentalManagement.Api.Controllers;
 public class SystemManagementController : ControllerBase
 {
     private readonly ISystemManagementService _systemManagementService;
+    private readonly IUserManagementService _userManagementService;
     private readonly ILogger<SystemManagementController> _logger;
 
     public SystemManagementController(
         ISystemManagementService systemManagementService,
+        IUserManagementService userManagementService,
         ILogger<SystemManagementController> logger)
     {
         _systemManagementService = systemManagementService;
+        _userManagementService = userManagementService;
         _logger = logger;
     }
 
@@ -299,4 +302,339 @@ public class SystemManagementController : ControllerBase
             return StatusCode(500, new { message = "An error occurred while importing settings" });
         }
     }
+
+    #region User Management
+
+    /// <summary>
+    /// Get paginated and filtered list of users
+    /// </summary>
+    [HttpGet("users")]
+    [ProducesResponseType(typeof(ApiResponse<PaginatedUsersDto>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<ApiResponse<PaginatedUsersDto>>> GetUsers([FromQuery] UserFilterDto filter)
+    {
+        try
+        {
+            var result = await _userManagementService.GetUsersAsync(filter);
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving users");
+            return StatusCode(500, ApiResponse<PaginatedUsersDto>.ErrorResponse("An error occurred while retrieving users"));
+        }
+    }
+
+    /// <summary>
+    /// Get user by ID with detailed information
+    /// </summary>
+    [HttpGet("users/{userId}")]
+    [ProducesResponseType(typeof(ApiResponse<UserDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<ApiResponse<UserDto>>> GetUserById(string userId)
+    {
+        try
+        {
+            var result = await _userManagementService.GetUserByIdAsync(userId);
+            
+            if (!result.Success)
+            {
+                return NotFound(result);
+            }
+
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving user {UserId}", userId);
+            return StatusCode(500, ApiResponse<UserDto>.ErrorResponse("An error occurred while retrieving user"));
+        }
+    }
+
+    /// <summary>
+    /// Create a new user
+    /// </summary>
+    [HttpPost("users")]
+    [ProducesResponseType(typeof(ApiResponse<UserDto>), StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<ApiResponse<UserDto>>> CreateUser([FromBody] CreateUserDto createDto)
+    {
+        try
+        {
+            var userId = User.FindFirst("id")?.Value ?? "Unknown";
+            var result = await _userManagementService.CreateUserAsync(createDto, userId);
+            
+            if (!result.Success)
+            {
+                return BadRequest(result);
+            }
+
+            return CreatedAtAction(nameof(GetUserById), new { userId = result.Data!.Id }, result);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error creating user");
+            return StatusCode(500, ApiResponse<UserDto>.ErrorResponse("An error occurred while creating user"));
+        }
+    }
+
+    /// <summary>
+    /// Update user information
+    /// </summary>
+    [HttpPut("users/{userId}")]
+    [ProducesResponseType(typeof(ApiResponse<UserDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<ApiResponse<UserDto>>> UpdateUser(string userId, [FromBody] UpdateUserProfileDto updateDto)
+    {
+        try
+        {
+            var currentUserId = User.FindFirst("id")?.Value ?? "Unknown";
+            var result = await _userManagementService.UpdateUserAsync(userId, updateDto, currentUserId);
+            
+            if (!result.Success)
+            {
+                return result.Message.Contains("not found") ? NotFound(result) : BadRequest(result);
+            }
+
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating user {UserId}", userId);
+            return StatusCode(500, ApiResponse<UserDto>.ErrorResponse("An error occurred while updating user"));
+        }
+    }
+
+    /// <summary>
+    /// Delete a user
+    /// </summary>
+    [HttpDelete("users/{userId}")]
+    [ProducesResponseType(typeof(ApiResponse<bool>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<ApiResponse<bool>>> DeleteUser(string userId)
+    {
+        try
+        {
+            var currentUserId = User.FindFirst("id")?.Value ?? "Unknown";
+            var result = await _userManagementService.DeleteUserAsync(userId, currentUserId);
+            
+            if (!result.Success)
+            {
+                return result.Message.Contains("not found") ? NotFound(result) : BadRequest(result);
+            }
+
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error deleting user {UserId}", userId);
+            return StatusCode(500, ApiResponse<bool>.ErrorResponse("An error occurred while deleting user"));
+        }
+    }
+
+    /// <summary>
+    /// Activate or deactivate a user account
+    /// </summary>
+    [HttpPatch("users/{userId}/activation")]
+    [ProducesResponseType(typeof(ApiResponse<bool>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<ApiResponse<bool>>> SetUserActivation(string userId, [FromBody] UserActivationDto activationDto)
+    {
+        try
+        {
+            var currentUserId = User.FindFirst("id")?.Value ?? "Unknown";
+            var result = await _userManagementService.SetUserActivationAsync(userId, activationDto, currentUserId);
+            
+            if (!result.Success)
+            {
+                return result.Message.Contains("not found") ? NotFound(result) : BadRequest(result);
+            }
+
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error setting user activation for {UserId}", userId);
+            return StatusCode(500, ApiResponse<bool>.ErrorResponse("An error occurred while updating user activation"));
+        }
+    }
+
+    /// <summary>
+    /// Reset user password (Admin only)
+    /// </summary>
+    [HttpPost("users/{userId}/reset-password")]
+    [ProducesResponseType(typeof(ApiResponse<bool>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<ApiResponse<bool>>> ResetUserPassword(string userId, [FromBody] ResetUserPasswordDto resetDto)
+    {
+        try
+        {
+            var currentUserId = User.FindFirst("id")?.Value ?? "Unknown";
+            var result = await _userManagementService.ResetUserPasswordAsync(userId, resetDto, currentUserId);
+            
+            if (!result.Success)
+            {
+                return result.Message.Contains("not found") ? NotFound(result) : BadRequest(result);
+            }
+
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error resetting password for user {UserId}", userId);
+            return StatusCode(500, ApiResponse<bool>.ErrorResponse("An error occurred while resetting password"));
+        }
+    }
+
+    /// <summary>
+    /// Assign roles to a user
+    /// </summary>
+    [HttpPost("users/{userId}/roles")]
+    [ProducesResponseType(typeof(ApiResponse<bool>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<ApiResponse<bool>>> AssignRoles(string userId, [FromBody] List<string> roles)
+    {
+        try
+        {
+            var currentUserId = User.FindFirst("id")?.Value ?? "Unknown";
+            var result = await _userManagementService.AssignRolesAsync(userId, roles, currentUserId);
+            
+            if (!result.Success)
+            {
+                return result.Message.Contains("not found") ? NotFound(result) : BadRequest(result);
+            }
+
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error assigning roles to user {UserId}", userId);
+            return StatusCode(500, ApiResponse<bool>.ErrorResponse("An error occurred while assigning roles"));
+        }
+    }
+
+    /// <summary>
+    /// Remove roles from a user
+    /// </summary>
+    [HttpDelete("users/{userId}/roles")]
+    [ProducesResponseType(typeof(ApiResponse<bool>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<ApiResponse<bool>>> RemoveRoles(string userId, [FromBody] List<string> roles)
+    {
+        try
+        {
+            var currentUserId = User.FindFirst("id")?.Value ?? "Unknown";
+            var result = await _userManagementService.RemoveRolesAsync(userId, roles, currentUserId);
+            
+            if (!result.Success)
+            {
+                return result.Message.Contains("not found") ? NotFound(result) : BadRequest(result);
+            }
+
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error removing roles from user {UserId}", userId);
+            return StatusCode(500, ApiResponse<bool>.ErrorResponse("An error occurred while removing roles"));
+        }
+    }
+
+    /// <summary>
+    /// Get all available roles
+    /// </summary>
+    [HttpGet("users/roles/available")]
+    [ProducesResponseType(typeof(ApiResponse<IEnumerable<RoleDto>>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<ApiResponse<IEnumerable<RoleDto>>>> GetAvailableRoles()
+    {
+        try
+        {
+            var result = await _userManagementService.GetAvailableRolesAsync();
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving available roles");
+            return StatusCode(500, ApiResponse<IEnumerable<RoleDto>>.ErrorResponse("An error occurred while retrieving roles"));
+        }
+    }
+
+    /// <summary>
+    /// Get user statistics
+    /// </summary>
+    [HttpGet("users/statistics")]
+    [ProducesResponseType(typeof(ApiResponse<UserStatisticsDto>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<ApiResponse<UserStatisticsDto>>> GetUserStatistics()
+    {
+        try
+        {
+            var result = await _userManagementService.GetUserStatisticsAsync();
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving user statistics");
+            return StatusCode(500, ApiResponse<UserStatisticsDto>.ErrorResponse("An error occurred while retrieving statistics"));
+        }
+    }
+
+    /// <summary>
+    /// Perform bulk operations on users
+    /// </summary>
+    [HttpPost("users/bulk")]
+    [ProducesResponseType(typeof(ApiResponse<int>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<ApiResponse<int>>> BulkUserOperation([FromBody] BulkUserOperationDto bulkOperation)
+    {
+        try
+        {
+            var currentUserId = User.FindFirst("id")?.Value ?? "Unknown";
+            var result = await _userManagementService.BulkUserOperationAsync(bulkOperation, currentUserId);
+            
+            if (!result.Success)
+            {
+                return BadRequest(result);
+            }
+
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error performing bulk user operation");
+            return StatusCode(500, ApiResponse<int>.ErrorResponse("An error occurred during bulk operation"));
+        }
+    }
+
+    /// <summary>
+    /// Get user audit log
+    /// </summary>
+    [HttpGet("users/{userId}/audit-log")]
+    [ProducesResponseType(typeof(ApiResponse<IEnumerable<string>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<ApiResponse<IEnumerable<string>>>> GetUserAuditLog(string userId, [FromQuery] int limit = 50)
+    {
+        try
+        {
+            var result = await _userManagementService.GetUserAuditLogAsync(userId, limit);
+            
+            if (!result.Success)
+            {
+                return NotFound(result);
+            }
+
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving audit log for user {UserId}", userId);
+            return StatusCode(500, ApiResponse<IEnumerable<string>>.ErrorResponse("An error occurred while retrieving audit log"));
+        }
+    }
+
+    #endregion
 }

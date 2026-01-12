@@ -156,3 +156,49 @@ export function Tooltip({
     </>
   );
 }
+
+/**
+ * Tooltip Provider Component
+ * Wraps the application or component tree to provide tooltip context
+ */
+export function TooltipProvider({ children }: { children: ReactNode }) {
+  return <>{children}</>;
+}
+
+/**
+ * Tooltip Trigger Component
+ * Wraps the element that triggers the tooltip
+ */
+export function TooltipTrigger({ 
+  children, 
+  className = '' 
+}: { 
+  children: ReactNode; 
+  className?: string;
+}) {
+  return (
+    <div className={`inline-flex ${className}`}>
+      {children}
+    </div>
+  );
+}
+
+/**
+ * Tooltip Content Component
+ * Contains the tooltip content to be displayed
+ */
+export function TooltipContent({ 
+  children, 
+  className = '',
+  side = 'top'
+}: { 
+  children: ReactNode; 
+  className?: string;
+  side?: 'top' | 'bottom' | 'left' | 'right';
+}) {
+  return (
+    <div className={`bg-gray-900 text-white text-xs sm:text-sm rounded-lg py-2 px-3 shadow-lg max-w-xs sm:max-w-sm ${className}`}>
+      {children}
+    </div>
+  );
+}

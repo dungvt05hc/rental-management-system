@@ -1,4 +1,5 @@
 import { ReactNode } from 'react';
+import * as React from 'react';
 
 export type AlertVariant = 'success' | 'error' | 'warning' | 'info';
 
@@ -99,3 +100,33 @@ export function Alert({ variant = 'info', title, children, onClose, className = 
     </div>
   );
 }
+
+/**
+ * Alert Title Component
+ */
+export const AlertTitle = React.forwardRef<
+  HTMLParagraphElement,
+  React.HTMLAttributes<HTMLHeadingElement>
+>(({ className, ...props }, ref) => (
+  <h5
+    ref={ref}
+    className={`mb-1 font-medium leading-none tracking-tight ${className || ''}`}
+    {...props}
+  />
+));
+AlertTitle.displayName = 'AlertTitle';
+
+/**
+ * Alert Description Component
+ */
+export const AlertDescription = React.forwardRef<
+  HTMLParagraphElement,
+  React.HTMLAttributes<HTMLParagraphElement>
+>(({ className, ...props }, ref) => (
+  <div
+    ref={ref}
+    className={`text-sm [&_p]:leading-relaxed ${className || ''}`}
+    {...props}
+  />
+));
+AlertDescription.displayName = 'AlertDescription';

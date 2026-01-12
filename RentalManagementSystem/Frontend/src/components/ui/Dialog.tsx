@@ -32,6 +32,17 @@ interface DialogFooterProps {
   className?: string;
 }
 
+interface DialogTriggerProps {
+  children: React.ReactNode;
+  onClick?: () => void;
+  className?: string;
+}
+
+interface DialogOverlayProps {
+  onClick?: () => void;
+  className?: string;
+}
+
 export function Dialog({ open, onOpenChange, children }: DialogProps) {
   if (!open) return null;
 
@@ -45,6 +56,27 @@ export function Dialog({ open, onOpenChange, children }: DialogProps) {
         {children}
       </div>
     </div>
+  );
+}
+
+export function DialogPortal({ children }: { children: React.ReactNode }) {
+  return <>{children}</>;
+}
+
+export function DialogOverlay({ onClick, className = '' }: DialogOverlayProps) {
+  return (
+    <div 
+      className={`fixed inset-0 bg-black/50 ${className}`}
+      onClick={onClick}
+    />
+  );
+}
+
+export function DialogTrigger({ children, onClick, className = '' }: DialogTriggerProps) {
+  return (
+    <button onClick={onClick} className={className}>
+      {children}
+    </button>
   );
 }
 
