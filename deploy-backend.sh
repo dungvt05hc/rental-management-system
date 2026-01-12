@@ -14,7 +14,7 @@ DATABASE_URL="Host=db.fpvgtejnkxkushmzkstu.supabase.co;Port=5432;Database=postgr
 JWT_SECRET_KEY="Nw6OuBAYTsjMpAvDW1r7xo62KAa8/7eTjS/+a9jO0h4="
 
 # Frontend URL (update after deploying frontend)
-FRONTEND_URL="https://your-frontend-url.netlify.app"
+FRONTEND_URL="https://rental-management-fresh-2026.netlify.app"
 
 echo "🚀 Deploying Rental Management API to Google Cloud Run..."
 echo "Project: ${PROJECT_ID}"

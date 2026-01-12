@@ -63,3 +63,11 @@ export function TableCell({ children, className }: TableProps) {
     </td>
   );
 }
+
+export function TableCaption({ children, className }: TableProps) {
+  return (
+    <caption className={cn('mt-4 text-sm text-muted-foreground', className)}>
+      {children}
+    </caption>
+  );
+}

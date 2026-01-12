@@ -457,3 +457,73 @@ export interface AuthContextType {
   isLoading: boolean;
   isAuthenticated: boolean;
 }
+
+// User Management Types
+export interface CreateUserDto {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phoneNumber?: string;
+  password?: string;
+  roles: string[];
+  isActive: boolean;
+}
+
+export interface UpdateUserDto {
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  phoneNumber?: string;
+  isActive?: boolean;
+}
+
+export interface UserFilterDto {
+  page?: number;
+  pageSize?: number;
+  searchTerm?: string;
+  role?: string;
+  isActive?: boolean;
+  sortBy?: string;
+  sortOrder?: string;
+}
+
+export interface PaginatedUsersDto {
+  users: User[];
+  totalCount: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+  hasPrevious: boolean;
+  hasNext: boolean;
+}
+
+export interface UserActivationDto {
+  isActive: boolean;
+  reason?: string;
+}
+
+export interface ResetUserPasswordDto {
+  newPassword: string;
+  confirmPassword: string;
+  sendEmailNotification?: boolean;
+}
+
+export interface RoleDto {
+  id: string;
+  name: string;
+  userCount: number;
+}
+
+export interface UserStatisticsDto {
+  totalUsers: number;
+  activeUsers: number;
+  inactiveUsers: number;
+  newUsersLast30Days: number;
+  usersByRole: Record<string, number>;
+}
+
+export interface BulkUserOperationDto {
+  userIds: string[];
+  operation: 'activate' | 'deactivate' | 'delete';
+  data?: Record<string, any>;
+}

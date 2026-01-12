@@ -51,15 +51,12 @@ fi
 echo ""
 echo "☁️  Updating Cloud Run service..."
 
-# Use proper quoting for environment variables with special characters
+# Use only --update-env-vars to avoid conflicts
 gcloud run services update ${SERVICE_NAME} \
   --platform managed \
   --region ${REGION} \
   --project ${PROJECT_ID} \
-  --set-env-vars "ASPNETCORE_ENVIRONMENT=Production" \
-  --update-env-vars "DATABASE_URL=${DATABASE_URL}" \
-  --update-env-vars "JWT_SECRET_KEY=${JWT_SECRET_KEY}" \
-  --update-env-vars "FRONTEND_URL=${FRONTEND_URL}"
+  --update-env-vars "ASPNETCORE_ENVIRONMENT=Production,DATABASE_URL=${DATABASE_URL},JWT_SECRET_KEY=${JWT_SECRET_KEY},FRONTEND_URL=${FRONTEND_URL}"
 
 if [ $? -ne 0 ]; then
     echo "❌ Update failed!"

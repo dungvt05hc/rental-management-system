@@ -17,6 +17,8 @@ import { ReportsPage } from './components/dashboard/ReportsPage';
 import { ItemsPage } from './components/items/ItemsPage';
 import SystemManagement from './components/SystemManagement/SystemManagement';
 import { LanguageManagement } from './components/admin/LanguageManagement';
+import { UserManagementPage } from './components/user-management';
+import { CreateUserPage } from './components/user-management/CreateUserPage';
 import type { ReactNode } from 'react';
 import './index.css'
 import { LocalizationProvider } from './contexts/LocalizationContext'
@@ -168,6 +170,22 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <LanguageManagement />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/users"
+        element={
+          <ProtectedRoute>
+            <UserManagementPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/users/new"
+        element={
+          <ProtectedRoute>
+            <CreateUserPage />
           </ProtectedRoute>
         }
       />

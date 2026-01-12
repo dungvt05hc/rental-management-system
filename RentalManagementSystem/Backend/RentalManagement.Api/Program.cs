@@ -81,6 +81,11 @@ var secretKey = Environment.GetEnvironmentVariable("JWT_SECRET_KEY")
     ?? jwtSettings["SecretKey"] 
     ?? throw new InvalidOperationException("JWT SecretKey not configured");
 
+Log.Information("JWT Configuration - Issuer: {Issuer}, Audience: {Audience}", 
+    jwtSettings["Issuer"], jwtSettings["Audience"]);
+
+var signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey));
+
 builder.Services.AddAuthentication(options =>
 {
     options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
@@ -88,6 +93,10 @@ builder.Services.AddAuthentication(options =>
 })
 .AddJwtBearer(options =>
 {
+    options.SaveToken = true;
+    options.RequireHttpsMetadata = false; // Set to true in production with HTTPS
+    options.MapInboundClaims = false; // Preserve claim names as-is
+    
     options.TokenValidationParameters = new TokenValidationParameters
     {
         ValidateIssuer = true,
@@ -96,8 +105,44 @@ builder.Services.AddAuthentication(options =>
         ValidateIssuerSigningKey = true,
         ValidIssuer = jwtSettings["Issuer"],
         ValidAudience = jwtSettings["Audience"],
-        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey)),
-        ClockSkew = TimeSpan.Zero
+        IssuerSigningKey = signingKey,
+        ClockSkew = TimeSpan.Zero,
+        RequireSignedTokens = true
+    };
+    
+    // Add event handlers to log authentication failures
+    options.Events = new JwtBearerEvents
+    {
+        OnAuthenticationFailed = context =>
+        {
+            Log.Error("JWT Authentication failed: {Exception}", context.Exception.Message);
+            if (context.Exception.InnerException != null)
+            {
+                Log.Error("Inner exception: {InnerException}", context.Exception.InnerException.Message);
+            }
+            return Task.CompletedTask;
+        },
+        OnTokenValidated = context =>
+        {
+            Log.Information("JWT Token validated successfully for user: {User}", 
+                context.Principal?.Identity?.Name ?? "Unknown");
+            return Task.CompletedTask;
+        },
+        OnMessageReceived = context =>
+        {
+            var token = context.Token;
+            if (!string.IsNullOrEmpty(token))
+            {
+                Log.Information("JWT Token received, length: {Length}", token.Length);
+            }
+            return Task.CompletedTask;
+        },
+        OnChallenge = context =>
+        {
+            Log.Warning("JWT Challenge triggered. Error: {Error}, ErrorDescription: {ErrorDescription}", 
+                context.Error, context.ErrorDescription);
+            return Task.CompletedTask;
+        }
     };
 });
 
@@ -160,6 +205,7 @@ builder.Services.AddScoped<IDatabaseManagementService, DatabaseManagementService
 builder.Services.AddScoped<IDatabaseSeeder, DatabaseSeeder>();
 builder.Services.AddScoped<ILocalizationService, LocalizationService>();
 builder.Services.AddScoped<ISystemManagementService, SystemManagementService>();
+builder.Services.AddScoped<IUserManagementService, UserManagementService>();
 
 // Add controllers
 builder.Services.AddControllers();
