@@ -11,6 +11,7 @@ using RentalManagement.Api.Services.Interfaces;
 using Serilog;
 using System.Text;
 using FluentValidation.AspNetCore;
+using System.IdentityModel.Tokens.Jwt;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -296,6 +297,13 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+
+// Add health check endpoint for Render
+app.MapGet("/api/health", () => Results.Ok(new { 
+    status = "healthy", 
+    timestamp = DateTime.UtcNow,
+    version = "1.0.0"
+}));
 
 // Initialize database and seed data
 using (var scope = app.Services.CreateScope())
