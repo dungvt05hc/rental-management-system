@@ -14,7 +14,7 @@ services:
       - key: ASPNETCORE_URLS
         value: http://0.0.0.0:10000
       - key: DATABASE_URL
-        value: Host=db.fpvgtejnkxkushmzkstu.supabase.co;Port=5432;Database=postgres;Username=postgres;Password=qijfiw-qetqof-paJmo4;SSL Mode=Require;Trust Server Certificate=true
+        value: postgresql://postgres.fpvgtejnkxkushmzkstu:qijfiw-qetqof-paJmo4@aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres
       - key: JWT_SECRET_KEY
         value: Nw6OuBAYTsjMpAvDW1r7xo62KAa8/7eTjS/+a9jO0h4=
       - key: FRONTEND_URL

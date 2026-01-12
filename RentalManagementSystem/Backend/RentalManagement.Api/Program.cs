@@ -43,7 +43,7 @@ Log.Information("==> Database connection configured. Host: {Host}",
 // Store in a static variable to ensure it's never lost
 StaticConnectionString.Value = connectionString;
 
-// Add Entity Framework with PostgreSQL using factory
+// Add Entity Framework with PostgreSQL using factory with connection resilience
 builder.Services.AddDbContext<RentalManagementContext>((serviceProvider, options) =>
 {
     var connStr = StaticConnectionString.Value;
@@ -51,7 +51,24 @@ builder.Services.AddDbContext<RentalManagementContext>((serviceProvider, options
     {
         throw new InvalidOperationException("Connection string is null or empty in DbContext factory");
     }
-    options.UseNpgsql(connStr);
+    
+    options.UseNpgsql(connStr, npgsqlOptions =>
+    {
+        // Add connection resilience for serverless environments like Render
+        npgsqlOptions.EnableRetryOnFailure(
+            maxRetryCount: 5,
+            maxRetryDelay: TimeSpan.FromSeconds(30),
+            errorCodesToAdd: null);
+        
+        // Set command timeout for long-running operations
+        npgsqlOptions.CommandTimeout(30);
+    });
+    
+    // Add detailed logging for connection issues
+    if (builder.Environment.IsProduction())
+    {
+        options.LogTo(message => Log.Information("EF Core: {Message}", message), LogLevel.Information);
+    }
 });
 
 // Add Identity
