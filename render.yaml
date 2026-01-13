@@ -14,7 +14,7 @@ services:
       - key: ASPNETCORE_URLS
         value: http://0.0.0.0:10000
       - key: DATABASE_URL
-        value: Host=aws-1-ap-southeast-1-ipv4.pooler.supabase.com;Port=6543;Database=postgres;Username=postgres.fpvgtejnkxkushmzkstu;Password=qijfiw-qetqof-paJmo4;SSL Mode=Require;Trust Server Certificate=true;Tcp Keepalive=true;Tcp Keepalive Time=30;Tcp Keepalive Interval=10;Timeout=30;Command Timeout=30
+        value: postgresql://postgres.fpvgtejnkxkushmzkstu:qijfiw-qetqof-paJmo4@aws-1-ap-southeast-1.pooler.supabase.com:5432/postgres
       - key: JWT_SECRET_KEY
         value: Nw6OuBAYTsjMpAvDW1r7xo62KAa8/7eTjS/+a9jO0h4=
       - key: FRONTEND_URL
