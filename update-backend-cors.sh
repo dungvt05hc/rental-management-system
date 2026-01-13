@@ -10,7 +10,7 @@ SERVICE_NAME="rental-management-api"
 IMAGE_NAME="gcr.io/${PROJECT_ID}/${SERVICE_NAME}"
 
 # Database and JWT settings (keep the same)
-DATABASE_URL="Host=db.fpvgtejnkxkushmzkstu.supabase.co;Port=5432;Database=postgres;Username=postgres;Password=qijfiw-qetqof-paJmo4;SSL Mode=Require;Trust Server Certificate=true"
+DATABASE_URL="Host=db.fpvgtejnkxkushmzkstu.dungtest5.supabase.co;Port=5432;Database=postgres;Username=postgres;Password=qijfiw-qetqof-paJmo4;SSL Mode=Require;Trust Server Certificate=true"
 JWT_SECRET_KEY="Nw6OuBAYTsjMpAvDW1r7xo62KAa8/7eTjS/+a9jO0h4="
 
 # Prompt for frontend URLs

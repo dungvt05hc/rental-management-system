@@ -8,7 +8,7 @@ IMAGE_NAME="gcr.io/${PROJECT_ID}/${SERVICE_NAME}"
 
 # Supabase Database Connection String (Direct Connection - Session Mode)
 # Using direct connection (port 5432) instead of transaction pooler for better reliability with EF Core
-DATABASE_URL="Host=db.fpvgtejnkxkushmzkstu.supabase.co;Port=5432;Database=postgres;Username=postgres;Password=qijfiw-qetqof-paJmo4;SSL Mode=Require;Trust Server Certificate=true"
+DATABASE_URL="Host=db.fpvgtejnkxkushmzkstu.dungtest1.supabase.co;Port=5432;Database=postgres;Username=postgres;Password=qijfiw-qetqof-paJmo4;SSL Mode=Require;Trust Server Certificate=true"
 
 # JWT Secret Key (generate a secure random string)
 JWT_SECRET_KEY="Nw6OuBAYTsjMpAvDW1r7xo62KAa8/7eTjS/+a9jO0h4="

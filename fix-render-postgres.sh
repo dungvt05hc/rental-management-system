@@ -33,7 +33,7 @@ echo "• Solution: Use Supabase Connection Pooler (IPv4 compatible)"
 echo ""
 
 echo "🔧 Fixed Connection String:"
-echo "OLD: Host=db.fpvgtejnkxkushmzkstu.supabase.co;Port=5432;..."
+echo "OLD: Host=db.fpvgtejnkxkushmzkstu.dungtest4.supabase.co;Port=5432;..."
 echo "NEW: postgresql://postgres.fpvgtejnkxkushmzkstu:qijfiw-qetqof-paJmo4@aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres"
 echo ""
 

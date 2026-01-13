@@ -99,7 +99,7 @@ else
     echo ""
     echo "5. Add Environment Variables:"
     echo "   - ASPNETCORE_ENVIRONMENT=Production"
-    echo "   - DATABASE_URL=Host=db.fpvgtejnkxkushmzkstu.supabase.co;Port=5432;Database=postgres;Username=postgres;Password=qijfiw-qetqof-paJmo4;SSL Mode=Require;Trust Server Certificate=true"
+    echo "   - DATABASE_URL=Host=db.fpvgtejnkxkushmzkstu.dungtest3.supabase.co;Port=5432;Database=postgres;Username=postgres;Password=qijfiw-qetqof-paJmo4;SSL Mode=Require;Trust Server Certificate=true"
     echo "   - JWT_SECRET_KEY=Nw6OuBAYTsjMpAvDW1r7xo62KAa8/7eTjS/+a9jO0h4="
     echo "   - FRONTEND_URL=https://rental-management-fresh-2026.netlify.app"
     echo ""
