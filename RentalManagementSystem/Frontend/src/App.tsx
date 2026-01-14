@@ -5,6 +5,7 @@ import { NotificationProvider } from './contexts/NotificationContext';
 import { NotificationContainer } from './components/ui/NotificationContainer';
 import { Layout } from './components/layout/Layout';
 import { LoginPage } from './components/auth/LoginPage';
+import { NoAccessPage } from './components/auth/NoAccessPage';
 import { DashboardPage } from './components/dashboard/DashboardPage';
 import { RoomsPage } from './components/rooms/RoomsPage';
 import { TenantsPage } from './components/tenants/TenantsPage';
@@ -23,6 +24,7 @@ import type { ReactNode } from 'react';
 import './index.css'
 import { LocalizationProvider } from './contexts/LocalizationContext'
 import { ToastProvider } from './contexts/ToastContext';
+import { canAccessFeature, getDefaultRoute, type FeatureKey } from './utils/accessControl';
 
 // Create a client
 const queryClient = new QueryClient({
@@ -37,10 +39,11 @@ const queryClient = new QueryClient({
 
 interface ProtectedRouteProps {
   children: ReactNode;
+  feature: FeatureKey;
 }
 
-function ProtectedRoute({ children }: ProtectedRouteProps) {
-  const { isAuthenticated, isLoading } = useAuth();
+function ProtectedRoute({ children, feature }: ProtectedRouteProps) {
+  const { isAuthenticated, isLoading, user } = useAuth();
 
   if (isLoading) {
     return (
@@ -54,6 +57,10 @@ function ProtectedRoute({ children }: ProtectedRouteProps) {
     return <Navigate to="/login" replace />;
   }
 
+  if (!canAccessFeature(user, feature)) {
+    return <Navigate to="/no-access" replace />;
+  }
+
   return <Layout>{children}</Layout>;
 }
 
@@ -61,10 +68,11 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/no-access" element={<NoAccessPage />} />
       <Route
         path="/"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute feature="dashboard">
             <DashboardPage />
           </ProtectedRoute>
         }
@@ -72,7 +80,7 @@ function AppRoutes() {
       <Route
         path="/rooms"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute feature="rooms">
             <RoomsPage />
           </ProtectedRoute>
         }
@@ -80,7 +88,7 @@ function AppRoutes() {
       <Route
         path="/tenants"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute feature="tenants">
             <TenantsPage />
           </ProtectedRoute>
         }
@@ -88,7 +96,7 @@ function AppRoutes() {
       <Route
         path="/invoices"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute feature="invoices">
             <InvoicesPage />
           </ProtectedRoute>
         }
@@ -96,7 +104,7 @@ function AppRoutes() {
       <Route
         path="/invoices/new"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute feature="invoices">
             <InvoiceFormPage />
           </ProtectedRoute>
         }
@@ -104,7 +112,7 @@ function AppRoutes() {
       <Route
         path="/invoices/:id"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute feature="invoices">
             <InvoiceDetailPage />
           </ProtectedRoute>
         }
@@ -112,7 +120,7 @@ function AppRoutes() {
       <Route
         path="/invoices/:id/edit"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute feature="invoices">
             <InvoiceFormPage />
           </ProtectedRoute>
         }
@@ -120,7 +128,7 @@ function AppRoutes() {
       <Route
         path="/items"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute feature="items">
             <ItemsPage />
           </ProtectedRoute>
         }
@@ -128,7 +136,7 @@ function AppRoutes() {
       <Route
         path="/payments"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute feature="payments">
             <PaymentsPage />
           </ProtectedRoute>
         }
@@ -136,7 +144,7 @@ function AppRoutes() {
       <Route
         path="/payments/new"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute feature="payments">
             <PaymentFormPage />
           </ProtectedRoute>
         }
@@ -144,7 +152,7 @@ function AppRoutes() {
       <Route
         path="/payments/:id/edit"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute feature="payments">
             <PaymentFormPage />
           </ProtectedRoute>
         }
@@ -152,7 +160,7 @@ function AppRoutes() {
       <Route
         path="/reports"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute feature="reports">
             <ReportsPage />
           </ProtectedRoute>
         }
@@ -160,7 +168,7 @@ function AppRoutes() {
       <Route
         path="/system"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute feature="system">
             <SystemManagement />
           </ProtectedRoute>
         }
@@ -168,7 +176,7 @@ function AppRoutes() {
       <Route
         path="/admin/languages"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute feature="languages">
             <LanguageManagement />
           </ProtectedRoute>
         }
@@ -176,7 +184,7 @@ function AppRoutes() {
       <Route
         path="/users"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute feature="users">
             <UserManagementPage />
           </ProtectedRoute>
         }
@@ -184,7 +192,7 @@ function AppRoutes() {
       <Route
         path="/users/new"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute feature="users">
             <CreateUserPage />
           </ProtectedRoute>
         }
