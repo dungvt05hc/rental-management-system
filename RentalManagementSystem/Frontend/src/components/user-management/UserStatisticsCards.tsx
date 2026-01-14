@@ -1,5 +1,5 @@
 import React from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '../ui';
 import type { UserStatisticsDto } from '../../types';
 import { Users, UserCheck, UserX, UserPlus, TrendingUp } from 'lucide-react';
 
