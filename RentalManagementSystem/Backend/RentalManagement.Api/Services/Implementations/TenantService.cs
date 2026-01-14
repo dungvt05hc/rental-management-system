@@ -354,8 +354,8 @@ public class TenantService : ITenantService
             // Assign tenant to new room
             tenant.RoomId = assignmentDto.RoomId;
             tenant.MonthlyRent = assignmentDto.MonthlyRent ?? room.MonthlyRent;
-            tenant.ContractStartDate = assignmentDto.ContractStartDate;
-            tenant.ContractEndDate = assignmentDto.ContractEndDate;
+            tenant.ContractStartDate = NormalizeToUtc(assignmentDto.ContractStartDate);
+            tenant.ContractEndDate = NormalizeToUtc(assignmentDto.ContractEndDate);
             tenant.UpdatedAt = DateTime.UtcNow;
 
             // Update new room status
@@ -425,6 +425,16 @@ public class TenantService : ITenantService
             _logger.LogError(ex, "Error unassigning tenant {TenantId} from room", tenantId);
             return ApiResponse<bool>.ErrorResponse("An error occurred while unassigning the tenant from the room");
         }
+    }
+
+    private static DateTime NormalizeToUtc(DateTime value)
+    {
+        return value.Kind switch
+        {
+            DateTimeKind.Utc => value,
+            DateTimeKind.Local => value.ToUniversalTime(),
+            _ => DateTime.SpecifyKind(value, DateTimeKind.Utc)
+        };
     }
 
     /// <summary>
