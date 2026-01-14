@@ -31,6 +31,7 @@ dist/
 .parcel-cache/
 .next/
 out/
+.vite/
 coverage/
 *.tsbuildinfo
 
