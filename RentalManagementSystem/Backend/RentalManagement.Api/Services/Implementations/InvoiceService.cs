@@ -64,9 +64,9 @@ public class InvoiceService : IInvoiceService
                 Discount = createInvoiceDto.Discount,
                 TotalAmount = totalAmount, // Will be recalculated if line items exist
                 RemainingBalance = totalAmount,
-                BillingPeriod = createInvoiceDto.BillingPeriod,
+                BillingPeriod = NormalizeToUtc(createInvoiceDto.BillingPeriod),
                 IssueDate = DateTime.UtcNow,
-                DueDate = createInvoiceDto.DueDate,
+                DueDate = NormalizeToUtc(createInvoiceDto.DueDate),
                 Status = InvoiceStatus.Issued,
                 AdditionalChargesDescription = createInvoiceDto.AdditionalChargesDescription,
                 Notes = createInvoiceDto.Notes
@@ -272,7 +272,7 @@ public class InvoiceService : IInvoiceService
                 invoice.Discount = updateInvoiceDto.Discount.Value;
 
             if (updateInvoiceDto.DueDate.HasValue)
-                invoice.DueDate = updateInvoiceDto.DueDate.Value;
+                invoice.DueDate = NormalizeToUtc(updateInvoiceDto.DueDate.Value);
 
             if (updateInvoiceDto.Status.HasValue)
                 invoice.Status = updateInvoiceDto.Status.Value;
@@ -397,7 +397,7 @@ public class InvoiceService : IInvoiceService
                 .ToListAsync();
 
             var generatedCount = 0;
-            var billingMonth = new DateTime(billingPeriod.Year, billingPeriod.Month, 1);
+            var billingMonth = NormalizeToUtc(new DateTime(billingPeriod.Year, billingPeriod.Month, 1));
 
             foreach (var tenant in activeTenantsWithRooms)
             {
@@ -513,7 +513,7 @@ public class InvoiceService : IInvoiceService
             invoice.Status = InvoiceStatus.Paid;
             invoice.PaidAmount = invoice.TotalAmount;
             invoice.RemainingBalance = 0;
-            invoice.PaidDate = paidDate ?? DateTime.UtcNow;
+            invoice.PaidDate = paidDate.HasValue ? NormalizeToUtc(paidDate.Value) : DateTime.UtcNow;
             invoice.UpdatedAt = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
@@ -598,6 +598,19 @@ public class InvoiceService : IInvoiceService
             _logger.LogError(ex, "Error sending invoice reminders");
             return ApiResponse<int>.ErrorResponse("An error occurred while sending invoice reminders");
         }
+    }
+
+    /// <summary>
+    /// Normalizes DateTime values to UTC for persistence.
+    /// </summary>
+    private static DateTime NormalizeToUtc(DateTime value)
+    {
+        return value.Kind switch
+        {
+            DateTimeKind.Utc => value,
+            DateTimeKind.Local => value.ToUniversalTime(),
+            _ => DateTime.SpecifyKind(value, DateTimeKind.Utc)
+        };
     }
 
     /// <summary>
