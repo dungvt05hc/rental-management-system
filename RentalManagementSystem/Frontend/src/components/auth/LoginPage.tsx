@@ -5,6 +5,7 @@ import { Button, Input, Card, CardHeader, CardTitle, CardContent } from '../ui';
 import { useForm } from '../../hooks';
 import { isValidEmail } from '../../utils';
 import { useTranslation } from '../../hooks/useTranslation';
+import { getDefaultRoute } from '../../utils/accessControl';
 
 interface LoginFormData {
   email: string;
@@ -13,7 +14,7 @@ interface LoginFormData {
 
 export function LoginPage() {
   const { t } = useTranslation();
-  const { login, isAuthenticated, isLoading } = useAuth();
+  const { login, isAuthenticated, isLoading, user } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   const {
@@ -28,7 +29,7 @@ export function LoginPage() {
 
   // Redirect if already authenticated
   if (isAuthenticated) {
-    return <Navigate to="/" replace />;
+    return <Navigate to={getDefaultRoute(user)} replace />;
   }
 
   const validateForm = (): boolean => {

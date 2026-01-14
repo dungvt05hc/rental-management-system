@@ -14,11 +14,13 @@ import {
   X,
   Package,
   Settings,
-  UserCog
+  UserCog,
+  Globe
 } from 'lucide-react';
 import { useState } from 'react';
 import { LanguageSwitcher, LanguageSwitcherCompact } from '../LanguageSwitcher';
 import { useTranslation } from '../../hooks/useTranslation';
+import { canAccessFeature } from '../../utils/accessControl';
 
 interface LayoutProps {
   children: ReactNode;
@@ -37,16 +39,19 @@ export function Layout({ children }: LayoutProps) {
   };
 
   const navigation = [
-    { name: t('dashboard.title', 'Dashboard'), href: '/', icon: Home },
-    { name: t('rooms.title', 'Rooms'), href: '/rooms', icon: Building },
-    { name: t('tenants.title', 'Tenants'), href: '/tenants', icon: Users },
-    { name: t('invoices.title', 'Invoices'), href: '/invoices', icon: FileText },
-    { name: t('items.title', 'Items'), href: '/items', icon: Package },
-    { name: t('payments.title', 'Payments'), href: '/payments', icon: CreditCard },
-    { name: t('reports.title', 'Reports'), href: '/reports', icon: BarChart3 },
-    { name: t('users.title', 'User Management'), href: '/users', icon: UserCog },
-    { name: t('system.title', 'System'), href: '/system', icon: Settings },
+    { name: t('dashboard.title', 'Dashboard'), href: '/', icon: Home, feature: 'dashboard' as const },
+    { name: t('rooms.title', 'Rooms'), href: '/rooms', icon: Building, feature: 'rooms' as const },
+    { name: t('tenants.title', 'Tenants'), href: '/tenants', icon: Users, feature: 'tenants' as const },
+    { name: t('invoices.title', 'Invoices'), href: '/invoices', icon: FileText, feature: 'invoices' as const },
+    { name: t('items.title', 'Items'), href: '/items', icon: Package, feature: 'items' as const },
+    { name: t('payments.title', 'Payments'), href: '/payments', icon: CreditCard, feature: 'payments' as const },
+    { name: t('reports.title', 'Reports'), href: '/reports', icon: BarChart3, feature: 'reports' as const },
+    { name: t('languages.title', 'Languages'), href: '/admin/languages', icon: Globe, feature: 'languages' as const },
+    { name: t('users.title', 'User Management'), href: '/users', icon: UserCog, feature: 'users' as const },
+    { name: t('system.title', 'System'), href: '/system', icon: Settings, feature: 'system' as const },
   ];
+
+  const visibleNavigation = navigation.filter((item) => canAccessFeature(user, item.feature));
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -72,7 +77,7 @@ export function Layout({ children }: LayoutProps) {
             </div>
             
             <nav className="mt-5 flex-1 space-y-1 bg-white px-2">
-              {navigation.map((item) => {
+              {visibleNavigation.map((item) => {
                 const Icon = item.icon;
                 const isActive = location.pathname === item.href;
                 
@@ -120,7 +125,7 @@ export function Layout({ children }: LayoutProps) {
             </div>
             
             <nav className="mt-5 flex-1 space-y-1 bg-white px-2">
-              {navigation.map((item) => {
+              {visibleNavigation.map((item) => {
                 const Icon = item.icon;
                 const isActive = location.pathname === item.href;
                 
