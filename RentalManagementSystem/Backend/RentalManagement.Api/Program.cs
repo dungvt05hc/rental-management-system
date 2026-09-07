@@ -105,12 +105,6 @@ builder.Services.AddDbContext<RentalManagementContext>((serviceProvider, options
         // Set command timeout for long-running operations
         npgsqlOptions.CommandTimeout(30);
     });
-
-    // Add detailed logging for connection issues
-    if (builder.Environment.IsProduction())
-    {
-        options.LogTo(message => Log.Information("EF Core: {Message}", message), LogLevel.Information);
-    }
 });
 
 // Add Identity
@@ -154,7 +148,7 @@ builder.Services.AddAuthentication(options =>
 .AddJwtBearer(options =>
 {
     options.SaveToken = true;
-    options.RequireHttpsMetadata = false; // Set to true in production with HTTPS
+    options.RequireHttpsMetadata = !builder.Environment.IsDevelopment();
     options.MapInboundClaims = false; // Preserve claim names as-is
 
     options.TokenValidationParameters = new TokenValidationParameters
@@ -184,7 +178,7 @@ builder.Services.AddAuthentication(options =>
         },
         OnTokenValidated = context =>
         {
-            Log.Information("JWT Token validated successfully for user: {User}",
+            Log.Debug("JWT Token validated successfully for user: {User}",
                 context.Principal?.Identity?.Name ?? "Unknown");
             return Task.CompletedTask;
         },
@@ -193,7 +187,7 @@ builder.Services.AddAuthentication(options =>
             var token = context.Token;
             if (!string.IsNullOrEmpty(token))
             {
-                Log.Information("JWT Token received, length: {Length}", token.Length);
+                Log.Debug("JWT Token received, length: {Length}", token.Length);
             }
             return Task.CompletedTask;
         },
@@ -261,8 +255,6 @@ builder.Services.AddScoped<IPaymentService, PaymentService>();
 builder.Services.AddScoped<IReportingService, ReportingService>();
 builder.Services.AddScoped<IItemService, ItemService>();
 builder.Services.AddScoped<IPdfService, PdfService>();
-builder.Services.AddScoped<IDatabaseManagementService, DatabaseManagementService>();
-builder.Services.AddScoped<IDatabaseSeeder, DatabaseSeeder>();
 builder.Services.AddScoped<ILocalizationService, LocalizationService>();
 builder.Services.AddScoped<ISystemManagementService, SystemManagementService>();
 builder.Services.AddScoped<IUserManagementService, UserManagementService>();
@@ -334,14 +326,6 @@ if (app.Environment.IsDevelopment())
 }
 else
 {
-    // Enable Swagger in production for testing (optional - remove if not needed)
-    app.UseSwagger();
-    app.UseSwaggerUI(c =>
-    {
-        c.SwaggerEndpoint("/swagger/v1/swagger.json", "Rental Management System API v1");
-        c.RoutePrefix = "swagger";
-    });
-
     // Only use HTTPS redirection in production
     app.UseHttpsRedirection();
 }
@@ -432,7 +416,14 @@ static async Task SeedAdminUserAsync(UserManager<User> userManager)
             IsActive = true
         };
 
-        var result = await userManager.CreateAsync(adminUser, "Admin123!");
+        var seedPassword = Environment.GetEnvironmentVariable("SEED_ADMIN_PASSWORD");
+        if (string.IsNullOrWhiteSpace(seedPassword))
+        {
+            Log.Warning("SEED_ADMIN_PASSWORD is not set. Skipping admin user creation.");
+            return;
+        }
+
+        var result = await userManager.CreateAsync(adminUser, seedPassword);
 
         if (result.Succeeded)
         {
