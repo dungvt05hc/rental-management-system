@@ -1,16 +1,26 @@
-version: '3.8'
+# Local development database only. Production runs on a managed Postgres.
+#
+# Credentials come from .env.dev, which dev.sh generates on first run. Start this
+# with ./dev.sh rather than `docker compose up` directly, so the API and the
+# database always agree on the same values.
 services:
   postgres:
     image: postgres:15
-    container_name: postgres_server
-    restart: always
+    container_name: rental_management_db
+    restart: unless-stopped
     environment:
-      POSTGRES_USER: admin
-      POSTGRES_PASSWORD: 123456a@A
-      POSTGRES_DB: rental_management
+      POSTGRES_USER: ${POSTGRES_USER:?run ./dev.sh instead}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?run ./dev.sh instead}
+      POSTGRES_DB: ${POSTGRES_DB:?run ./dev.sh instead}
     ports:
-      - "5433:5432"
+      - "${POSTGRES_PORT:-5433}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-admin} -d ${POSTGRES_DB:-rental_management}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
 volumes:
   postgres_data:

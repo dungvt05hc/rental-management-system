@@ -1,8 +1,8 @@
 # 🏠 Rental Management System
 
-A comprehensive full-stack rental property management application built with .NET 8 Web API and React TypeScript.
+A comprehensive full-stack rental property management application built with .NET 9 Web API and React TypeScript.
 
-![.NET](https://img.shields.io/badge/.NET-8.0-512BD4?logo=dotnet)
+![.NET](https://img.shields.io/badge/.NET-9.0-512BD4?logo=dotnet)
 ![React](https://img.shields.io/badge/React-19-61DAFB?logo=react)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.0-3178C6?logo=typescript)
 ![Entity Framework](https://img.shields.io/badge/Entity%20Framework-Core-512BD4)
@@ -50,8 +50,8 @@ A comprehensive full-stack rental property management application built with .NE
 ## 🛠️ Technology Stack
 
 ### Backend
-- **.NET 8** Web API
-- **Entity Framework Core** with SQL Server
+- **.NET 9** Web API
+- **Entity Framework Core** with PostgreSQL
 - **AutoMapper** for object mapping
 - **JWT Authentication**
 - **Swagger/OpenAPI** documentation
@@ -68,66 +68,37 @@ A comprehensive full-stack rental property management application built with .NE
 ## 🚀 Getting Started
 
 ### Prerequisites
-- [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
-- [Node.js](https://nodejs.org/) (v18 or later)
-- [SQL Server](https://www.microsoft.com/en-us/sql-server) or SQL Server Express
+- [.NET 9 SDK](https://dotnet.microsoft.com/download/dotnet/9.0)
+- [Node.js](https://nodejs.org/) (v20 or later)
+- [Docker](https://docs.docker.com/get-docker/), for the local PostgreSQL database
 
-### Backend Setup
+### Run it
 
-1. **Navigate to the backend directory:**
-   ```bash
-   cd RentalManagementSystem/Backend/RentalManagement.Api
-   ```
+```bash
+./dev.sh
+```
 
-2. **Restore NuGet packages:**
-   ```bash
-   dotnet restore
-   ```
+That starts PostgreSQL, applies database migrations, seeds an admin account, and
+runs both the API and the web app. No configuration needed — on first run the
+script generates `.env.dev` with local-only credentials and prints the admin
+password it created.
 
-3. **Update the connection string** in `appsettings.json`:
-   ```json
-   {
-     "ConnectionStrings": {
-       "DefaultConnection": "Server=(localdb)\\mssqllocaldb;Database=RentalManagementDB;Trusted_Connection=true;MultipleActiveResultSets=true"
-     }
-   }
-   ```
+| | |
+| --- | --- |
+| Web | http://localhost:3000 |
+| API | http://localhost:5152 |
+| Swagger | http://localhost:5152/swagger |
+| PostgreSQL | localhost:5433 |
+| Sign in | `admin@rentalmanagement.com` — password printed on startup, and stored in `.env.dev` |
 
-4. **Run database migrations:**
-   ```bash
-   dotnet ef database update
-   ```
+```bash
+./dev.sh stop                 # stop the database
+./dev.sh reset                # wipe the database and start over
+./dev.sh migration <Name>     # create an EF Core migration
+```
 
-5. **Start the API:**
-   ```bash
-   dotnet run
-   ```
-
-The API will be available at `https://localhost:7232` with Swagger documentation at `https://localhost:7232/swagger`
-
-### Frontend Setup
-
-1. **Navigate to the frontend directory:**
-   ```bash
-   cd RentalManagementSystem/Frontend
-   ```
-
-2. **Install dependencies:**
-   ```bash
-   npm install
-   ```
-
-3. **Create environment file** `.env`:
-   ```env
-   VITE_API_BASE_URL=https://localhost:7232/api
-   ```
-
-4. **Start the development server:**
-   ```bash
-   npm run dev
-   ```
-
-The frontend will be available at `http://localhost:3000`
+Migrations live in `RentalManagementSystem/Backend/RentalManagement.Api/Migrations/`
+and are committed — the API applies them automatically at startup.
 
 ## 📱 Application Screenshots
 
@@ -221,21 +192,9 @@ npm test
 
 ## 📦 Deployment
 
-### Backend Deployment
-1. Publish the application:
-   ```bash
-   dotnet publish -c Release -o ./publish
-   ```
-
-2. Deploy to your preferred hosting platform (Azure, AWS, IIS, etc.)
-
-### Frontend Deployment
-1. Build the application:
-   ```bash
-   npm run build
-   ```
-
-2. Deploy the `dist` folder to your static hosting service
+Both services are described by [`render.yaml`](render.yaml) at the repository
+root. See **[DEPLOYMENT.md](DEPLOYMENT.md)** for environment variables, the
+first-deploy sequence, and troubleshooting.
 
 ## 🤝 Contributing
 

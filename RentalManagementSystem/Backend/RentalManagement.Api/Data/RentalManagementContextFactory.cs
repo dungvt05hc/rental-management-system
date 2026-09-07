@@ -12,10 +12,12 @@ public class RentalManagementContextFactory : IDesignTimeDbContextFactory<Rental
     {
         var optionsBuilder = new DbContextOptionsBuilder<RentalManagementContext>();
         
-        // Use connection string from environment variable or default
+        // DATABASE_URL is set by ./dev.sh. The fallback carries no password: it is
+        // enough for offline commands like `migrations add`, but anything that
+        // reaches the database needs the real value.
         var connectionString = Environment.GetEnvironmentVariable("DATABASE_URL")
-            ?? "Host=localhost;Port=5432;Database=rental_management;Username=admin;Password=123456aA;Include Error Detail=true";
-        
+            ?? "Host=localhost;Port=5433;Database=rental_management;Username=admin;Include Error Detail=true";
+
         optionsBuilder.UseNpgsql(connectionString);
         
         return new RentalManagementContext(optionsBuilder.Options);

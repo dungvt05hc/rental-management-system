@@ -1,0 +1,44 @@
+services:
+  - type: web
+    name: rental-management-api
+    runtime: docker
+    plan: free
+    region: singapore
+    dockerfilePath: ./RentalManagementSystem/Backend/RentalManagement.Api/Dockerfile
+    dockerContext: ./RentalManagementSystem/Backend/RentalManagement.Api
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production
+      # Npgsql connection string, or a postgresql:// URL — Program.cs normalizes both.
+      - key: DATABASE_URL
+        sync: false
+      # At least 32 characters. Signs every JWT the API issues.
+      - key: JWT_SECRET_KEY
+        sync: false
+      # Comma-separated list of origins allowed by CORS.
+      - key: FRONTEND_URL
+        sync: false
+      # Password for the seeded admin@rentalmanagement.com account.
+      # If unset, the admin user is not created.
+      - key: SEED_ADMIN_PASSWORD
+        sync: false
+
+  - type: web
+    name: rental-management-web
+    runtime: static
+    rootDir: RentalManagementSystem/Frontend
+    buildCommand: npm ci && npm run build
+    staticPublishPath: dist
+    autoDeploy: true
+    envVars:
+      # Must point at the API service, including the /api suffix.
+      - key: VITE_API_BASE_URL
+        sync: false
+      - key: VITE_API_URL
+        sync: false
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html

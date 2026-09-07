@@ -251,19 +251,24 @@ RentalManagement.Api/
 ## Configuration
 
 ### Database Connection
-```json
-{
-  "ConnectionStrings": {
-    "DefaultConnection": "Server=localhost,1433;Database=RentalManagementDb;User Id=sa;Password=123456aA@3;TrustServerCertificate=True"
-  }
-}
+
+Set via the `DATABASE_URL` environment variable — it takes precedence over
+`appsettings.json`, and keeps credentials out of the repository. `./dev.sh` sets
+it for local development; see [DEPLOYMENT.md](../../DEPLOYMENT.md) for deployed
+environments.
+
+```
+Host=localhost;Port=5433;Database=rental_management;Username=admin;Password=${DB_PASSWORD}
 ```
 
 ### JWT Configuration
+
+The signing key comes from the `JWT_SECRET_KEY` environment variable. The
+remaining settings live in `appsettings.json`:
+
 ```json
 {
   "JwtSettings": {
-    "SecretKey": "your-super-secret-key-that-is-at-least-32-characters-long",
     "Issuer": "RentalManagement.Api",
     "Audience": "RentalManagement.Client",
     "ExpirationMinutes": 60
