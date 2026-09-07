@@ -2,6 +2,8 @@ import * as React from 'react';
 import { AlertCircle, CheckCircle, Info, XCircle, X } from 'lucide-react';
 import * as AlertDialogPrimitive from '@radix-ui/react-alert-dialog';
 
+export type AlertType = 'default' | 'destructive' | 'warning' | 'success' | 'info';
+
 interface AlertDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -10,7 +12,7 @@ interface AlertDialogProps {
   confirmText?: string;
   cancelText?: string;
   onConfirm: () => void | Promise<void>;
-  variant?: 'default' | 'destructive' | 'warning' | 'success' | 'info';
+  variant?: AlertType;
 }
 
 export function AlertDialog({

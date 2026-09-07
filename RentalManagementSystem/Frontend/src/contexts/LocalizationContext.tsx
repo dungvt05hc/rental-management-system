@@ -60,23 +60,17 @@ export const LocalizationProvider: React.FC<LocalizationProviderProps> = ({ chil
       setIsLoading(true);
       setError(null);
 
-      console.log(`Attempting to change language to: ${languageCode}`);
-
       const language = await localizationService.getLanguageByCode(languageCode);
-      
+
       if (!language) {
         throw new Error(`Language ${languageCode} not found`);
       }
-
-      console.log(`Language found:`, language);
 
       await loadTranslations(languageCode);
       setCurrentLanguage(language);
       
       // Store preference in localStorage
       localStorage.setItem(STORAGE_KEY, languageCode);
-      
-      console.log(`Successfully changed language to ${languageCode}`);
     } catch (error) {
       console.error('Failed to change language:', error);
       setError(`Failed to change language: ${error instanceof Error ? error.message : 'Unknown error'}`);

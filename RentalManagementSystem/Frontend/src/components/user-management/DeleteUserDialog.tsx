@@ -1,6 +1,6 @@
 import React from 'react';
 import {
-  AlertDialog,
+  AlertDialogRoot as AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,

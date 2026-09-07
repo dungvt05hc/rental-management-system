@@ -101,8 +101,8 @@ export function isValidEmail(email: string): boolean {
 
 // Validate phone number
 export function isValidPhone(phone: string): boolean {
-  const phoneRegex = /^[\+]?[1-9][\d]{0,15}$/;
-  return phoneRegex.test(phone.replace(/[\s\-\(\)]/g, ''));
+  const phoneRegex = /^[+]?[1-9][\d]{0,15}$/;
+  return phoneRegex.test(phone.replace(/[\s\-()]/g, ''));
 }
 
 // Generate random ID
@@ -138,7 +138,7 @@ export function deepClone<T>(obj: T): T {
   if (typeof obj === 'object') {
     const clonedObj = {} as T;
     for (const key in obj) {
-      if (obj.hasOwnProperty(key)) {
+      if (Object.prototype.hasOwnProperty.call(obj, key)) {
         clonedObj[key] = deepClone(obj[key]);
       }
     }

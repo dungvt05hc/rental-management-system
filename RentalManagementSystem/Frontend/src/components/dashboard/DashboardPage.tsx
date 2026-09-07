@@ -73,18 +73,12 @@ export function DashboardPage() {
       setIsLoading(true);
       setError(null);
 
-      console.log('Loading dashboard data...');
-
       // Load dashboard summary which includes both occupancy and revenue data
       const [occupancyResponse, dashboardResponse, roomsResponse] = await Promise.all([
         reportService.getOccupancyReport(),
         reportService.getDashboardSummary(),
         roomService.getRooms({ page: 1, pageSize: 5 }),
       ]);
-
-      console.log('Occupancy Response:', occupancyResponse);
-      console.log('Dashboard Response:', dashboardResponse);
-      console.log('Rooms Response:', roomsResponse);
 
       // Check if responses are successful
       if (!occupancyResponse.success) {
@@ -97,23 +91,15 @@ export function DashboardPage() {
         throw new Error(dashboardResponse.message || 'Failed to load dashboard data');
       }
 
-      if (!roomsResponse.success) {
-        console.warn('Rooms failed to load:', roomsResponse);
-        // Don't throw error for rooms, just log it
-      }
+      // A rooms failure is not fatal for the dashboard — the recent-rooms list
+      // simply stays empty (see the guarded assignment below).
 
       const occupancy = occupancyResponse.data as OccupancyReport;
       const dashboard = dashboardResponse.data as any;
 
-      console.log('Parsed occupancy:', occupancy);
-      console.log('Parsed dashboard:', dashboard);
-
       // Extract financial data from dashboard.Financials (note the capital F)
       const financials = dashboard?.Financials || dashboard?.financials || {};
       const occupancyData = dashboard?.Occupancy || dashboard?.occupancy || {};
-      
-      console.log('Financials:', financials);
-      console.log('Occupancy Data:', occupancyData);
 
       setStats({
         totalRooms: occupancy?.totalRooms || occupancyData?.TotalRooms || occupancyData?.totalRooms || 0,
@@ -149,7 +135,6 @@ export function DashboardPage() {
       }
       
       setLastUpdated(new Date());
-      console.log('Dashboard data loaded successfully');
     } catch (err) {
       console.error('Dashboard error:', err);
       const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred';

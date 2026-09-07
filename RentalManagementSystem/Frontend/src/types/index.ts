@@ -385,7 +385,9 @@ export enum PaymentMethod {
 }
 
 export interface CreatePaymentRequest {
-  invoiceId: string;
+  // Backend CreatePaymentDto.InvoiceId is an int — must be sent as a number,
+  // System.Text.Json rejects a quoted string here.
+  invoiceId: number;
   amount: number;
   paymentMethod: PaymentMethod;
   reference?: string;

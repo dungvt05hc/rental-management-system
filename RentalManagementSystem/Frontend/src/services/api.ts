@@ -19,9 +19,6 @@ apiClient.interceptors.request.use(
     const token = localStorage.getItem('authToken');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
-      console.log('Authorization header added, token length:', token.length);
-    } else {
-      console.warn('No auth token found in localStorage for request:', config.url);
     }
     return config;
   },
@@ -72,6 +69,16 @@ export const apiService = {
   async put<T = any>(url: string, data?: any): Promise<ApiResponse<T>> {
     try {
       const response = await apiClient.put<ApiResponse<T>>(url, data);
+      return response.data;
+    } catch (error) {
+      return handleApiError(error);
+    }
+  },
+
+  // PATCH request
+  async patch<T = any>(url: string, data?: any): Promise<ApiResponse<T>> {
+    try {
+      const response = await apiClient.patch<ApiResponse<T>>(url, data);
       return response.data;
     } catch (error) {
       return handleApiError(error);

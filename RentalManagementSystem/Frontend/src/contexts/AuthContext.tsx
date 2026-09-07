@@ -126,8 +126,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
           throw new Error('Failed to store authentication token');
         }
         
-        console.log('Token stored successfully, length:', storedToken.length);
-        
         dispatch({
           type: 'LOGIN_SUCCESS',
           payload: { user, token },

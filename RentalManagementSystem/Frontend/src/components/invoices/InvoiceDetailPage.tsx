@@ -2,6 +2,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { FileText, Calendar, DollarSign, User, Home, Package, Mail, Phone, ArrowLeft, Edit, Printer, Download } from 'lucide-react';
 import { Button, Badge, AlertDialog } from '../ui';
+import type { AlertType } from '../ui';
 import { formatCurrency, formatDate } from '../../utils';
 import { invoiceService } from '../../services/invoices';
 import { InvoicePrintDialog } from './InvoicePrintDialog';
@@ -13,13 +14,14 @@ export function InvoiceDetailPage() {
   const [isPrintDialogOpen, setIsPrintDialogOpen] = useState(false);
   const [alertConfig, setAlertConfig] = useState<{
     open: boolean;
-    type: 'success' | 'error' | 'warning' | 'info';
-    title?: string;
-    message: string;
+    variant: AlertType;
+    title: string;
+    description: string;
   }>({
     open: false,
-    type: 'info',
-    message: '',
+    variant: 'info',
+    title: '',
+    description: '',
   });
 
   const { data: invoice, isLoading, error } = useQuery({
@@ -95,18 +97,19 @@ export function InvoiceDetailPage() {
       setTimeout(() => {
         setAlertConfig({
           open: true,
-          type: 'success',
+          variant: 'success',
           title: 'Success',
-          message: 'PDF export initiated successfully! Please check your downloads folder.',
+          description: 'PDF export initiated successfully! Please check your downloads folder.',
         });
       }, 500);
     } catch (err) {
       console.error('Error exporting PDF:', err);
       setAlertConfig({
         open: true,
-        type: 'error',
+        variant: 'destructive',
         title: 'Export Failed',
-        message: err instanceof Error ? err.message : 'An unknown error occurred while exporting the PDF.',
+        description:
+          err instanceof Error ? err.message : 'An unknown error occurred while exporting the PDF.',
       });
     }
   };
@@ -507,9 +510,11 @@ export function InvoiceDetailPage() {
       <AlertDialog
         open={alertConfig.open}
         onOpenChange={(open) => setAlertConfig({ ...alertConfig, open })}
-        type={alertConfig.type}
+        variant={alertConfig.variant}
         title={alertConfig.title}
-        message={alertConfig.message}
+        description={alertConfig.description}
+        confirmText="OK"
+        onConfirm={() => setAlertConfig((prev) => ({ ...prev, open: false }))}
       />
     </div>
   );

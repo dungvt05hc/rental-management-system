@@ -49,7 +49,6 @@ export function CreateUserPage() {
   });
 
   const onSubmit = async (values: CreateUserFormValues) => {
-    console.log('Submitting values:', values);
     try {
       await createUserMutation.mutateAsync(values);
       toast.showSuccess('Success', 'User created successfully');

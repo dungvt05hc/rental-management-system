@@ -79,16 +79,13 @@ export const invoiceService = {
       const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5152/api';
       
       const url = `${API_BASE_URL}/invoices/${id}/export-pdf`;
-      console.log('Exporting PDF from URL:', url);
-      
+
       const response = await fetch(url, {
         method: 'GET',
         headers: {
           'Authorization': token ? `Bearer ${token}` : '',
         },
       });
-
-      console.log('PDF export response status:', response.status);
 
       if (!response.ok) {
         // Try to get error message from response
@@ -122,8 +119,7 @@ export const invoiceService = {
 
       // Create blob and download
       const blob = await response.blob();
-      console.log('PDF blob size:', blob.size, 'bytes');
-      
+
       if (blob.size === 0) {
         throw new Error('Received empty PDF file');
       }
@@ -136,8 +132,6 @@ export const invoiceService = {
       link.click();
       document.body.removeChild(link);
       window.URL.revokeObjectURL(blobUrl);
-      
-      console.log('PDF downloaded successfully:', filename);
     } catch (error) {
       console.error('Error exporting PDF:', error);
       throw error;

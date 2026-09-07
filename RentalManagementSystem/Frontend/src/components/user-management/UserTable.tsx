@@ -192,7 +192,7 @@ export function UserTable({
                 return (
                   <Button
                     key={pageNum}
-                    variant={page === pageNum ? 'default' : 'outline'}
+                    variant={page === pageNum ? 'primary' : 'outline'}
                     size="sm"
                     onClick={() => onPageChange(pageNum)}
                   >

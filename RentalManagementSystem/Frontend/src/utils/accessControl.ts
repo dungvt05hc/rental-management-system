@@ -13,7 +13,7 @@ export type FeatureKey =
   | 'system'
   | 'languages';
 
-const ROLE_FEATURES: Record<UserRole, FeatureKey[] | ['*']> = {
+const ROLE_FEATURES: Record<UserRole, ReadonlyArray<FeatureKey | '*'>> = {
   [UserRole.Admin]: ['*'],
   [UserRole.Manager]: ['rooms', 'tenants', 'invoices', 'items', 'payments', 'dashboard', 'reports'],
   [UserRole.Staff]: ['rooms', 'tenants', 'invoices', 'items', 'payments'],

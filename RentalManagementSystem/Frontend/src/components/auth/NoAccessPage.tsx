@@ -1,10 +1,11 @@
-import { Navigate, Link } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { Button, Card, CardContent, CardHeader, CardTitle } from '../ui';
 import { getDefaultRoute } from '../../utils/accessControl';
 
 export function NoAccessPage() {
   const { user, isAuthenticated, isLoading } = useAuth();
+  const navigate = useNavigate();
   const fallbackRoute = getDefaultRoute(user);
 
   if (isLoading) {
@@ -31,9 +32,7 @@ export function NoAccessPage() {
             contact an administrator.
           </p>
           <div className="flex justify-end">
-            <Button asChild>
-              <Link to={fallbackRoute}>Go back</Link>
-            </Button>
+            <Button onClick={() => navigate(fallbackRoute)}>Go back</Button>
           </div>
         </CardContent>
       </Card>

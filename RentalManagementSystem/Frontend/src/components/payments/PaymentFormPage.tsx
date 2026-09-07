@@ -110,7 +110,7 @@ export function PaymentFormPage() {
 
     try {
       const paymentData = {
-        invoiceId: String(formData.invoiceId),
+        invoiceId: Number(formData.invoiceId),
         amount: Number(formData.amount),
         paymentDate: new Date(formData.paymentDate).toISOString(),
         paymentMethod: formData.paymentMethod as PaymentMethod,

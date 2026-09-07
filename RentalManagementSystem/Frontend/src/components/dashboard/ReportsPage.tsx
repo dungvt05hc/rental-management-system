@@ -88,8 +88,8 @@ export function ReportsPage() {
   const isLoading = occupancyLoading || revenueLoading || monthlyLoading;
 
   const handleExportReport = (format: 'pdf' | 'excel') => {
-    // Placeholder for export functionality
-    console.log(`Exporting ${selectedReport} report as ${format}`);
+    // Placeholder: report export is not wired to a backend endpoint yet.
+    void format;
   };
 
   const renderOccupancyReport = () => {

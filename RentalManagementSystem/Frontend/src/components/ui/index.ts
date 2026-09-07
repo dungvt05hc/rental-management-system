@@ -5,7 +5,7 @@ export { Table, TableHeader, TableBody, TableFooter, TableHead, TableRow, TableC
 export { Dialog, DialogPortal, DialogOverlay, DialogClose, DialogTrigger, DialogContent, DialogHeader, DialogFooter, DialogTitle, DialogDescription } from './Dialog';
 export { Badge } from './Badge';
 export { Alert, AlertTitle, AlertDescription } from './Alert';
-export { AlertDialog, AlertDialogPortal, AlertDialogOverlay, AlertDialogTrigger, AlertDialogContent, AlertDialogHeader, AlertDialogFooter, AlertDialogTitle, AlertDialogDescription, AlertDialogAction, AlertDialogCancel } from './AlertDialog';
+export { AlertDialog, AlertDialogRoot, AlertDialogPortal, AlertDialogOverlay, AlertDialogTrigger, AlertDialogContent, AlertDialogHeader, AlertDialogFooter, AlertDialogTitle, AlertDialogDescription, AlertDialogAction, AlertDialogCancel } from './AlertDialog';
 export { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from './Tooltip';
 export { NotificationContainer } from './NotificationContainer';
 export { Switch } from './Switch';

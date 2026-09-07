@@ -72,7 +72,8 @@ export const userManagementService = {
     userId: string,
     activationData: UserActivationDto
   ): Promise<ApiResponse<boolean>> {
-    return apiService.put<boolean>(`${BASE_URL}/${userId}/activation`, activationData);
+    // Backend declares this route as [HttpPatch] — PUT returns 405.
+    return apiService.patch<boolean>(`${BASE_URL}/${userId}/activation`, activationData);
   },
 
   /**

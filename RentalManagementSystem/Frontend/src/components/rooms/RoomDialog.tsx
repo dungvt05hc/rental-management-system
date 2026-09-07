@@ -97,9 +97,6 @@ export function RoomDialog({ open, onOpenChange, room, onSuccess }: RoomDialogPr
         isFurnished: formData.isFurnished,
       };
 
-      console.log('Form data before submit:', formData);
-      console.log('Request data being sent:', requestData);
-
       let response;
       if (room) {
         response = await roomService.updateRoom(String(room.id), requestData as UpdateRoomRequest);

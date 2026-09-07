@@ -16,7 +16,7 @@ import { Alert, AlertDescription } from '../ui/Alert';
 const passwordResetSchema = z.object({
   newPassword: z.string().min(6, 'Password must be at least 6 characters'),
   confirmPassword: z.string(),
-  sendEmailNotification: z.boolean().default(false),
+  sendEmailNotification: z.boolean(),
 }).refine((data) => data.newPassword === data.confirmPassword, {
   message: "Passwords don't match",
   path: ['confirmPassword'],
