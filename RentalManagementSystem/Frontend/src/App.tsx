@@ -18,7 +18,7 @@ import { ReportsPage } from './components/dashboard/ReportsPage';
 import { ItemsPage } from './components/items/ItemsPage';
 import SystemManagement from './components/SystemManagement/SystemManagement';
 import { LanguageManagement } from './components/admin/LanguageManagement';
-import { UserManagementPage } from './components/user-management';
+import { UserManagementPage } from './components/user-management/UserManagementPage';
 import { CreateUserPage } from './components/user-management/CreateUserPage';
 import type { ReactNode } from 'react';
 import './index.css'

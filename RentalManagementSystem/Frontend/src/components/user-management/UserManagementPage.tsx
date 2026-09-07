@@ -237,7 +237,7 @@ export function UserManagementPage() {
         </div>
       )}
 
-      {/* Dialogs - Remove CreateUserDialog */}
+      {/* Dialogs */}
       {editingUser && (
         <EditUserDialog
           user={editingUser}
