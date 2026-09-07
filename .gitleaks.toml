@@ -1,0 +1,85 @@
+# Gitleaks config cho Rental Management System
+# Chạy:  gitleaks detect --config .gitleaks.toml --redact -v
+#        gitleaks protect --staged --config .gitleaks.toml --redact -v   (pre-commit)
+#
+# Kế thừa bộ rule mặc định của gitleaks rồi bổ sung rule riêng cho repo này.
+[extend]
+useDefault = true
+
+# ---------------------------------------------------------------------------
+# Rules
+# ---------------------------------------------------------------------------
+
+[[rules]]
+id = "connstring-password"
+description = "Password= trong connection string (ADO.NET / Npgsql)"
+regex = '''(?i)\bPassword\s*=\s*(?!["']?(\{\{|\$\{|\$\(|%|<|__|YOUR|CHANGE|PLACEHOLDER|REPLACE|xxx|\*\*\*|ENV|SECRET_|TODO))["']?([^\s;"'`,)]{8,})'''
+tags = ["password", "database"]
+[rules.allowlist]
+regexTarget = "match"
+regexes = [
+  '''(?i)Password\s*=\s*["']?(\$\{[^}]+\}|\$\([^)]+\)|\{\{[^}]+\}\}|%[A-Z_]+%|<[^>]+>|__[A-Z_]+__)''',
+  '''(?i)Password\s*=\s*["']?(your[-_ ]?password|changeme|change[-_ ]?me|placeholder|replace[-_ ]?me|example|sample|dummy|test1234|postgres|password)\b''',
+  '''\*\*\*REMOVED''',
+]
+
+[[rules]]
+id = "postgres-url-password"
+description = "Password nhúng trong URL postgres/postgresql/mysql/mongodb"
+regex = '''(?i)\b(postgres(?:ql)?|mysql|mongodb(?:\+srv)?|amqp|redis)://[^:@/\s]+:([^@/\s]{8,})@'''
+secretGroup = 2
+tags = ["password", "database", "uri"]
+[rules.allowlist]
+regexTarget = "match"
+regexes = [
+  '''://[^:@/\s]+:(\$\{[^}]+\}|\{\{[^}]+\}\}|<[^>]+>|\[[^\]]+\]|YOUR[-_A-Z]*|PASSWORD|password|changeme|\*\*\*[^@]*)@''',
+]
+
+[[rules]]
+id = "jwt-secret-key"
+description = "JWT_SECRET / Jwt:Key / SecretKey với giá trị thật"
+regex = '''(?i)\b(JWT[-_]?SECRET(?:[-_]?KEY)?|SECRET[-_]?KEY|SIGNING[-_]?KEY|Jwt__Key|Jwt:Key)\b\s*[:=]\s*["']?([A-Za-z0-9+/=_\-]{24,})["']?'''
+secretGroup = 2
+tags = ["jwt", "key"]
+[rules.allowlist]
+regexTarget = "match"
+regexes = [
+  '''(?i)(\$\{[^}]+\}|\{\{[^}]+\}\}|<[^>]+>|__[A-Z_]+__|YOUR[-_A-Z]*|CHANGE[-_]?ME|PLACEHOLDER|REPLACE[-_]?ME|GENERATE|\*\*\*REMOVED)''',
+  # generate-jwt-secret.sh sinh giá trị lúc runtime, không phải secret cứng
+  '''(?i)SECRET\s*=\s*\$\(''',
+]
+
+[[rules]]
+id = "generic-api-key"
+description = "api_key / apikey / access_token / client_secret với giá trị thật"
+regex = '''(?i)\b(api[-_]?key|apikey|access[-_]?token|auth[-_]?token|client[-_]?secret|private[-_]?key)\b\s*[:=]\s*["']?([A-Za-z0-9+/=_\-]{20,})["']?'''
+secretGroup = 2
+tags = ["key", "api"]
+[rules.allowlist]
+regexTarget = "match"
+regexes = [
+  '''(?i)(\$\{[^}]+\}|\{\{[^}]+\}\}|<[^>]+>|process\.env|import\.meta\.env|__[A-Z_]+__|YOUR[-_A-Z]*|CHANGE[-_]?ME|PLACEHOLDER|EXAMPLE|SAMPLE|DUMMY|\*\*\*REMOVED)''',
+]
+
+[[rules]]
+id = "supabase-service-role-key"
+description = "Supabase service_role / anon JWT key"
+regex = '''\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\b'''
+tags = ["supabase", "jwt"]
+
+# ---------------------------------------------------------------------------
+# Allowlist toàn cục — giảm false positive
+# ---------------------------------------------------------------------------
+[allowlist]
+description = "Đường dẫn và giá trị không phải secret"
+paths = [
+  '''(^|/)node_modules/''',
+  '''(^|/)(bin|obj|dist|build)/''',
+  '''package-lock\.json$''',
+  '''\.lock$''',
+  '''(^|/)\.gitleaks\.toml$''',
+  '''(^|/)\.git/''',
+]
+regexes = [
+  '''\*\*\*REMOVED-(DB-PASSWORD|JWT-SECRET)\*\*\*''',
+]

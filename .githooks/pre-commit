@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+# Chặn commit chứa secret thật.
+# Kích hoạt:  git config core.hooksPath .githooks
+# Bỏ qua 1 lần (chỉ khi chắc chắn là false positive):  git commit --no-verify
+set -uo pipefail
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+CONFIG="$REPO_ROOT/.gitleaks.toml"
+RED=$'\033[0;31m'; YEL=$'\033[0;33m'; NC=$'\033[0m'
+
+fail() {
+  echo "${RED}✖ COMMIT BỊ CHẶN: phát hiện secret trong staged changes.${NC}" >&2
+  echo "  Hãy gỡ secret ra khỏi code, dùng biến môi trường / secret manager." >&2
+  echo "  Nếu chắc chắn là false positive: git commit --no-verify" >&2
+  exit 1
+}
+
+# ---- 1. gitleaks (nếu có) --------------------------------------------------
+if command -v gitleaks >/dev/null 2>&1; then
+  if ! gitleaks protect --staged --config "$CONFIG" --redact --no-banner -v; then
+    fail
+  fi
+else
+  echo "${YEL}⚠ gitleaks chưa cài (brew install gitleaks) — dùng fallback grep.${NC}" >&2
+fi
+
+# ---- 2. Fallback / lớp chặn thứ hai: grep trên nội dung staged -------------
+# Chỉ soi phần được thêm vào (dòng bắt đầu bằng '+'), bỏ qua file lock/vendor.
+STAGED_DIFF="$(git diff --cached --unified=0 --no-color \
+  -- . \
+  ':(exclude)**/node_modules/**' \
+  ':(exclude)**/package-lock.json' \
+  ':(exclude)**/bin/**' ':(exclude)**/obj/**' ':(exclude)**/dist/**' \
+  | grep -E '^\+' | grep -vF '+++' || true)"
+
+[ -z "$STAGED_DIFF" ] && exit 0
+
+# Giá trị được coi là placeholder → cho qua
+PLACEHOLDER='\$\{|\$\(|\{\{|<[A-Za-z_]|__[A-Z_]+__|%[A-Z_]+%|YOUR|CHANGE_?ME|PLACEHOLDER|REPLACE_?ME|EXAMPLE|SAMPLE|DUMMY|process\.env|import\.meta\.env|\*\*\*REMOVED'
+
+PATTERNS=(
+  # Password= với giá trị >=8 ký tự
+  '[Pp]assword[[:space:]]*=[[:space:]]*"?[^[:space:];"'"'"'`,)]{8,}'
+  # password nhúng trong URL DB
+  '(postgres(ql)?|mysql|mongodb(\+srv)?|redis|amqp)://[^:@/[:space:]]+:[^@/[:space:]]{8,}@'
+  # JWT_SECRET / SecretKey / SigningKey
+  '(JWT[-_]?SECRET([-_]?KEY)?|SECRET[-_]?KEY|SIGNING[-_]?KEY|Jwt__Key|Jwt:Key)[[:space:]]*[:=][[:space:]]*"?[A-Za-z0-9+/=_-]{24,}'
+  # api_key / access_token / client_secret
+  '(api[-_]?key|apikey|access[-_]?token|auth[-_]?token|client[-_]?secret|private[-_]?key)[[:space:]]*[:=][[:space:]]*"?[A-Za-z0-9+/=_-]{20,}'
+  # Supabase / JWT token literal
+  'eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}'
+)
+
+HITS=0
+for p in "${PATTERNS[@]}"; do
+  matches="$(printf '%s\n' "$STAGED_DIFF" | grep -inE "$p" || true)"
+  [ -z "$matches" ] && continue
+  matches="$(printf '%s\n' "$matches" | grep -vE "$PLACEHOLDER" || true)"
+  [ -z "$matches" ] && continue
+  HITS=1
+  printf '%s\n' "$matches" | sed -E 's/([Pp]assword[[:space:]]*=[[:space:]]*)[^;"'"'"' ]+/\1***/g' >&2
+done
+
+[ "$HITS" -eq 1 ] && fail
+exit 0
