@@ -97,6 +97,18 @@ export const apiService = {
       return handleApiError<T>(error);
     }
   },
+
+  // GET một endpoint trả file thô (ví dụ File(bytes, "text/csv") ở controller).
+  // Không dùng get() được: những endpoint đó không bọc kết quả trong
+  // ApiResponse, và responseType phải nằm trong axios config chứ không phải
+  // trong params — nếu nhét vào params thì nó chỉ thành một query string vô
+  // nghĩa còn body vẫn bị parse thành JSON.
+  // Lỗi được ném ra nguyên trạng để caller tự xử lý, vì Promise<Blob> không
+  // có chỗ nào để trả về ApiResponse lỗi.
+  async getFile(url: string, params?: QueryParams): Promise<Blob> {
+    const response = await apiClient.get<Blob>(url, { params, responseType: 'blob' });
+    return response.data;
+  },
 };
 
 // Error handler — mọi nhánh đều trả về lỗi nên không nhánh nào đặt `data`,

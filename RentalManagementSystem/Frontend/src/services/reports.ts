@@ -63,10 +63,9 @@ export const reportService = {
 
   // Export report as CSV
   async exportReportCsv(reportType: string, fromDate?: string, toDate?: string): Promise<Blob> {
-    const response = await apiService.get<Blob>(`/reports/export/${reportType}`, {
+    return apiService.getFile(`/reports/export/${reportType}`, {
       fromDate,
       toDate
     });
-    return response.data;
   }
 };
