@@ -104,26 +104,26 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5152/api'
 The frontend integrates with these backend endpoints:
 
 ### User Operations
-- `GET /api/SystemManagement/users` - Get paginated users
-- `GET /api/SystemManagement/users/{id}` - Get user by ID
-- `POST /api/SystemManagement/users` - Create new user
-- `PUT /api/SystemManagement/users/{id}` - Update user
-- `DELETE /api/SystemManagement/users/{id}` - Delete user
+- `GET /api/users` - Get paginated users
+- `GET /api/users/{id}` - Get user by ID
+- `POST /api/users` - Create new user
+- `PUT /api/users/{id}` - Update user
+- `DELETE /api/users/{id}` - Delete user
 
 ### User Activation
-- `PUT /api/SystemManagement/users/{id}/activation` - Activate/deactivate user
+- `PUT /api/users/{id}/activation` - Activate/deactivate user
 
 ### Password Management
-- `POST /api/SystemManagement/users/{id}/reset-password` - Reset password
+- `POST /api/users/{id}/reset-password` - Reset password
 
 ### Role Management
-- `GET /api/SystemManagement/users/roles/available` - Get available roles
-- `POST /api/SystemManagement/users/{id}/roles` - Assign roles
-- `DELETE /api/SystemManagement/users/{id}/roles` - Remove roles
+- `GET /api/users/roles/available` - Get available roles
+- `POST /api/users/{id}/roles` - Assign roles
+- `DELETE /api/users/{id}/roles` - Remove roles
 
 ### Statistics & Bulk Operations
-- `GET /api/SystemManagement/users/statistics` - Get user statistics
-- `POST /api/SystemManagement/users/bulk` - Perform bulk operations
+- `GET /api/users/statistics` - Get user statistics
+- `POST /api/users/bulk` - Perform bulk operations
 
 ## 🎨 Component Breakdown
 

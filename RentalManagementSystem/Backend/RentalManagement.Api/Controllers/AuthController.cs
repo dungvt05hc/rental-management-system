@@ -6,7 +6,8 @@ using RentalManagement.Api.Services.Interfaces;
 namespace RentalManagement.Api.Controllers;
 
 /// <summary>
-/// Controller for authentication operations
+/// Controller for authentication and the caller's own profile.
+/// User administration lives in <see cref="UsersController"/>.
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
@@ -114,61 +115,4 @@ public class AuthController : ControllerBase
         return Ok(result);
     }
 
-    /// <summary>
-    /// Assign role to user (Admin only)
-    /// </summary>
-    /// <param name="userId">User ID</param>
-    /// <param name="assignRoleDto">Role assignment information</param>
-    /// <returns>Role assignment result</returns>
-    [HttpPost("users/{userId}/roles")]
-    [Authorize(Roles = "Admin")]
-    public async Task<ActionResult<ApiResponse<bool>>> AssignRole(string userId, [FromBody] AssignRoleDto assignRoleDto)
-    {
-        var result = await _authService.AssignRoleAsync(userId, assignRoleDto.RoleName);
-
-        if (!result.Success)
-        {
-            return BadRequest(result);
-        }
-
-        return Ok(result);
-    }
-
-    /// <summary>
-    /// Remove role from user (Admin only)
-    /// </summary>
-    /// <param name="userId">User ID</param>
-    /// <param name="assignRoleDto">Role removal information</param>
-    /// <returns>Role removal result</returns>
-    [HttpDelete("users/{userId}/roles")]
-    [Authorize(Roles = "Admin")]
-    public async Task<ActionResult<ApiResponse<bool>>> RemoveRole(string userId, [FromBody] AssignRoleDto assignRoleDto)
-    {
-        var result = await _authService.RemoveRoleAsync(userId, assignRoleDto.RoleName);
-
-        if (!result.Success)
-        {
-            return BadRequest(result);
-        }
-
-        return Ok(result);
-    }
-
-    /// <summary>
-    /// Get all users (Admin/Manager only)
-    /// </summary>
-    /// <returns>List of all users</returns>
-    [HttpGet("users")]
-    [Authorize(Roles = "Admin,Manager")]
-    public async Task<ActionResult<ApiResponse<IEnumerable<UserDto>>>> GetAllUsers()
-    {
-        var result = await _authService.GetUsersAsync();
-
-        if (!result.Success)
-        {
-            return BadRequest(result);
-        }
-
-        return Ok(result);
-    }
 }

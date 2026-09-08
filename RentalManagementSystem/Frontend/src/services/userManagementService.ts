@@ -13,7 +13,7 @@ import type {
   BulkUserOperationDto,
 } from '../types';
 
-const BASE_URL = '/SystemManagement/users';
+const BASE_URL = '/users';
 
 /**
  * User Management Service

@@ -25,7 +25,7 @@ All endpoints require **Admin** role authentication.
 ### 1. Get Users (Paginated & Filtered)
 
 ```http
-GET /api/SystemManagement/users
+GET /api/users
 ```
 
 **Query Parameters:**
@@ -72,14 +72,14 @@ GET /api/SystemManagement/users
 
 **Example Request:**
 ```bash
-curl -X GET "https://api.example.com/api/SystemManagement/users?page=1&pageSize=20&searchTerm=john&isActive=true" \
+curl -X GET "https://api.example.com/api/users?page=1&pageSize=20&searchTerm=john&isActive=true" \
   -H "Authorization: Bearer YOUR_JWT_TOKEN"
 ```
 
 ### 2. Get User by ID
 
 ```http
-GET /api/SystemManagement/users/{userId}
+GET /api/users/{userId}
 ```
 
 **Response:**
@@ -104,7 +104,7 @@ GET /api/SystemManagement/users/{userId}
 ### 3. Create User
 
 ```http
-POST /api/SystemManagement/users
+POST /api/users
 ```
 
 **Request Body:**
@@ -142,7 +142,7 @@ POST /api/SystemManagement/users
 ### 4. Update User
 
 ```http
-PUT /api/SystemManagement/users/{userId}
+PUT /api/users/{userId}
 ```
 
 **Request Body:**
@@ -159,7 +159,7 @@ PUT /api/SystemManagement/users/{userId}
 ### 5. Delete User
 
 ```http
-DELETE /api/SystemManagement/users/{userId}
+DELETE /api/users/{userId}
 ```
 
 **Response:**
@@ -176,7 +176,7 @@ DELETE /api/SystemManagement/users/{userId}
 ### 6. Activate/Deactivate User
 
 ```http
-PATCH /api/SystemManagement/users/{userId}/activation
+PATCH /api/users/{userId}/activation
 ```
 
 **Request Body:**
@@ -199,7 +199,7 @@ PATCH /api/SystemManagement/users/{userId}/activation
 ### 7. Reset User Password
 
 ```http
-POST /api/SystemManagement/users/{userId}/reset-password
+POST /api/users/{userId}/reset-password
 ```
 
 **Request Body:**
@@ -214,7 +214,7 @@ POST /api/SystemManagement/users/{userId}/reset-password
 ### 8. Assign Roles
 
 ```http
-POST /api/SystemManagement/users/{userId}/roles
+POST /api/users/{userId}/roles
 ```
 
 **Request Body:**
@@ -234,7 +234,7 @@ POST /api/SystemManagement/users/{userId}/roles
 ### 9. Remove Roles
 
 ```http
-DELETE /api/SystemManagement/users/{userId}/roles
+DELETE /api/users/{userId}/roles
 ```
 
 **Request Body:**
@@ -247,7 +247,7 @@ DELETE /api/SystemManagement/users/{userId}/roles
 ### 10. Get Available Roles
 
 ```http
-GET /api/SystemManagement/users/roles/available
+GET /api/users/roles/available
 ```
 
 **Response:**
@@ -278,7 +278,7 @@ GET /api/SystemManagement/users/roles/available
 ### 11. Get User Statistics
 
 ```http
-GET /api/SystemManagement/users/statistics
+GET /api/users/statistics
 ```
 
 **Response:**
@@ -303,7 +303,7 @@ GET /api/SystemManagement/users/statistics
 ### 12. Bulk User Operations
 
 ```http
-POST /api/SystemManagement/users/bulk
+POST /api/users/bulk
 ```
 
 **Request Body:**
@@ -329,7 +329,7 @@ POST /api/SystemManagement/users/bulk
 ### 13. Get User Audit Log
 
 ```http
-GET /api/SystemManagement/users/{userId}/audit-log?limit=50
+GET /api/users/{userId}/audit-log?limit=50
 ```
 
 **Response:**
@@ -412,7 +412,7 @@ export const UserManagementService = {
       }
     });
     
-    const response = await api.get(`/SystemManagement/users?${params}`);
+    const response = await api.get(`/users?${params}`);
     return response.data;
   },
 
@@ -426,7 +426,7 @@ export const UserManagementService = {
     roles: string[];
     isActive?: boolean;
   }) {
-    const response = await api.post('/SystemManagement/users', userData);
+    const response = await api.post('/users', userData);
     return response.data;
   },
 
@@ -438,25 +438,25 @@ export const UserManagementService = {
     phoneNumber?: string;
     isActive?: boolean;
   }) {
-    const response = await api.put(`/SystemManagement/users/${userId}`, userData);
+    const response = await api.put(`/users/${userId}`, userData);
     return response.data;
   },
 
   // Delete user
   async deleteUser(userId: string) {
-    const response = await api.delete(`/SystemManagement/users/${userId}`);
+    const response = await api.delete(`/users/${userId}`);
     return response.data;
   },
 
   // Assign roles
   async assignRoles(userId: string, roles: string[]) {
-    const response = await api.post(`/SystemManagement/users/${userId}/roles`, roles);
+    const response = await api.post(`/users/${userId}/roles`, roles);
     return response.data;
   },
 
   // Get statistics
   async getStatistics() {
-    const response = await api.get('/SystemManagement/users/statistics');
+    const response = await api.get('/users/statistics');
     return response.data;
   }
 };

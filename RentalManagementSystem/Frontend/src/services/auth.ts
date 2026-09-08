@@ -28,20 +28,7 @@ export const authService = {
     return apiService.put<User>('/auth/profile', userData);
   },
 
-  // Get all users (Admin/Manager only)
-  async getAllUsers(): Promise<ApiResponse<User[]>> {
-    return apiService.get<User[]>('/auth/users');
-  },
-
-  // Assign role to user (Admin only)
-  async assignRole(userId: string, roleName: string): Promise<ApiResponse<boolean>> {
-    return apiService.post<boolean>(`/auth/users/${userId}/roles`, { roleName });
-  },
-
-  // Remove role from user (Admin only)
-  async removeRole(userId: string, roleName: string): Promise<ApiResponse<boolean>> {
-    return apiService.delete<boolean>(`/auth/users/${userId}/roles`, { roleName });
-  },
+  // User administration (list, roles) lives in userManagementService.
 
   // Local logout (clear token)
   logout(): void {
