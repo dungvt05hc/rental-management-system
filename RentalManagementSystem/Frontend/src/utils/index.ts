@@ -6,9 +6,9 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-// Format currency
-export function formatCurrency(amount: number, currency = 'USD'): string {
-  return new Intl.NumberFormat('en-US', {
+// Format currency — mặc định là VND vì đây là app quản lý nhà trọ Việt Nam
+export function formatCurrency(amount: number, currency = 'VND'): string {
+  return new Intl.NumberFormat('vi-VN', {
     style: 'currency',
     currency,
   }).format(amount);
@@ -50,11 +50,6 @@ export function formatPercentage(value: number, decimals = 1): string {
 export function truncateText(text: string, maxLength: number): string {
   if (text.length <= maxLength) return text;
   return text.slice(0, maxLength) + '...';
-}
-
-// Capitalize first letter
-export function capitalize(text: string): string {
-  return text.charAt(0).toUpperCase() + text.slice(1).toLowerCase();
 }
 
 // Get initials from name
@@ -105,48 +100,6 @@ export function isValidPhone(phone: string): boolean {
   return phoneRegex.test(phone.replace(/[\s\-()]/g, ''));
 }
 
-// Generate random ID
-export function generateId(prefix = ''): string {
-  const timestamp = Date.now().toString(36);
-  const randomStr = Math.random().toString(36).substring(2, 8);
-  return `${prefix}${timestamp}${randomStr}`;
-}
-
-// Debounce function
-export function debounce<T extends (...args: any[]) => any>(
-  func: T,
-  wait: number
-): (...args: Parameters<T>) => void {
-  let timeout: ReturnType<typeof setTimeout>;
-  
-  return function executedFunction(...args: Parameters<T>) {
-    const later = () => {
-      clearTimeout(timeout);
-      func(...args);
-    };
-    
-    clearTimeout(timeout);
-    timeout = setTimeout(later, wait);
-  };
-}
-
-// Deep clone object
-export function deepClone<T>(obj: T): T {
-  if (obj === null || typeof obj !== 'object') return obj;
-  if (obj instanceof Date) return new Date(obj.getTime()) as unknown as T;
-  if (obj instanceof Array) return obj.map(item => deepClone(item)) as unknown as T;
-  if (typeof obj === 'object') {
-    const clonedObj = {} as T;
-    for (const key in obj) {
-      if (Object.prototype.hasOwnProperty.call(obj, key)) {
-        clonedObj[key] = deepClone(obj[key]);
-      }
-    }
-    return clonedObj;
-  }
-  return obj;
-}
-
 // Calculate pagination info
 export function calculatePagination(page: number, pageSize: number, totalCount: number) {
   const totalPages = Math.ceil(totalCount / pageSize);
@@ -164,9 +117,4 @@ export function calculatePagination(page: number, pageSize: number, totalCount: 
     isFirstPage: page === 1,
     isLastPage: page === totalPages,
   };
-}
-
-// Sleep utility
-export function sleep(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
 }
