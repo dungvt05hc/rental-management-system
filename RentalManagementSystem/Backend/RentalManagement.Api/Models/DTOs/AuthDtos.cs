@@ -51,7 +51,7 @@ public class RegisterRequestDto
     /// User's password
     /// </summary>
     [Required]
-    [StringLength(100, MinimumLength = 6)]
+    [StringLength(100, MinimumLength = 10)]
     public string Password { get; set; } = string.Empty;
 
     /// <summary>
@@ -186,7 +186,7 @@ public class ChangePasswordDto
     /// New password
     /// </summary>
     [Required]
-    [StringLength(100, MinimumLength = 6)]
+    [StringLength(100, MinimumLength = 10)]
     public string NewPassword { get; set; } = string.Empty;
 
     /// <summary>
@@ -268,7 +268,7 @@ public class CreateUserDto
     /// <summary>
     /// Initial password (if not provided, a default will be generated)
     /// </summary>
-    [StringLength(100, MinimumLength = 6)]
+    [StringLength(100, MinimumLength = 10)]
     public string? Password { get; set; }
 
     /// <summary>
@@ -408,7 +408,7 @@ public class ResetUserPasswordDto
     /// New password for the user
     /// </summary>
     [Required]
-    [StringLength(100, MinimumLength = 6)]
+    [StringLength(100, MinimumLength = 10)]
     public string NewPassword { get; set; } = string.Empty;
 
     /// <summary>
