@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using RentalManagement.Api.Models.DTOs;
 using RentalManagement.Api.Models.Entities;
+using RentalManagement.Api.Security;
 using RentalManagement.Api.Services.Interfaces;
 
 namespace RentalManagement.Api.Services.Implementations;
@@ -562,50 +563,7 @@ public class UserManagementService : IUserManagementService
     /// <summary>
     /// Generates a random secure password
     /// </summary>
-    private static string GenerateRandomPassword()
-    {
-        var options = new PasswordOptions
-        {
-            RequiredLength = 12,
-            RequireDigit = true,
-            RequireLowercase = true,
-            RequireUppercase = true,
-            RequireNonAlphanumeric = true
-        };
-
-        var randomChars = new[]
-        {
-            "ABCDEFGHJKLMNOPQRSTUVWXYZ",
-            "abcdefghijkmnopqrstuvwxyz",
-            "0123456789",
-            "!@#$%^&*"
-        };
-
-        var random = new Random();
-        var chars = new List<char>();
-
-        // Ensure at least one character from each required group
-        if (options.RequireUppercase)
-            chars.Insert(random.Next(0, chars.Count), randomChars[0][random.Next(0, randomChars[0].Length)]);
-
-        if (options.RequireLowercase)
-            chars.Insert(random.Next(0, chars.Count), randomChars[1][random.Next(0, randomChars[1].Length)]);
-
-        if (options.RequireDigit)
-            chars.Insert(random.Next(0, chars.Count), randomChars[2][random.Next(0, randomChars[2].Length)]);
-
-        if (options.RequireNonAlphanumeric)
-            chars.Insert(random.Next(0, chars.Count), randomChars[3][random.Next(0, randomChars[3].Length)]);
-
-        // Fill the rest
-        for (var i = chars.Count; i < options.RequiredLength; i++)
-        {
-            var rcs = randomChars[random.Next(0, randomChars.Length)];
-            chars.Insert(random.Next(0, chars.Count), rcs[random.Next(0, rcs.Length)]);
-        }
-
-        return new string(chars.ToArray());
-    }
+    private static string GenerateRandomPassword() => PasswordGenerator.Generate();
 
     /// <summary>
     /// Performs activation/deactivation on a user
