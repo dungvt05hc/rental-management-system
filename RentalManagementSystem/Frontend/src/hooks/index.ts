@@ -118,12 +118,13 @@ export function usePagination(initialPage = 1, initialPageSize = 10) {
 }
 
 // Hook for managing form state
-export function useForm<T extends Record<string, any>>(initialValues: T) {
+export function useForm<T extends Record<string, unknown>>(initialValues: T) {
   const [values, setValues] = useState<T>(initialValues);
   const [errors, setErrors] = useState<Partial<Record<keyof T, string>>>({});
   const [touched, setTouchedFields] = useState<Partial<Record<keyof T, boolean>>>({});
 
-  const setValue = (name: keyof T, value: any) => {
+  // Generic theo từng key để value phải đúng kiểu của chính field đó
+  const setValue = <K extends keyof T>(name: K, value: T[K]) => {
     setValues(prev => ({ ...prev, [name]: value }));
     // Clear error when user starts typing
     if (errors[name]) {
@@ -164,7 +165,7 @@ export function useForm<T extends Record<string, any>>(initialValues: T) {
 }
 
 // Hook for managing async operations
-export function useAsync<T, Args extends any[]>(
+export function useAsync<T, Args extends unknown[]>(
   asyncFunction: (...args: Args) => Promise<T>
 ) {
   const [state, setState] = useState<{

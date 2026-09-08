@@ -117,7 +117,7 @@ export function RoomDialog({ open, onOpenChange, room, onSuccess }: RoomDialogPr
     }
   };
 
-  const handleChange = (field: string, value: any) => {
+  const handleChange = <K extends keyof typeof formData>(field: K, value: (typeof formData)[K]) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 

@@ -253,13 +253,16 @@ export interface CreateInvoiceRequest {
   invoiceItems?: CreateInvoiceItemRequest[];
 }
 
+// Khớp với UpdateInvoiceDto ở Backend/Models/DTOs/InvoiceDtos.cs
 export interface UpdateInvoiceRequest {
   additionalCharges?: number;
   discount?: number;
-  status?: InvoiceStatus | string;
+  status?: InvoiceStatus;
   dueDate?: string;
   additionalChargesDescription?: string;
   notes?: string;
+  // Backend UpdateInvoiceDto có nhận InvoiceItems — type cũ thiếu field này
+  invoiceItems?: CreateInvoiceItemRequest[];
 }
 
 export type InvoiceSearchRequest = {

@@ -7,6 +7,16 @@ import { AlertDialog } from '../ui';
 import { useToast } from '../../contexts/ToastContext';
 import { useTranslation } from '../../hooks/useTranslation';
 
+// Một dòng trong file JSON import. Không dùng lại type Translation vì file
+// bên ngoài chỉ cần đúng hai field này.
+type ImportedTranslation = { key: string; value: string };
+
+const isImportedTranslation = (entry: unknown): entry is ImportedTranslation =>
+  typeof entry === 'object' &&
+  entry !== null &&
+  typeof (entry as ImportedTranslation).key === 'string' &&
+  typeof (entry as ImportedTranslation).value === 'string';
+
 /**
  * Translation Management Component
  * Provides full CRUD operations for managing translations across languages
@@ -253,17 +263,21 @@ export const TranslationManagement: React.FC = () => {
     reader.onload = async (event) => {
       try {
         const content = event.target?.result as string;
-        const data = JSON.parse(content);
-        
-        if (!data.translations || !Array.isArray(data.translations)) {
+        const data: unknown = JSON.parse(content);
+
+        // File do người dùng tải lên nên không tin được shape — phải kiểm tra
+        // từng phần tử, không chỉ kiểm tra là mảng. Trước đây một phần tử
+        // thiếu key/value sẽ lọt vào và tạo ra entry "undefined".
+        const translations = (data as { translations?: unknown } | null)?.translations;
+        if (!Array.isArray(translations) || !translations.every(isImportedTranslation)) {
           throw new Error('Invalid translation file format');
         }
 
         // Convert to bulk format
         const bulkData = {
           languageCode: selectedLanguage,
-          translations: data.translations.reduce((acc: Record<string, string>, t: any) => {
-            acc[t.key] = t.value;
+          translations: translations.reduce<Record<string, string>>((acc, entry) => {
+            acc[entry.key] = entry.value;
             return acc;
           }, {}),
         };

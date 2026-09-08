@@ -7,10 +7,12 @@ import { isValidEmail } from '../../utils';
 import { useTranslation } from '../../hooks/useTranslation';
 import { getDefaultRoute } from '../../utils/accessControl';
 
-interface LoginFormData {
+// type alias chứ không phải interface: useForm ràng buộc
+// T extends Record<string, unknown>, mà interface không có index signature ngầm.
+type LoginFormData = {
   email: string;
   password: string;
-}
+};
 
 export function LoginPage() {
   const { t } = useTranslation();

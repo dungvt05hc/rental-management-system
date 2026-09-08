@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import axios from 'axios';
 import { Save, RefreshCw, Plus, Trash2, Download, Upload } from 'lucide-react';
 import { Button, Input, Card, CardContent, CardHeader, CardTitle, AlertDialog } from '../ui';
 import {
@@ -50,8 +51,13 @@ const SystemSettingsTab: React.FC = () => {
       setSettingsByCategory(data);
       setEditedSettings({});
       setExpandedCategories(new Set(data.map(c => c.category)));
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to load settings');
+    } catch (err) {
+      // systemManagementApi gọi thẳng axios (không qua apiService) nên lỗi ở
+      // đây là AxiosError, body lỗi nằm trong response.data.
+      const message = axios.isAxiosError(err)
+        ? (err.response?.data as { message?: string } | undefined)?.message
+        : undefined;
+      setError(message || 'Failed to load settings');
     } finally {
       setLoading(false);
     }
@@ -80,7 +86,7 @@ const SystemSettingsTab: React.FC = () => {
         t('system.settingsUpdated', `Successfully updated ${settingsToUpdate.length} settings`)
       );
       await loadSettings();
-    } catch (err: any) {
+    } catch {
       showError(t('common.error', 'Error'), t('system.saveError', 'Failed to save settings'));
     } finally {
       setLoading(false);
@@ -101,7 +107,7 @@ const SystemSettingsTab: React.FC = () => {
         description: '',
       });
       await loadSettings();
-    } catch (err: any) {
+    } catch {
       showError(t('common.error', 'Error'), t('system.createError', 'Failed to create setting'));
     } finally {
       setLoading(false);
@@ -130,7 +136,7 @@ const SystemSettingsTab: React.FC = () => {
         await systemManagementApi.deleteSetting(confirmDialog.settingKey);
         showSuccess(t('common.success', 'Success'), t('system.settingDeleted', 'Setting deleted successfully'));
         await loadSettings();
-      } catch (err: any) {
+      } catch {
         showError(t('common.error', 'Error'), t('system.deleteError', 'Failed to delete setting'));
       }
     } else if (confirmDialog.action === 'seed') {
@@ -138,7 +144,7 @@ const SystemSettingsTab: React.FC = () => {
         await systemManagementApi.seedDefaultSettings();
         showSuccess(t('common.success', 'Success'), t('system.settingsSeeded', 'Default settings seeded successfully'));
         await loadSettings();
-      } catch (err: any) {
+      } catch {
         showError(t('common.error', 'Error'), t('system.seedError', 'Failed to seed settings'));
       }
     }
@@ -157,7 +163,7 @@ const SystemSettingsTab: React.FC = () => {
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
       showSuccess(t('common.success', 'Success'), t('system.settingsExported', 'Settings exported successfully'));
-    } catch (err: any) {
+    } catch {
       showError(t('common.error', 'Error'), t('system.exportError', 'Failed to export settings'));
     }
   };

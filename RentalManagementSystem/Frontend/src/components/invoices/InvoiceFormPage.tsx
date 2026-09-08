@@ -102,7 +102,7 @@ export function InvoiceFormPage() {
       const response = await invoiceService.getInvoice(invoiceId);
 
       if (response.success && response.data) {
-        const invoiceData = response.data as any;
+        const invoiceData = response.data;
         setFormData({
           tenantId: String(invoiceData.tenant?.id || invoiceData.tenantId || ''),
           roomId: String(invoiceData.room?.id || invoiceData.roomId || ''),
@@ -128,8 +128,7 @@ export function InvoiceFormPage() {
     try {
       const response = await tenantService.getTenants({ pageSize: 1000 });
       if (response.success && response.data) {
-        const data = response.data as any;
-        setTenants(data.items || []);
+        setTenants(response.data.items || []);
       }
     } catch (err) {
       console.error('Failed to load tenants:', err);
@@ -140,8 +139,7 @@ export function InvoiceFormPage() {
     try {
       const response = await roomService.getRooms({ pageSize: 1000 });
       if (response.success && response.data) {
-        const data = response.data as any;
-        setRooms(data.items || []);
+        setRooms(response.data.items || []);
       }
     } catch (err) {
       console.error('Failed to load rooms:', err);
@@ -152,8 +150,7 @@ export function InvoiceFormPage() {
     try {
       const response = await itemService.getItems({ pageSize: 1000, isActive: true });
       if (response.success && response.data) {
-        const data = response.data as any;
-        setItems(data.items || data.data || []);
+        setItems(response.data.items || []);
       }
     } catch (err) {
       console.error('Failed to load items:', err);
@@ -205,7 +202,7 @@ export function InvoiceFormPage() {
     }
   };
 
-  const handleEditItem = (index: number, field: keyof InvoiceItem, value: any) => {
+  const handleEditItem = <K extends keyof InvoiceItem>(index: number, field: K, value: InvoiceItem[K]) => {
     const newItems = [...invoiceItems];
     newItems[index] = {
       ...newItems[index],
@@ -247,7 +244,7 @@ export function InvoiceFormPage() {
       );
 
       if (isEditMode && id) {
-        const updateData: any = {
+        const updateData: UpdateInvoiceRequest = {
           additionalCharges: parseFloat(formData.additionalCharges),
           discount: parseFloat(formData.discount),
           status: parseInt(formData.status) as InvoiceStatus,
@@ -266,7 +263,7 @@ export function InvoiceFormPage() {
           showError(t('common.error', 'Error'), response.message || t('invoices.updateError', 'Failed to update invoice'));
         }
       } else {
-        const createData: any = {
+        const createData: CreateInvoiceRequest = {
           tenantId: parseInt(formData.tenantId),
           roomId: parseInt(formData.roomId),
           billingPeriod: formData.billingPeriod,
@@ -278,7 +275,7 @@ export function InvoiceFormPage() {
           invoiceItems: validItems,
         };
 
-        const response = await invoiceService.createInvoice(createData as CreateInvoiceRequest);
+        const response = await invoiceService.createInvoice(createData);
 
         if (response.success) {
           showSuccess(t('common.success', 'Success'), t('invoices.createSuccess', 'Invoice created successfully'));
@@ -297,7 +294,7 @@ export function InvoiceFormPage() {
     }
   };
 
-  const handleChange = (field: string, value: any) => {
+  const handleChange = <K extends keyof typeof formData>(field: K, value: (typeof formData)[K]) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
@@ -376,7 +373,7 @@ export function InvoiceFormPage() {
                   <option value="">Select Tenant</option>
                   {tenants.map(tenant => (
                     <option key={tenant.id} value={tenant.id}>
-                      {(tenant as any).fullName || `${tenant.firstName} ${tenant.lastName}`}
+                      {tenant.fullName || `${tenant.firstName} ${tenant.lastName}`}
                       {tenant.room && ` - Room ${tenant.room.roomNumber}`}
                     </option>
                   ))}

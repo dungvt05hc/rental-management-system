@@ -123,7 +123,7 @@ export function InvoiceItemsTable({ items, onChange, disabled = false }: Invoice
     setConfirmDialog({ open: false, itemIndex: null, itemName: '' });
   };
 
-  const handleFieldChange = (field: keyof InvoiceItem, value: any) => {
+  const handleFieldChange = <K extends keyof InvoiceItem>(field: K, value: InvoiceItem[K]) => {
     if (editingItem) {
       setEditingItem({
         ...editingItem,

@@ -93,7 +93,7 @@ export function TenantDialog({ open, onOpenChange, tenant, onSuccess }: TenantDi
     setError(null);
 
     try {
-      const requestData: any = {
+      const requestData: CreateTenantRequest = {
         firstName: formData.firstName,
         lastName: formData.lastName,
         email: formData.email,
@@ -107,21 +107,19 @@ export function TenantDialog({ open, onOpenChange, tenant, onSuccess }: TenantDi
         notes: formData.notes,
       };
 
-      if (tenant) {
-        requestData.isActive = formData.isActive;
-      }
-
       let response;
       if (tenant) {
-        response = await tenantService.updateTenant(String(tenant.id), requestData as UpdateTenantRequest);
+        // isActive chỉ có trên UpdateTenantRequest, không có khi tạo mới
+        const updateData: UpdateTenantRequest = { ...requestData, isActive: formData.isActive };
+        response = await tenantService.updateTenant(String(tenant.id), updateData);
       } else {
-        response = await tenantService.createTenant(requestData as CreateTenantRequest);
+        response = await tenantService.createTenant(requestData);
       }
 
       if (response.success) {
         // If room is assigned and this is a new tenant or room changed, assign to room
         if (formData.roomId && response.data) {
-          const tenantId = tenant?.id || (response.data as any).id;
+          const tenantId = tenant?.id || response.data.id;
           const currentRoomId = tenant?.room?.id;
           
           // Only assign room if contract dates are provided
@@ -169,7 +167,7 @@ export function TenantDialog({ open, onOpenChange, tenant, onSuccess }: TenantDi
     }
   };
 
-  const handleChange = (field: string, value: any) => {
+  const handleChange = <K extends keyof typeof formData>(field: K, value: (typeof formData)[K]) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
