@@ -50,13 +50,13 @@ export function TenantsPage() {
       };
 
       if (statusFilter) {
-        (searchParams as any).isActive = statusFilter === 'Active' ? true : statusFilter === 'Inactive' ? false : undefined;
+        searchParams.isActive = statusFilter === 'Active' ? true : statusFilter === 'Inactive' ? false : undefined;
       }
 
       const response = await tenantService.getTenants(searchParams);
 
       if (response.success && response.data) {
-        const paginatedData = response.data as any;
+        const paginatedData = response.data;
         setTenants(paginatedData.items || []);
         setPagination({
           page: paginatedData.page || 1,
@@ -119,7 +119,7 @@ export function TenantsPage() {
     return isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800';
   };
 
-  const getTenantStatus = (tenant: any) => {
+  const getTenantStatus = (tenant: Tenant) => {
     return tenant.isActive ? t('tenants.active', 'Active') : t('tenants.inactive', 'Inactive');
   };
 
@@ -188,7 +188,7 @@ export function TenantsPage() {
               <div>
                 <p className="text-sm font-medium text-gray-600">{t('tenants.active', 'Active')}</p>
                 <p className="text-2xl font-bold text-green-600">
-                  {tenants?.filter(t => (t as any).isActive === true).length || 0}
+                  {tenants?.filter(t => t.isActive === true).length || 0}
                 </p>
               </div>
               <div className="p-3 rounded-lg bg-green-100">
@@ -203,7 +203,7 @@ export function TenantsPage() {
               <div>
                 <p className="text-sm font-medium text-gray-600">{t('tenants.inactive', 'Inactive')}</p>
                 <p className="text-2xl font-bold text-yellow-600">
-                  {tenants?.filter(t => (t as any).isActive === false).length || 0}
+                  {tenants?.filter(t => t.isActive === false).length || 0}
                 </p>
               </div>
               <div className="p-3 rounded-lg bg-yellow-100">
@@ -218,7 +218,7 @@ export function TenantsPage() {
               <div>
                 <p className="text-sm font-medium text-gray-600">{t('tenants.withRooms', 'With Rooms')}</p>
                 <p className="text-2xl font-bold text-purple-600">
-                  {tenants?.filter(t => (t as any).room || t.room).length || 0}
+                  {tenants?.filter(tenant => tenant.room).length || 0}
                 </p>
               </div>
               <div className="p-3 rounded-lg bg-purple-100">
@@ -291,10 +291,10 @@ export function TenantsPage() {
                             </div>
                             <div className="ml-4">
                               <div className="text-sm font-medium text-gray-900">
-                                {(tenant as any).fullName || `${tenant.firstName} ${tenant.lastName}`}
+                                {tenant.fullName || `${tenant.firstName} ${tenant.lastName}`}
                               </div>
                               <div className="text-sm text-gray-500">
-                                ID: {(tenant as any).identificationNumber || tenant.identityNumber || 'N/A'}
+                                ID: {tenant.identificationNumber || tenant.identityNumber || 'N/A'}
                               </div>
                             </div>
                           </div>
@@ -312,30 +312,30 @@ export function TenantsPage() {
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          {(tenant as any).room || tenant.room ? (
+                          {tenant.room ? (
                             <div className="text-sm font-medium text-gray-900">
-                              {t('tenants.roomNumber', 'Room')} {((tenant as any).room?.roomNumber || tenant.room?.roomNumber)}
+                              {t('tenants.roomNumber', 'Room')} {tenant.room.roomNumber}
                             </div>
                           ) : (
                             <div className="text-sm text-gray-500">{t('tenants.noRoomAssigned', 'No room assigned')}</div>
                           )}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <Badge className={getStatusBadgeColor((tenant as any).isActive)}>
+                          <Badge className={getStatusBadgeColor(tenant.isActive)}>
                             {getTenantStatus(tenant)}
                           </Badge>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm text-gray-900">
-                            {(tenant as any).contractStartDate || tenant.checkInDate ? (
+                            {tenant.contractStartDate || tenant.checkInDate ? (
                               <div className="flex items-center">
                                 <Calendar className="h-4 w-4 mr-2 text-gray-400" />
-                                {formatDate((tenant as any).contractStartDate || tenant.checkInDate!)}
-                                {((tenant as any).contractEndDate || tenant.checkOutDate) && (
+                                {formatDate(tenant.contractStartDate || tenant.checkInDate!)}
+                                {(tenant.contractEndDate || tenant.checkOutDate) && (
                                   <span className="mx-1">→</span>
                                 )}
-                                {((tenant as any).contractEndDate || tenant.checkOutDate) && 
-                                  formatDate((tenant as any).contractEndDate || tenant.checkOutDate!)}
+                                {(tenant.contractEndDate || tenant.checkOutDate) && 
+                                  formatDate(tenant.contractEndDate || tenant.checkOutDate!)}
                               </div>
                             ) : (
                               <span className="text-gray-500">{t('tenants.notSet', 'Not set')}</span>
@@ -356,7 +356,7 @@ export function TenantsPage() {
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => handleDeleteTenant(String(tenant.id), (tenant as any).fullName || `${tenant.firstName} ${tenant.lastName}`)}
+                              onClick={() => handleDeleteTenant(String(tenant.id), tenant.fullName || `${tenant.firstName} ${tenant.lastName}`)}
                               className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
                               title={t('common.delete', 'Delete Tenant')}
                             >

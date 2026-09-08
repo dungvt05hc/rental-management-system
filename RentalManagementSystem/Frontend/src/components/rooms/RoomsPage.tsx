@@ -55,7 +55,7 @@ export function RoomsPage() {
       const response = await roomService.getRooms(searchParams);
 
       if (response.success && response.data) {
-        const paginatedData = response.data as any;
+        const paginatedData = response.data;
         // API returns items, page, pageSize, totalItems, totalPages
         setRooms(paginatedData.items || []);
         setPagination({
@@ -198,7 +198,7 @@ export function RoomsPage() {
               <div>
                 <p className="text-sm font-medium text-gray-600">{t('rooms.available', 'Available')}</p>
                 <p className="text-2xl font-bold text-green-600">
-                  {rooms?.filter(r => (r as any).statusName?.toLowerCase() === 'vacant').length || 0}
+                  {rooms?.filter(r => r.statusName?.toLowerCase() === 'vacant').length || 0}
                 </p>
               </div>
               <div className="p-3 rounded-lg bg-green-100">
@@ -213,7 +213,7 @@ export function RoomsPage() {
               <div>
                 <p className="text-sm font-medium text-gray-600">{t('rooms.occupied', 'Occupied')}</p>
                 <p className="text-2xl font-bold text-blue-600">
-                  {rooms?.filter(r => (r as any).statusName?.toLowerCase() === 'rented' || (r as any).statusName?.toLowerCase() === 'occupied').length || 0}
+                  {rooms?.filter(r => r.statusName?.toLowerCase() === 'rented' || r.statusName?.toLowerCase() === 'occupied').length || 0}
                 </p>
               </div>
               <div className="p-3 rounded-lg bg-blue-100">
@@ -296,11 +296,11 @@ export function RoomsPage() {
                           <div className="font-medium text-gray-900">{room.roomNumber}</div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-gray-700">{(room as any).typeName || 'N/A'}</div>
+                          <div className="text-gray-700">{room.typeName || 'N/A'}</div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <Badge className={getStatusBadgeColor((room as any).statusName || room.status)}>
-                            {(room as any).statusName || room.status}
+                          <Badge className={getStatusBadgeColor(String(room.statusName ?? room.status))}>
+                            {room.statusName ?? room.status}
                           </Badge>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">

@@ -55,8 +55,7 @@ export function InvoicesPage() {
       const response = await invoiceService.getInvoices(searchParams);
 
       if (response.success && response.data) {
-        const paginatedData = response.data as any;
-        // API returns items, page, pageSize, totalItems, totalPages
+        const paginatedData = response.data;
         setInvoices(paginatedData.items || []);
         setPagination({
           page: paginatedData.page || 1,
@@ -182,33 +181,33 @@ export function InvoicesPage() {
     setPagination(prev => ({ ...prev, page }));
   };
 
+  // Backend trả statusName dạng chuỗi, nhưng không phải endpoint nào cũng có,
+  // nên fallback về status (enum số) và luôn ép về chuỗi — isOverdue gọi
+  // .toLowerCase() nên nhận số vào là ném lỗi.
+  const statusLabelOf = (invoice: Invoice) => String(invoice.statusName ?? invoice.status);
+  const statusNameOf = (invoice: Invoice) => statusLabelOf(invoice).toLowerCase();
+
   // Calculate statistics
-  const totalAmount = (invoices || []).reduce((sum, invoice) => {
-    const invoiceData = invoice as any;
-    return sum + (invoiceData.totalAmount || invoice.amount || 0);
-  }, 0);
-  
-  const paidAmount = (invoices || []).filter(i => {
-    const statusName = (i as any).statusName?.toLowerCase() || String(i.status)?.toLowerCase();
-    return statusName === 'paid';
-  }).reduce((sum, invoice) => {
-    const invoiceData = invoice as any;
-    return sum + (invoiceData.paidAmount || invoiceData.totalAmount || invoice.amount || 0);
-  }, 0);
-  
-  const pendingAmount = (invoices || []).filter(i => {
-    const statusName = (i as any).statusName?.toLowerCase() || String(i.status)?.toLowerCase();
-    return statusName === 'pending';
-  }).reduce((sum, invoice) => {
-    const invoiceData = invoice as any;
-    return sum + (invoiceData.remainingBalance || invoiceData.totalAmount || invoice.amount || 0);
-  }, 0);
-  
-  const overdueInvoices = (invoices || []).filter(i => (i as any).isOverdue || isOverdue(i.dueDate, (i as any).statusName || i.status));
-  const overdueAmount = overdueInvoices.reduce((sum, invoice) => {
-    const invoiceData = invoice as any;
-    return sum + (invoiceData.remainingBalance || invoiceData.totalAmount || invoice.amount || 0);
-  }, 0);
+  const totalAmount = (invoices || []).reduce(
+    (sum, invoice) => sum + (invoice.totalAmount || invoice.amount || 0),
+    0
+  );
+
+  const paidAmount = (invoices || [])
+    .filter(i => statusNameOf(i) === 'paid')
+    .reduce((sum, invoice) => sum + (invoice.paidAmount || invoice.totalAmount || invoice.amount || 0), 0);
+
+  const pendingAmount = (invoices || [])
+    .filter(i => statusNameOf(i) === 'pending')
+    .reduce((sum, invoice) => sum + (invoice.remainingBalance || invoice.totalAmount || invoice.amount || 0), 0);
+
+  const overdueInvoices = (invoices || []).filter(
+    i => i.isOverdue || isOverdue(i.dueDate, statusNameOf(i))
+  );
+  const overdueAmount = overdueInvoices.reduce(
+    (sum, invoice) => sum + (invoice.remainingBalance || invoice.totalAmount || invoice.amount || 0),
+    0
+  );
 
   return (
     <div className="space-y-6">
@@ -340,7 +339,7 @@ export function InvoicesPage() {
                 </div>
                 <p className="text-2xl lg:text-3xl font-bold text-yellow-900 truncate">{formatCurrency(pendingAmount)}</p>
                 <p className="text-xs text-yellow-700 mt-2">
-                  {(invoices || []).filter(i => (i as any).statusName?.toLowerCase() === 'pending' || String(i.status) === 'Pending').length} {t('invoices.pending', 'pending')}
+                  {(invoices || []).filter(i => statusNameOf(i) === 'pending').length} {t('invoices.pending', 'pending')}
                 </p>
               </div>
               <div className="flex-shrink-0 p-4 rounded-2xl bg-yellow-200">
@@ -450,9 +449,8 @@ export function InvoicesPage() {
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {invoices.map((invoice) => {
-                    const invoiceData = invoice as any;
-                    const status = invoiceData.statusName || invoice.status;
-                    const overdue = invoiceData.isOverdue || isOverdue(invoice.dueDate, status);
+                    const status = statusLabelOf(invoice);
+                    const overdue = invoice.isOverdue || isOverdue(invoice.dueDate, status);
                     
                     return (
                       <tr key={invoice.id} className="hover:bg-gray-50 transition-colors">
@@ -463,23 +461,23 @@ export function InvoicesPage() {
                             </div>
                             <div>
                               <div className="text-sm font-semibold text-gray-900">
-                                {invoiceData.invoiceNumber || invoice.invoiceNumber}
+                                {invoice.invoiceNumber}
                               </div>
                               <div className="text-xs text-gray-500">
-                                {invoiceData.billingPeriod ? formatDate(invoiceData.billingPeriod) : 'N/A'}
+                                {invoice.billingPeriod ? formatDate(invoice.billingPeriod) : 'N/A'}
                               </div>
                             </div>
                           </div>
                         </td>
                         <td className="px-6 py-4">
-                          {invoiceData.tenant || invoice.tenant ? (
+                          {invoice.tenant ? (
                             <div>
                               <div className="text-sm font-medium text-gray-900">
-                                {invoiceData.tenant?.fullName || `${invoice.tenant?.firstName} ${invoice.tenant?.lastName}`}
+                                {invoice.tenant?.fullName || `${invoice.tenant?.firstName} ${invoice.tenant?.lastName}`}
                               </div>
                               <div className="text-xs text-gray-500 flex items-center mt-1">
                                 <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
-                                  {t('tenants.room', 'Room')} {invoiceData.room?.roomNumber || invoice.room?.roomNumber || 'N/A'}
+                                  {t('tenants.room', 'Room')} {invoice.room?.roomNumber || 'N/A'}
                                 </span>
                               </div>
                             </div>
@@ -490,16 +488,16 @@ export function InvoicesPage() {
                         <td className="px-6 py-4">
                           <div>
                             <div className="text-sm font-bold text-gray-900">
-                              {formatCurrency(invoiceData.totalAmount || invoice.amount)}
+                              {formatCurrency(invoice.totalAmount || invoice.amount)}
                             </div>
-                            {invoiceData.remainingBalance !== undefined && invoiceData.remainingBalance > 0 && (
+                            {invoice.remainingBalance !== undefined && invoice.remainingBalance > 0 && (
                               <div className="text-xs text-orange-600 font-medium mt-1">
-                                {formatCurrency(invoiceData.remainingBalance)} {t('invoices.due', 'due')}
+                                {formatCurrency(invoice.remainingBalance)} {t('invoices.due', 'due')}
                               </div>
                             )}
-                            {invoiceData.paidAmount !== undefined && invoiceData.paidAmount > 0 && (
+                            {invoice.paidAmount !== undefined && invoice.paidAmount > 0 && (
                               <div className="text-xs text-green-600 mt-1">
-                                {formatCurrency(invoiceData.paidAmount)} {t('invoices.paid', 'paid')}
+                                {formatCurrency(invoice.paidAmount)} {t('invoices.paid', 'paid')}
                               </div>
                             )}
                           </div>

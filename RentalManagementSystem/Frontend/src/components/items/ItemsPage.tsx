@@ -58,12 +58,12 @@ export const ItemsPage: React.FC = () => {
       const response = await itemService.getItems(params);
       
       if (response.success && response.data) {
-        const paginatedData = response.data as any;
-        setItems(paginatedData.items || paginatedData.data || []);
+        const paginatedData = response.data;
+        setItems(paginatedData.items || []);
         setPagination(prev => ({
           ...prev,
-          totalItems: paginatedData.totalItems || paginatedData.totalCount || 0,
-          totalPages: paginatedData.totalPages || Math.ceil((paginatedData.totalCount || 0) / prev.pageSize)
+          totalItems: paginatedData.totalItems || 0,
+          totalPages: paginatedData.totalPages || Math.ceil((paginatedData.totalItems || 0) / prev.pageSize)
         }));
       }
     } catch (error) {
