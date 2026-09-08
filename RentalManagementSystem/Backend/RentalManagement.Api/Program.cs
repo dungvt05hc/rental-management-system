@@ -83,19 +83,10 @@ var csb = new NpgsqlConnectionStringBuilder(connectionString);
 Log.Information("DB configured. Host={Host} Port={Port} Database={Db} Username={User}",
     csb.Host, csb.Port, csb.Database, csb.Username);
 
-// Store in a static variable to ensure it's never lost
-StaticConnectionString.Value = connectionString;
-
 // Add Entity Framework with PostgreSQL using factory with connection resilience
-builder.Services.AddDbContext<RentalManagementContext>((serviceProvider, options) =>
+builder.Services.AddDbContext<RentalManagementContext>(options =>
 {
-    var connStr = StaticConnectionString.Value;
-    if (string.IsNullOrWhiteSpace(connStr))
-    {
-        throw new InvalidOperationException("Connection string is null or empty in DbContext factory");
-    }
-
-    options.UseNpgsql(connStr, npgsqlOptions =>
+    options.UseNpgsql(connectionString, npgsqlOptions =>
     {
         // Add connection resilience for serverless environments like Render
         npgsqlOptions.EnableRetryOnFailure(
@@ -440,12 +431,4 @@ static async Task SeedAdminUserAsync(UserManager<User> userManager)
             Log.Error("Failed to create admin user: {Errors}", string.Join(", ", result.Errors.Select(e => e.Description)));
         }
     }
-}
-
-/// <summary>
-/// Static storage for connection string
-/// </summary>
-public static class StaticConnectionString
-{
-    public static string Value { get; set; } = string.Empty;
 }
