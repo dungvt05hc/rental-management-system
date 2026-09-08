@@ -130,26 +130,37 @@ public class InvoiceItem
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
     /// <summary>
-    /// Calculate line totals based on quantity, price, discount, and tax
+    /// Calculate line totals based on quantity, price, discount, and tax.
+    /// Every figure is rounded to cents as it is produced: Quantity is
+    /// decimal(18,3) and the money columns are decimal(18,2), so an unrounded line
+    /// would be rounded again by the database on write and no longer add up to the
+    /// invoice total, which is summed from these values.
     /// </summary>
     public void CalculateTotals()
     {
         // Calculate discount amount if percentage is provided
         if (DiscountPercent > 0 && DiscountAmount == 0)
         {
-            DiscountAmount = (Quantity * UnitPrice * DiscountPercent) / 100;
+            DiscountAmount = RoundToCents((Quantity * UnitPrice * DiscountPercent) / 100);
         }
 
         // Calculate line total before tax
-        LineTotal = (Quantity * UnitPrice) - DiscountAmount;
+        LineTotal = RoundToCents((Quantity * UnitPrice) - DiscountAmount);
 
         // Calculate tax amount if percentage is provided
         if (TaxPercent > 0)
         {
-            TaxAmount = (LineTotal * TaxPercent) / 100;
+            TaxAmount = RoundToCents((LineTotal * TaxPercent) / 100);
         }
 
         // Calculate line total with tax
-        LineTotalWithTax = LineTotal + TaxAmount;
+        LineTotalWithTax = RoundToCents(LineTotal + TaxAmount);
     }
+
+    /// <summary>
+    /// Rounds to two decimals the same way PostgreSQL rounds a value into a
+    /// decimal(18,2) column — halves away from zero, not to even.
+    /// </summary>
+    private static decimal RoundToCents(decimal value) =>
+        Math.Round(value, 2, MidpointRounding.AwayFromZero);
 }

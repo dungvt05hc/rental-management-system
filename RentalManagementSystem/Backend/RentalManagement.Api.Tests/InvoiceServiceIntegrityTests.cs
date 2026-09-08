@@ -14,7 +14,8 @@ namespace RentalManagement.Api.Tests;
 /// Data-integrity tests for invoice creation: unique numbering under concurrency
 /// and all-or-nothing writes.
 /// </summary>
-public class InvoiceServiceIntegrityTests : IClassFixture<PostgresFixture>, IAsyncLifetime
+[Collection(PostgresCollection.Name)]
+public class InvoiceServiceIntegrityTests : IAsyncLifetime
 {
     private readonly PostgresFixture _fixture;
     private readonly IMapper _mapper;

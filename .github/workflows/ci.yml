@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A new push to a PR makes the in-flight run pointless.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: dotnet test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Restore
+        run: dotnet restore Project.sln
+
+      - name: Build
+        run: dotnet build Project.sln --configuration Release --no-restore
+
+      # The suite starts its own PostgreSQL containers through Testcontainers,
+      # which uses the Docker daemon already present on ubuntu-latest.
+      - name: Test
+        run: dotnet test Project.sln --configuration Release --no-build --logger "console;verbosity=normal"
+
+  frontend:
+    name: npm build + test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: RentalManagementSystem/Frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: RentalManagementSystem/Frontend/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      # Typechecks (tsc -b) as well as bundling — a red build is not mergeable.
+      - name: Build
+        run: npm run build
+
+      - name: Test
+        run: npm test
