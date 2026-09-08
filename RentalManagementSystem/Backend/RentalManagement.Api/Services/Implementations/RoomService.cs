@@ -127,10 +127,12 @@ public class RoomService : IRoomService
             _ => query.OrderBy(r => r.RoomNumber)
         };
 
+        var (page, pageSize) = PaginationLimits.Normalize(searchDto.Page, searchDto.PageSize);
+
         var totalItems = await query.CountAsync();
         var rooms = await query
-            .Skip((searchDto.Page - 1) * searchDto.PageSize)
-            .Take(searchDto.PageSize)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
             .ToListAsync();
 
         var roomDtos = _mapper.Map<List<RoomDto>>(rooms);
@@ -139,9 +141,9 @@ public class RoomService : IRoomService
         {
             Items = roomDtos,
             TotalItems = totalItems,
-            Page = searchDto.Page,
-            PageSize = searchDto.PageSize,
-            TotalPages = (int)Math.Ceiling((double)totalItems / searchDto.PageSize)
+            Page = page,
+            PageSize = pageSize,
+            TotalPages = (int)Math.Ceiling((double)totalItems / pageSize)
         };
 
         return ApiResponse<PagedResponse<RoomDto>>.SuccessResponse(pagedResponse);

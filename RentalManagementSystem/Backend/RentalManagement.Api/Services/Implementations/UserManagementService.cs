@@ -78,13 +78,15 @@ public class UserManagementService : IUserManagementService
             _ => query.OrderByDescending(u => u.CreatedAt)
         };
 
+        var (page, pageSize) = PaginationLimits.Normalize(filter.Page, filter.PageSize);
+
         // Get total count before pagination
         var totalCount = await query.CountAsync();
 
         // Apply pagination
         var users = await query
-            .Skip((filter.Page - 1) * filter.PageSize)
-            .Take(filter.PageSize)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
             .ToListAsync();
 
         // Map to DTOs with roles
@@ -95,17 +97,17 @@ public class UserManagementService : IUserManagementService
             userDtos.Add(userDto);
         }
 
-        var totalPages = (int)Math.Ceiling(totalCount / (double)filter.PageSize);
+        var totalPages = (int)Math.Ceiling(totalCount / (double)pageSize);
 
         var result = new PaginatedUsersDto
         {
             Users = userDtos,
             TotalCount = totalCount,
-            Page = filter.Page,
-            PageSize = filter.PageSize,
+            Page = page,
+            PageSize = pageSize,
             TotalPages = totalPages,
-            HasPrevious = filter.Page > 1,
-            HasNext = filter.Page < totalPages
+            HasPrevious = page > 1,
+            HasNext = page < totalPages
         };
 
         return ApiResponse<PaginatedUsersDto>.SuccessResponse(result);

@@ -103,10 +103,12 @@ public class ItemService : IItemService
             _ => query.OrderBy(i => i.ItemName)
         };
 
+        var (page, pageSize) = PaginationLimits.Normalize(searchDto.Page, searchDto.PageSize);
+
         var totalItems = await query.CountAsync();
         var items = await query
-            .Skip((searchDto.Page - 1) * searchDto.PageSize)
-            .Take(searchDto.PageSize)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
             .ToListAsync();
 
         var itemDtos = _mapper.Map<List<ItemDto>>(items);
@@ -115,9 +117,9 @@ public class ItemService : IItemService
         {
             Items = itemDtos,
             TotalItems = totalItems,
-            Page = searchDto.Page,
-            PageSize = searchDto.PageSize,
-            TotalPages = (int)Math.Ceiling((double)totalItems / searchDto.PageSize)
+            Page = page,
+            PageSize = pageSize,
+            TotalPages = (int)Math.Ceiling((double)totalItems / pageSize)
         };
 
         return ApiResponse<PagedResponse<ItemDto>>.SuccessResponse(pagedResponse);

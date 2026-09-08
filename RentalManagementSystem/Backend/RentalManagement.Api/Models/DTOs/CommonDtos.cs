@@ -115,6 +115,39 @@ public class PagedResponse<T>
 }
 
 /// <summary>
+/// Giới hạn phân trang dùng chung cho tầng service.
+/// </summary>
+public static class PaginationLimits
+{
+    /// <summary>
+    /// Số bản ghi tối đa cho một trang. Chặn client yêu cầu pageSize quá lớn
+    /// (pageSize=100000) kéo cả bảng về trong một request.
+    /// </summary>
+    public const int MaxPageSize = 100;
+
+    /// <summary>
+    /// PageSize dùng khi client gửi giá trị không hợp lệ (&lt;= 0).
+    /// </summary>
+    public const int DefaultPageSize = 10;
+
+    /// <summary>
+    /// Ép page và pageSize về khoảng hợp lệ trước khi Skip/Take.
+    /// </summary>
+    public static (int Page, int PageSize) Normalize(int page, int pageSize)
+    {
+        var normalizedPage = page < 1 ? 1 : page;
+        var normalizedPageSize = pageSize switch
+        {
+            <= 0 => DefaultPageSize,
+            > MaxPageSize => MaxPageSize,
+            _ => pageSize
+        };
+
+        return (normalizedPage, normalizedPageSize);
+    }
+}
+
+/// <summary>
 /// DTO for validation error responses
 /// </summary>
 public class ValidationErrorResponse

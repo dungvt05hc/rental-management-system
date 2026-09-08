@@ -108,9 +108,12 @@ public class InvoiceService : IInvoiceService
 
                 await _context.SaveChangesAsync();
 
-                // Recalculate invoice total from line items
-                invoice.TotalAmount = lineItemsTotal;
-                invoice.RemainingBalance = lineItemsTotal;
+                // Recalculate the invoice total from the line items, which replace the
+                // room rent as the basis. The invoice-level charges and discount still
+                // apply on top — same expression as UpdateInvoiceAsync, and the same one
+                // the invoice form previews to the user before they submit.
+                invoice.TotalAmount = lineItemsTotal + createInvoiceDto.AdditionalCharges - createInvoiceDto.Discount;
+                invoice.RemainingBalance = invoice.TotalAmount;
                 await _context.SaveChangesAsync();
 
                 // Reload invoice with items to include in response
@@ -217,18 +220,20 @@ public class InvoiceService : IInvoiceService
             _ => query.OrderByDescending(i => i.IssueDate)
         };
 
+        var (page, pageSize) = PaginationLimits.Normalize(searchDto.Page, searchDto.PageSize);
+
         var totalCount = await query.CountAsync();
         var invoices = await query
-            .Skip((searchDto.Page - 1) * searchDto.PageSize)
-            .Take(searchDto.PageSize)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
             .ToListAsync();
 
         var invoiceDtos = _mapper.Map<List<InvoiceDto>>(invoices);
 
         var pagedResponse = PagedResponse<InvoiceDto>.Create(
             invoiceDtos,
-            searchDto.Page,
-            searchDto.PageSize,
+            page,
+            pageSize,
             totalCount
         );
 

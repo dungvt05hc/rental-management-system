@@ -140,18 +140,20 @@ public class TenantService : ITenantService
             _ => query.OrderBy(t => t.FirstName).ThenBy(t => t.LastName)
         };
 
+        var (page, pageSize) = PaginationLimits.Normalize(searchDto.Page, searchDto.PageSize);
+
         var totalCount = await query.CountAsync();
         var tenants = await query
-            .Skip((searchDto.Page - 1) * searchDto.PageSize)
-            .Take(searchDto.PageSize)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
             .ToListAsync();
 
         var tenantDtos = _mapper.Map<List<TenantDto>>(tenants);
 
         var pagedResponse = PagedResponse<TenantDto>.Create(
             tenantDtos,
-            searchDto.Page,
-            searchDto.PageSize,
+            page,
+            pageSize,
             totalCount
         );
 

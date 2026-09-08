@@ -31,62 +31,102 @@ public class PaymentService : IPaymentService
     /// </summary>
     public async Task<ApiResponse<PaymentDto>> CreatePaymentAsync(CreatePaymentDto createPaymentDto, string? userId = null)
     {
-        // Validate invoice exists
-        var invoice = await _context.Invoices
-            .Include(i => i.Tenant)
-            .Include(i => i.Room)
-            .FirstOrDefaultAsync(i => i.Id == createPaymentDto.InvoiceId);
+        // Checking the balance and then writing it back is only safe if nothing else
+        // can change it in between, so both happen inside one transaction with the
+        // invoice row locked.
+        var strategy = _context.Database.CreateExecutionStrategy();
 
-        if (invoice == null)
+        return await strategy.ExecuteAsync(async () =>
         {
-            return ApiResponse<PaymentDto>.ErrorResponse("Invoice not found");
-        }
+            // A retried attempt must not re-send entities left tracked by the attempt
+            // that failed.
+            _context.ChangeTracker.Clear();
 
-        // Validate payment amount doesn't exceed remaining balance
-        if (createPaymentDto.Amount > invoice.RemainingBalance)
-        {
-            return ApiResponse<PaymentDto>.ErrorResponse("Payment amount cannot exceed remaining balance");
-        }
+            await using var transaction = await _context.Database.BeginTransactionAsync();
 
-        var payment = new Payment
-        {
-            InvoiceId = createPaymentDto.InvoiceId,
-            Amount = createPaymentDto.Amount,
-            Method = createPaymentDto.Method,
-            ReferenceNumber = createPaymentDto.ReferenceNumber,
-            PaymentDate = createPaymentDto.PaymentDate,
-            Notes = createPaymentDto.Notes,
-            IsVerified = false,
-            RecordedByUserId = userId
-        };
+            var invoice = await LockInvoiceAsync(createPaymentDto.InvoiceId);
 
-        _context.Payments.Add(payment);
+            if (invoice == null)
+            {
+                return ApiResponse<PaymentDto>.ErrorResponse("Invoice not found");
+            }
 
-        // Update invoice payment tracking
-        invoice.PaidAmount += createPaymentDto.Amount;
-        invoice.RemainingBalance = invoice.TotalAmount - invoice.PaidAmount;
+            // Validate payment amount doesn't exceed remaining balance
+            if (createPaymentDto.Amount > invoice.RemainingBalance)
+            {
+                return ApiResponse<PaymentDto>.ErrorResponse("Payment amount cannot exceed remaining balance");
+            }
 
-        // Update invoice status if fully paid
-        if (invoice.RemainingBalance <= 0)
-        {
-            invoice.Status = InvoiceStatus.Paid;
-            invoice.PaidDate = createPaymentDto.PaymentDate;
-        }
-        else if (invoice.PaidAmount > 0)
-        {
-            invoice.Status = InvoiceStatus.PartiallyPaid;
-        }
+            var payment = new Payment
+            {
+                InvoiceId = createPaymentDto.InvoiceId,
+                Amount = createPaymentDto.Amount,
+                Method = createPaymentDto.Method,
+                ReferenceNumber = createPaymentDto.ReferenceNumber,
+                PaymentDate = createPaymentDto.PaymentDate,
+                Notes = createPaymentDto.Notes,
+                IsVerified = false,
+                RecordedByUserId = userId
+            };
 
-        invoice.UpdatedAt = DateTime.UtcNow;
+            _context.Payments.Add(payment);
 
-        await _context.SaveChangesAsync();
+            // Update invoice payment tracking
+            invoice.PaidAmount += createPaymentDto.Amount;
+            invoice.RemainingBalance = invoice.TotalAmount - invoice.PaidAmount;
 
-        var paymentDto = _mapper.Map<PaymentDto>(payment);
+            // Update invoice status if fully paid
+            if (invoice.RemainingBalance <= 0)
+            {
+                invoice.Status = InvoiceStatus.Paid;
+                invoice.PaidDate = createPaymentDto.PaymentDate;
+            }
+            else if (invoice.PaidAmount > 0)
+            {
+                invoice.Status = InvoiceStatus.PartiallyPaid;
+            }
 
-        _logger.LogInformation("Created payment {PaymentId} for invoice {InvoiceId} - Amount: {Amount}", 
-            payment.Id, invoice.Id, payment.Amount);
+            invoice.UpdatedAt = DateTime.UtcNow;
 
-        return ApiResponse<PaymentDto>.SuccessResponse(paymentDto, "Payment created successfully");
+            await _context.SaveChangesAsync();
+            await transaction.CommitAsync();
+
+            await LoadInvoiceSummaryAsync(invoice);
+
+            var paymentDto = _mapper.Map<PaymentDto>(payment);
+
+            _logger.LogInformation("Created payment {PaymentId} for invoice {InvoiceId} - Amount: {Amount}",
+                payment.Id, invoice.Id, payment.Amount);
+
+            return ApiResponse<PaymentDto>.SuccessResponse(paymentDto, "Payment created successfully");
+        });
+    }
+
+    /// <summary>
+    /// Reads an invoice with its row locked until the surrounding transaction ends.
+    /// Concurrent callers queue on the lock instead of all reading the same balance
+    /// and overwriting each other's totals.
+    /// </summary>
+    private async Task<Invoice?> LockInvoiceAsync(int invoiceId)
+    {
+        // Materialised with ToListAsync rather than a composed FirstOrDefaultAsync:
+        // composing would let EF wrap this in a subquery, and FOR UPDATE has to stay
+        // on the statement that reads the row.
+        var invoices = await _context.Invoices
+            .FromSql($"""SELECT * FROM "Invoices" WHERE "Id" = {invoiceId} FOR UPDATE""")
+            .ToListAsync();
+
+        return invoices.SingleOrDefault();
+    }
+
+    /// <summary>
+    /// Loads the tenant and room a PaymentDto's invoice summary needs. Runs after the
+    /// transaction commits: it reads no balance, so it needs no lock.
+    /// </summary>
+    private async Task LoadInvoiceSummaryAsync(Invoice invoice)
+    {
+        await _context.Entry(invoice).Reference(i => i.Tenant).LoadAsync();
+        await _context.Entry(invoice).Reference(i => i.Room).LoadAsync();
     }
 
     /// <summary>
@@ -115,6 +155,8 @@ public class PaymentService : IPaymentService
     /// </summary>
     public async Task<ApiResponse<PagedResponse<PaymentDto>>> GetPaymentsAsync(int? invoiceId = null, int page = 1, int pageSize = 10)
     {
+        (page, pageSize) = PaginationLimits.Normalize(page, pageSize);
+
         var query = _context.Payments
             .Include(p => p.Invoice)
                 .ThenInclude(i => i.Tenant)
@@ -172,70 +214,87 @@ public class PaymentService : IPaymentService
     /// </summary>
     public async Task<ApiResponse<PaymentDto>> UpdatePaymentAsync(int id, CreatePaymentDto createPaymentDto)
     {
-        var payment = await _context.Payments
-            .Include(p => p.Invoice)
-            .FirstOrDefaultAsync(p => p.Id == id);
+        var strategy = _context.Database.CreateExecutionStrategy();
 
-        if (payment == null)
+        return await strategy.ExecuteAsync(async () =>
         {
-            return ApiResponse<PaymentDto>.ErrorResponse("Payment not found");
-        }
+            _context.ChangeTracker.Clear();
 
-        // Don't allow updates to verified payments
-        if (payment.IsVerified)
-        {
-            return ApiResponse<PaymentDto>.ErrorResponse("Cannot update a verified payment");
-        }
+            await using var transaction = await _context.Database.BeginTransactionAsync();
 
-        var invoice = payment.Invoice;
-        var oldAmount = payment.Amount;
+            var payment = await _context.Payments.FirstOrDefaultAsync(p => p.Id == id);
 
-        // Validate new payment amount
-        var remainingAfterReversal = invoice.RemainingBalance + oldAmount;
-        if (createPaymentDto.Amount > remainingAfterReversal)
-        {
-            return ApiResponse<PaymentDto>.ErrorResponse("Updated payment amount exceeds available balance");
-        }
+            if (payment == null)
+            {
+                return ApiResponse<PaymentDto>.ErrorResponse("Payment not found");
+            }
 
-        // Update payment properties
-        payment.Amount = createPaymentDto.Amount;
-        payment.Method = createPaymentDto.Method;
-        payment.ReferenceNumber = createPaymentDto.ReferenceNumber;
-        payment.PaymentDate = createPaymentDto.PaymentDate;
-        payment.Notes = createPaymentDto.Notes;
-        payment.UpdatedAt = DateTime.UtcNow;
+            // Don't allow updates to verified payments
+            if (payment.IsVerified)
+            {
+                return ApiResponse<PaymentDto>.ErrorResponse("Cannot update a verified payment");
+            }
 
-        // Update invoice payment tracking
-        var amountDifference = createPaymentDto.Amount - oldAmount;
-        invoice.PaidAmount += amountDifference;
-        invoice.RemainingBalance = invoice.TotalAmount - invoice.PaidAmount;
+            // Locked before its balance is read, for the same reason as in CreatePaymentAsync.
+            var invoice = await LockInvoiceAsync(payment.InvoiceId);
 
-        // Update invoice status
-        if (invoice.RemainingBalance <= 0)
-        {
-            invoice.Status = InvoiceStatus.Paid;
-            invoice.PaidDate = createPaymentDto.PaymentDate;
-        }
-        else if (invoice.PaidAmount > 0)
-        {
-            invoice.Status = InvoiceStatus.PartiallyPaid;
-        }
-        else
-        {
-            invoice.Status = InvoiceStatus.Issued;
-            invoice.PaidDate = null;
-        }
+            if (invoice == null)
+            {
+                return ApiResponse<PaymentDto>.ErrorResponse("Invoice not found");
+            }
 
-        invoice.UpdatedAt = DateTime.UtcNow;
+            var oldAmount = payment.Amount;
 
-        await _context.SaveChangesAsync();
+            // Validate new payment amount
+            var remainingAfterReversal = invoice.RemainingBalance + oldAmount;
+            if (createPaymentDto.Amount > remainingAfterReversal)
+            {
+                return ApiResponse<PaymentDto>.ErrorResponse("Updated payment amount exceeds available balance");
+            }
 
-        var paymentDto = _mapper.Map<PaymentDto>(payment);
+            // Update payment properties
+            payment.Amount = createPaymentDto.Amount;
+            payment.Method = createPaymentDto.Method;
+            payment.ReferenceNumber = createPaymentDto.ReferenceNumber;
+            payment.PaymentDate = createPaymentDto.PaymentDate;
+            payment.Notes = createPaymentDto.Notes;
+            payment.UpdatedAt = DateTime.UtcNow;
 
-        _logger.LogInformation("Updated payment {PaymentId} - Amount changed from {OldAmount} to {NewAmount}", 
-            payment.Id, oldAmount, payment.Amount);
+            // Update invoice payment tracking
+            var amountDifference = createPaymentDto.Amount - oldAmount;
+            invoice.PaidAmount += amountDifference;
+            invoice.RemainingBalance = invoice.TotalAmount - invoice.PaidAmount;
 
-        return ApiResponse<PaymentDto>.SuccessResponse(paymentDto, "Payment updated successfully");
+            // Update invoice status
+            if (invoice.RemainingBalance <= 0)
+            {
+                invoice.Status = InvoiceStatus.Paid;
+                invoice.PaidDate = createPaymentDto.PaymentDate;
+            }
+            else if (invoice.PaidAmount > 0)
+            {
+                invoice.Status = InvoiceStatus.PartiallyPaid;
+            }
+            else
+            {
+                invoice.Status = InvoiceStatus.Issued;
+                invoice.PaidDate = null;
+            }
+
+            invoice.UpdatedAt = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync();
+            await transaction.CommitAsync();
+
+            await LoadInvoiceSummaryAsync(invoice);
+
+            var paymentDto = _mapper.Map<PaymentDto>(payment);
+
+            _logger.LogInformation("Updated payment {PaymentId} - Amount changed from {OldAmount} to {NewAmount}",
+                payment.Id, oldAmount, payment.Amount);
+
+            return ApiResponse<PaymentDto>.SuccessResponse(paymentDto, "Payment updated successfully");
+        });
     }
 
     /// <summary>
@@ -243,48 +302,62 @@ public class PaymentService : IPaymentService
     /// </summary>
     public async Task<ApiResponse<bool>> DeletePaymentAsync(int id)
     {
-        var payment = await _context.Payments
-            .Include(p => p.Invoice)
-            .FirstOrDefaultAsync(p => p.Id == id);
+        var strategy = _context.Database.CreateExecutionStrategy();
 
-        if (payment == null)
+        return await strategy.ExecuteAsync(async () =>
         {
-            return ApiResponse<bool>.ErrorResponse("Payment not found");
-        }
+            _context.ChangeTracker.Clear();
 
-        // Don't allow deletion of verified payments
-        if (payment.IsVerified)
-        {
-            return ApiResponse<bool>.ErrorResponse("Cannot delete a verified payment");
-        }
+            await using var transaction = await _context.Database.BeginTransactionAsync();
 
-        var invoice = payment.Invoice;
+            var payment = await _context.Payments.FirstOrDefaultAsync(p => p.Id == id);
 
-        // Reverse the payment from invoice
-        invoice.PaidAmount -= payment.Amount;
-        invoice.RemainingBalance = invoice.TotalAmount - invoice.PaidAmount;
+            if (payment == null)
+            {
+                return ApiResponse<bool>.ErrorResponse("Payment not found");
+            }
 
-        // Update invoice status
-        if (invoice.PaidAmount <= 0)
-        {
-            invoice.Status = InvoiceStatus.Issued;
-            invoice.PaidDate = null;
-        }
-        else if (invoice.RemainingBalance > 0)
-        {
-            invoice.Status = InvoiceStatus.PartiallyPaid;
-            invoice.PaidDate = null;
-        }
+            // Don't allow deletion of verified payments
+            if (payment.IsVerified)
+            {
+                return ApiResponse<bool>.ErrorResponse("Cannot delete a verified payment");
+            }
 
-        invoice.UpdatedAt = DateTime.UtcNow;
+            // Locked before its balance is read, for the same reason as in CreatePaymentAsync.
+            var invoice = await LockInvoiceAsync(payment.InvoiceId);
 
-        _context.Payments.Remove(payment);
-        await _context.SaveChangesAsync();
+            if (invoice == null)
+            {
+                return ApiResponse<bool>.ErrorResponse("Invoice not found");
+            }
 
-        _logger.LogInformation("Deleted payment {PaymentId} - Reversed amount: {Amount}", 
-            payment.Id, payment.Amount);
+            // Reverse the payment from invoice
+            invoice.PaidAmount -= payment.Amount;
+            invoice.RemainingBalance = invoice.TotalAmount - invoice.PaidAmount;
 
-        return ApiResponse<bool>.SuccessResponse(true, "Payment deleted successfully");
+            // Update invoice status
+            if (invoice.PaidAmount <= 0)
+            {
+                invoice.Status = InvoiceStatus.Issued;
+                invoice.PaidDate = null;
+            }
+            else if (invoice.RemainingBalance > 0)
+            {
+                invoice.Status = InvoiceStatus.PartiallyPaid;
+                invoice.PaidDate = null;
+            }
+
+            invoice.UpdatedAt = DateTime.UtcNow;
+
+            _context.Payments.Remove(payment);
+            await _context.SaveChangesAsync();
+            await transaction.CommitAsync();
+
+            _logger.LogInformation("Deleted payment {PaymentId} - Reversed amount: {Amount}",
+                payment.Id, payment.Amount);
+
+            return ApiResponse<bool>.SuccessResponse(true, "Payment deleted successfully");
+        });
     }
 
     /// <summary>
