@@ -43,11 +43,11 @@ export function LoginPage() {
       isValid = false;
     }
 
+    // Form đăng nhập chỉ kiểm tra có nhập hay chưa, không áp độ dài tối thiểu:
+    // policy độ dài chỉ áp khi ĐẶT mật khẩu. Người dùng tạo từ trước còn giữ
+    // mật khẩu ngắn hơn, chặn ở đây là khoá họ khỏi tài khoản của chính mình.
     if (!values.password) {
       setError('password', t('auth.passwordRequired', 'Password is required'));
-      isValid = false;
-    } else if (values.password.length < 6) {
-      setError('password', t('auth.passwordMinLength', 'Password must be at least 6 characters'));
       isValid = false;
     }
 

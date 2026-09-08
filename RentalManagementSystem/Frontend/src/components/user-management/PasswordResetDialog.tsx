@@ -14,7 +14,7 @@ import { Loader2, AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription } from '../ui/Alert';
 
 const passwordResetSchema = z.object({
-  newPassword: z.string().min(6, 'Password must be at least 6 characters'),
+  newPassword: z.string().min(10, 'Password must be at least 10 characters'),
   confirmPassword: z.string(),
   sendEmailNotification: z.boolean(),
 }).refine((data) => data.newPassword === data.confirmPassword, {

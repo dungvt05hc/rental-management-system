@@ -18,7 +18,7 @@ const createUserSchema = z.object({
   lastName: z.string().min(1, 'Last name is required').max(100),
   email: z.string().email('Invalid email address'),
   phoneNumber: z.string().transform(val => val.trim() === '' ? undefined : val).optional(),
-  password: z.string().min(6, 'Password must be at least 6 characters').or(z.literal('')).transform(val => val === '' ? undefined : val).optional(),
+  password: z.string().min(10, 'Password must be at least 10 characters').or(z.literal('')).transform(val => val === '' ? undefined : val).optional(),
   roles: z.array(z.string()).min(1, 'At least one role is required'),
   isActive: z.boolean(),
 });
@@ -193,7 +193,7 @@ export function CreateUserPage() {
                       />
                     </FormControl>
                     <FormDescription>
-                      Minimum 6 characters. A secure password will be auto-generated if left empty.
+                      Minimum 10 characters. A secure password will be auto-generated if left empty.
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
