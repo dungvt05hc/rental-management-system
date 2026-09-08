@@ -3,6 +3,7 @@ import { Plus, Trash2, Edit2, Save, X, ChevronDown, ChevronRight, Search } from 
 import { Button, Input, AlertDialog } from '../ui';
 import type { InvoiceItem, Item } from '../../types';
 import { itemService } from '../../services';
+import { calculateItemTotals, calculateInvoiceItemsTotals } from './invoiceItemCalculations';
 
 interface InvoiceItemsTableProps {
   items: InvoiceItem[];
@@ -69,33 +70,6 @@ export function InvoiceItemsTable({ items, onChange, disabled = false }: Invoice
       newExpanded.add(index);
     }
     setExpandedRows(newExpanded);
-  };
-
-  const calculateItemTotals = (item: InvoiceItem): InvoiceItem => {
-    const subtotal = item.quantity * item.unitPrice;
-    
-    // Calculate discount
-    let discountAmount = item.discountAmount;
-    if (item.discountPercent > 0) {
-      discountAmount = (subtotal * item.discountPercent) / 100;
-    }
-    
-    // Calculate line total before tax
-    const lineTotal = subtotal - discountAmount;
-    
-    // Calculate tax
-    const taxAmount = (lineTotal * item.taxPercent) / 100;
-    
-    // Calculate line total with tax
-    const lineTotalWithTax = lineTotal + taxAmount;
-    
-    return {
-      ...item,
-      discountAmount,
-      taxAmount,
-      lineTotal,
-      lineTotalWithTax,
-    };
   };
 
   const handleAddRow = () => {
@@ -183,16 +157,7 @@ export function InvoiceItemsTable({ items, onChange, disabled = false }: Invoice
     (item.category && item.category.toLowerCase().includes(itemSearchTerm.toLowerCase()))
   );
 
-  const totals = items.reduce(
-    (acc, item) => ({
-      subtotal: acc.subtotal + (item.quantity * item.unitPrice),
-      discount: acc.discount + item.discountAmount,
-      afterDiscount: acc.afterDiscount + item.lineTotal,
-      tax: acc.tax + item.taxAmount,
-      total: acc.total + item.lineTotalWithTax,
-    }),
-    { subtotal: 0, discount: 0, afterDiscount: 0, tax: 0, total: 0 }
-  );
+  const totals = calculateInvoiceItemsTotals(items);
 
   return (
     <div className="space-y-4">

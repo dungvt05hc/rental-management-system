@@ -21,17 +21,17 @@ export function InvoicePrintDialog({ open, onOpenChange, invoice, onExportPdf }:
 
   if (!open || !invoice) return null;
 
-  const invoiceData = invoice as any;
-  const status = invoiceData.statusName || invoice.status;
-  
+  const invoiceData = invoice;
+  const status = String(invoice.statusName ?? invoice.status);
+
   // Calculate total amount by summing all line items
   const additionalChargesAmount = invoiceData.additionalCharges || 0;
   const invoiceItemsTotal = (invoiceData.invoiceItems || []).reduce(
-    (sum: number, item: any) => sum + (item.lineTotalWithTax || item.lineTotal || 0), 
+    (sum, item) => sum + (item.lineTotalWithTax || item.lineTotal || 0),
     0
   );
   const discountAmount = invoiceData.discount || 0;
-  
+
   const totalAmount = additionalChargesAmount + invoiceItemsTotal - discountAmount;
   const paidAmount = invoiceData.paidAmount || 0;
   const remainingBalance = totalAmount - paidAmount;
@@ -269,16 +269,16 @@ export function InvoicePrintDialog({ open, onOpenChange, invoice, onExportPdf }:
                     )}
 
                     {invoiceData.invoiceItems && invoiceData.invoiceItems.length > 0 && (
-                      invoiceData.invoiceItems.map((item: any, index: number) => (
+                      invoiceData.invoiceItems.map((item, index) => (
                         <tr key={index} className="no-break hover:bg-gray-50">
                           <td className="px-2 py-2 text-xs text-gray-900 border-r border-gray-200 print:px-1.5 print:py-1 print:text-[9px]">
                             <div className="font-medium">{item.itemName}</div>
                             {item.description && (
                               <div className="text-[10px] text-gray-500 italic mt-0.5 print:text-[8px]">{item.description}</div>
                             )}
-                            {item.taxRate > 0 && (
+                            {item.taxPercent > 0 && (
                               <div className="text-[10px] text-gray-500 mt-0.5 print:text-[8px]">
-                                Tax: {item.taxRate}%
+                                Tax: {item.taxPercent}%
                               </div>
                             )}
                           </td>
@@ -364,7 +364,7 @@ export function InvoicePrintDialog({ open, onOpenChange, invoice, onExportPdf }:
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200">
-                      {invoiceData.payments.map((payment: any, index: number) => (
+                      {invoiceData.payments.map((payment, index) => (
                         <tr key={index} className="no-break">
                           <td className="px-2 py-1.5 text-[10px] text-gray-900 border-r border-gray-200 print:px-1.5 print:py-1 print:text-[8px]">
                             {formatDate(payment.paymentDate)}

@@ -88,15 +88,16 @@ export function PaymentsPage() {
   };
 
   const filteredPayments = payments.filter((payment: Payment) => {
+    const term = searchTerm.toLowerCase();
     const matchesSearch =
-      payment.invoice?.tenant?.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      payment.invoice?.tenant?.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      payment.invoice?.tenant?.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      payment.paymentMethod.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      payment.reference?.toLowerCase().includes(searchTerm.toLowerCase());
+      (payment.invoice?.tenantName || '').toLowerCase().includes(term) ||
+      (payment.invoice?.invoiceNumber || '').toLowerCase().includes(term) ||
+      (payment.invoice?.roomNumber || '').toLowerCase().includes(term) ||
+      (payment.methodName || '').toLowerCase().includes(term) ||
+      (payment.referenceNumber || '').toLowerCase().includes(term);
 
     const matchesStatus =
-      statusFilter === 'all' || payment.paymentMethod.toLowerCase() === statusFilter.toLowerCase();
+      statusFilter === 'all' || (payment.methodName || '').toLowerCase() === statusFilter.toLowerCase();
 
     return matchesSearch && matchesStatus;
   });
@@ -195,9 +196,12 @@ export function PaymentsPage() {
                           </div>
                           <div>
                             <p className="font-medium text-gray-900">
-                              {payment.invoice?.tenant?.firstName} {payment.invoice?.tenant?.lastName}
+                              {payment.invoice?.tenantName || '—'}
                             </p>
-                            <p className="text-sm text-gray-500">{payment.invoice?.tenant?.email}</p>
+                            <p className="text-sm text-gray-500">
+                              {payment.invoice?.invoiceNumber}
+                              {payment.invoice?.roomNumber && ` • ${t('tenants.room', 'Room')} ${payment.invoice.roomNumber}`}
+                            </p>
                           </div>
                         </div>
                       </td>
@@ -217,7 +221,7 @@ export function PaymentsPage() {
                       <td className="py-4 px-6">
                         <div className="flex items-center space-x-2 px-3 py-2 bg-gray-50 rounded-lg w-fit">
                           <DollarSign className="h-4 w-4 text-green-500" />
-                          <span className="text-gray-900 font-medium">{payment.paymentMethod}</span>
+                          <span className="text-gray-900 font-medium">{payment.methodName}</span>
                         </div>
                       </td>
                       <td className="py-4 px-6">
@@ -238,7 +242,7 @@ export function PaymentsPage() {
                       </td>
                       <td className="py-4 px-6">
                         <span className="text-gray-600 font-mono text-sm bg-gray-100 px-2 py-1 rounded">
-                          {payment.reference || 'N/A'}
+                          {payment.referenceNumber || 'N/A'}
                         </span>
                       </td>
                       <td className="py-4 px-6">
@@ -251,7 +255,7 @@ export function PaymentsPage() {
                             <Edit className="h-4 w-4" />
                           </button>
                           <button
-                            onClick={() => handleDeletePayment(payment.id, payment.reference || '')}
+                            onClick={() => handleDeletePayment(payment.id, payment.referenceNumber || '')}
                             className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                             title={t('common.delete', 'Delete Payment')}
                           >

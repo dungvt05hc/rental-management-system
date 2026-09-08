@@ -364,33 +364,61 @@ export type ItemSearchRequest = {
 }
 
 // Payment Types
+// Khớp với InvoiceSummaryDto ở Backend/Models/DTOs/InvoiceDtos.cs.
+// PaymentDto nhúng bản tóm tắt này chứ không trả invoiceId rời.
+export interface InvoiceSummary {
+  id: string;
+  invoiceNumber: string;
+  tenantName: string;
+  roomNumber: string;
+  totalAmount: number;
+  remainingBalance: number;
+  status: InvoiceStatus;
+  statusName: string;
+  billingPeriod: string;
+  dueDate: string;
+  isOverdue: boolean;
+}
+
+// Khớp với PaymentDto ở Backend/Models/DTOs/InvoiceDtos.cs
 export interface Payment {
   id: string;
-  invoiceId: string;
+  invoice?: InvoiceSummary;
   amount: number;
+  method: PaymentMethod;
+  methodName: string;
+  referenceNumber?: string;
   paymentDate: string;
-  paymentMethod: PaymentMethod;
-  reference?: string;
+  recordedDate: string;
+  recordedByUserId?: string;
   notes?: string;
+  isVerified: boolean;
   createdAt: string;
-  updatedAt: string;
-  invoice?: Invoice;
 }
 
+// Khớp với enum PaymentMethod ở Backend/Models/Entities/Payment.cs.
+// Backend không đăng ký JsonStringEnumConverter nên enum lên wire là SỐ,
+// không phải chuỗi.
 export enum PaymentMethod {
-  Cash = 'Cash',
-  BankTransfer = 'BankTransfer',
-  Check = 'Check',
-  CreditCard = 'CreditCard'
+  Cash = 1,
+  Check = 2,
+  BankTransfer = 3,
+  CreditCard = 4,
+  DebitCard = 5,
+  DigitalWallet = 6,
+  MoneyOrder = 7,
+  Other = 8
 }
 
+// Khớp với CreatePaymentDto ở Backend/Models/DTOs/InvoiceDtos.cs
 export interface CreatePaymentRequest {
   // Backend CreatePaymentDto.InvoiceId is an int — must be sent as a number,
   // System.Text.Json rejects a quoted string here.
   invoiceId: number;
   amount: number;
-  paymentMethod: PaymentMethod;
-  reference?: string;
+  method: PaymentMethod;
+  referenceNumber?: string;
+  paymentDate: string;
   notes?: string;
 }
 

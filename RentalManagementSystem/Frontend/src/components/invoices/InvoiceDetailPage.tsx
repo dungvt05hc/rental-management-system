@@ -50,10 +50,10 @@ export function InvoiceDetailPage() {
     );
   }
 
-  const invoiceData = invoice as any;
-  const status = invoiceData.statusName || invoice.status;
-  const tenant = invoiceData.tenant || invoice.tenant;
-  const room = invoiceData.room || invoice.room;
+  const invoiceData = invoice;
+  const status = String(invoice.statusName ?? invoice.status);
+  const tenant = invoice.tenant;
+  const room = invoice.room;
 
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
@@ -418,7 +418,7 @@ export function InvoiceDetailPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
-                    {invoiceData.invoiceItems.map((item: any, index: number) => (
+                    {invoiceData.invoiceItems.map((item, index) => (
                       <tr key={item.id || index} className="hover:bg-gray-50 transition-colors">
                         <td className="px-6 py-4">
                           <div className="font-semibold text-gray-900">{item.itemName}</div>
@@ -465,7 +465,7 @@ export function InvoiceDetailPage() {
                 </div>
               </div>
               <div className="p-6 space-y-3">
-                {invoiceData.payments.map((payment: any, index: number) => (
+                {invoiceData.payments.map((payment, index) => (
                   <div
                     key={payment.id || index}
                     className="flex justify-between items-center p-4 bg-gradient-to-r from-gray-50 to-green-50 rounded-xl border border-gray-200 hover:shadow-md transition-shadow"

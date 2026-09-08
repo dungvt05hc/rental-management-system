@@ -6,6 +6,11 @@ import { invoiceService, tenantService, roomService, itemService } from '../../s
 import type { CreateInvoiceRequest, UpdateInvoiceRequest, Tenant, Room, InvoiceItem, Item, InvoiceStatus } from '../../types';
 import { useTranslation } from '../../hooks/useTranslation';
 import { useToast } from '../../contexts/ToastContext';
+import {
+  calculateItemTotals,
+  calculateInvoiceItemsTotals,
+  roundToCents,
+} from './invoiceItemCalculations';
 
 const statusOptions = [
   { value: 1, label: 'Draft', color: 'gray' },
@@ -169,27 +174,6 @@ export function InvoiceFormPage() {
     }
   };
 
-  const calculateItemTotals = (item: InvoiceItem): InvoiceItem => {
-    const subtotal = item.quantity * item.unitPrice;
-
-    let discountAmount = item.discountAmount;
-    if (item.discountPercent > 0) {
-      discountAmount = (subtotal * item.discountPercent) / 100;
-    }
-
-    const lineTotal = subtotal - discountAmount;
-    const taxAmount = (lineTotal * item.taxPercent) / 100;
-    const lineTotalWithTax = lineTotal + taxAmount;
-
-    return {
-      ...item,
-      discountAmount,
-      taxAmount,
-      lineTotal,
-      lineTotalWithTax,
-    };
-  };
-
   const handleAddMultipleItems = () => {
     const newItem: InvoiceItem = {
       ...defaultItem,
@@ -317,22 +301,16 @@ export function InvoiceFormPage() {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
+  const itemsTotals = calculateInvoiceItemsTotals(invoiceItems);
+
+  // Same expression the backend applies when it recalculates the invoice, so the
+  // figure previewed here is the one that gets stored.
   const calculateTotal = () => {
     const additional = parseFloat(formData.additionalCharges) || 0;
     const discount = parseFloat(formData.discount) || 0;
-    const itemsTotal = invoiceItems.reduce((sum, item) => sum + item.lineTotalWithTax, 0);
 
-    return additional + itemsTotal - discount;
+    return roundToCents(itemsTotals.total + additional - discount);
   };
-
-  const itemsTotals = invoiceItems.reduce(
-    (acc, item) => ({
-      subtotal: acc.subtotal + item.lineTotal,
-      tax: acc.tax + item.taxAmount,
-      total: acc.total + item.lineTotalWithTax,
-    }),
-    { subtotal: 0, tax: 0, total: 0 }
-  );
 
   if (isLoading) {
     return (
@@ -658,7 +636,7 @@ export function InvoiceFormPage() {
                         Subtotal:
                       </td>
                       <td className="px-4 py-3 text-right font-bold text-gray-900">
-                        ${itemsTotals.subtotal.toFixed(2)}
+                        ${itemsTotals.afterDiscount.toFixed(2)}
                       </td>
                       <td></td>
                     </tr>

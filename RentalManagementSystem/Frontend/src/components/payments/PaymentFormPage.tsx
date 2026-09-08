@@ -3,10 +3,20 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Save, DollarSign, Calendar, CreditCard, FileText, AlertCircle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, Button, Input } from '../ui';
 import { paymentService, invoiceService } from '../../services';
-import type { Invoice, PaymentMethod } from '../../types';
+import type { Invoice, CreatePaymentRequest } from '../../types';
+import { PaymentMethod, InvoiceStatus } from '../../types';
 import { useTranslation } from '../../hooks/useTranslation';
 import { useToast } from '../../contexts/ToastContext';
 import { formatCurrency, formatDate } from '../../utils';
+
+// Các phương thức thanh toán cho người dùng chọn. Value là số vì backend
+// serialize enum PaymentMethod dạng số (không có JsonStringEnumConverter).
+const PAYMENT_METHOD_OPTIONS: Array<{ value: PaymentMethod; label: string }> = [
+  { value: PaymentMethod.Cash, label: 'Cash' },
+  { value: PaymentMethod.BankTransfer, label: 'Bank Transfer' },
+  { value: PaymentMethod.Check, label: 'Check' },
+  { value: PaymentMethod.CreditCard, label: 'Credit Card' },
+];
 
 export function PaymentFormPage() {
   const { t } = useTranslation();
@@ -22,8 +32,8 @@ export function PaymentFormPage() {
     invoiceId: '',
     amount: 0,
     paymentDate: new Date().toISOString().split('T')[0],
-    paymentMethod: 'Cash',
-    reference: '',
+    method: PaymentMethod.Cash,
+    referenceNumber: '',
     notes: '',
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -44,10 +54,9 @@ export function PaymentFormPage() {
         // We can filter client-side for invoices with remaining balance
       });
       if (response.success && response.data) {
-        const data = response.data as any;
         // Filter for invoices that have a remaining balance
-        const unpaidInvoices = (data.items || []).filter((inv: any) => 
-          inv.remainingBalance > 0 && inv.status !== 5 // 5 = Paid
+        const unpaidInvoices = (response.data.items || []).filter(
+          inv => (inv.remainingBalance ?? 0) > 0 && inv.status !== InvoiceStatus.Paid
         );
         setInvoices(unpaidInvoices);
       }
@@ -63,11 +72,11 @@ export function PaymentFormPage() {
       if (response.success && response.data) {
         const payment = response.data;
         setFormData({
-          invoiceId: String(payment.invoiceId),
+          invoiceId: String(payment.invoice?.id ?? ''),
           amount: payment.amount,
           paymentDate: payment.paymentDate.split('T')[0],
-          paymentMethod: payment.paymentMethod,
-          reference: payment.reference || '',
+          method: payment.method,
+          referenceNumber: payment.referenceNumber || '',
           notes: payment.notes || '',
         });
       }
@@ -93,8 +102,8 @@ export function PaymentFormPage() {
     if (!formData.paymentDate) {
       newErrors.paymentDate = t('payments.dateRequired', 'Payment date is required');
     }
-    if (!formData.paymentMethod) {
-      newErrors.paymentMethod = t('payments.methodRequired', 'Payment method is required');
+    if (!formData.method) {
+      newErrors.method = t('payments.methodRequired', 'Payment method is required');
     }
 
     setErrors(newErrors);
@@ -109,12 +118,12 @@ export function PaymentFormPage() {
     setIsSubmitting(true);
 
     try {
-      const paymentData = {
+      const paymentData: CreatePaymentRequest = {
         invoiceId: Number(formData.invoiceId),
         amount: Number(formData.amount),
         paymentDate: new Date(formData.paymentDate).toISOString(),
-        paymentMethod: formData.paymentMethod as PaymentMethod,
-        reference: formData.reference || undefined,
+        method: formData.method,
+        referenceNumber: formData.referenceNumber || undefined,
         notes: formData.notes || undefined,
       };
 
@@ -154,7 +163,7 @@ export function PaymentFormPage() {
 
   const selectedInvoice = invoices.find((inv) => String(inv.id) === String(formData.invoiceId));
   const remainingBalance = selectedInvoice
-    ? (selectedInvoice as any).remainingBalance || selectedInvoice.amount
+    ? selectedInvoice.remainingBalance || selectedInvoice.amount
     : 0;
 
   if (isLoading) {
@@ -216,16 +225,13 @@ export function PaymentFormPage() {
                 }`}
               >
                 <option value="">{t('payments.selectInvoicePlaceholder', '-- Select an invoice --')}</option>
-                {invoices.map((invoice: Invoice) => {
-                  const invoiceData = invoice as any;
-                  return (
-                    <option key={invoice.id} value={invoice.id}>
-                      #{invoiceData.invoiceNumber || invoice.id} -{' '}
-                      {invoiceData.tenant?.firstName} {invoiceData.tenant?.lastName} -{' '}
-                      {formatCurrency(invoiceData.remainingBalance || invoice.amount)} remaining
-                    </option>
-                  );
-                })}
+                {invoices.map((invoice: Invoice) => (
+                  <option key={invoice.id} value={invoice.id}>
+                    #{invoice.invoiceNumber || invoice.id} -{' '}
+                    {invoice.tenant?.firstName} {invoice.tenant?.lastName} -{' '}
+                    {formatCurrency(invoice.remainingBalance || invoice.amount)} remaining
+                  </option>
+                ))}
               </select>
               {errors.invoiceId && (
                 <p className="mt-2 text-sm text-red-600 flex items-center">
@@ -241,8 +247,8 @@ export function PaymentFormPage() {
                   <div>
                     <p className="text-xs text-gray-600 mb-1">{t('invoices.tenant', 'Tenant')}</p>
                     <p className="font-semibold text-gray-900">
-                      {(selectedInvoice as any).tenant?.firstName}{' '}
-                      {(selectedInvoice as any).tenant?.lastName}
+                      {selectedInvoice.tenant?.firstName}{' '}
+                      {selectedInvoice.tenant?.lastName}
                     </p>
                   </div>
                   <div>
@@ -338,28 +344,26 @@ export function PaymentFormPage() {
                 {t('payments.method', 'Payment Method')} *
               </label>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                {['Cash', 'BankTransfer', 'Check', 'CreditCard'].map((method) => (
+                {PAYMENT_METHOD_OPTIONS.map(({ value, label }) => (
                   <button
-                    key={method}
+                    key={value}
                     type="button"
-                    onClick={() => setFormData({ ...formData, paymentMethod: method })}
+                    onClick={() => setFormData({ ...formData, method: value })}
                     className={`p-4 border-2 rounded-lg text-center transition-all ${
-                      formData.paymentMethod === method
+                      formData.method === value
                         ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-md'
                         : 'border-gray-300 hover:border-gray-400 text-gray-700'
                     }`}
                   >
                     <CreditCard className="h-6 w-6 mx-auto mb-2" />
-                    <span className="text-sm font-medium">
-                      {method === 'BankTransfer' ? 'Bank Transfer' : method === 'CreditCard' ? 'Credit Card' : method}
-                    </span>
+                    <span className="text-sm font-medium">{label}</span>
                   </button>
                 ))}
               </div>
-              {errors.paymentMethod && (
+              {errors.method && (
                 <p className="mt-2 text-sm text-red-600 flex items-center">
                   <AlertCircle className="h-4 w-4 mr-1" />
-                  {errors.paymentMethod}
+                  {errors.method}
                 </p>
               )}
             </div>
@@ -370,8 +374,8 @@ export function PaymentFormPage() {
                 {t('payments.reference', 'Reference Number')}
               </label>
               <Input
-                value={formData.reference}
-                onChange={(e) => setFormData({ ...formData, reference: e.target.value })}
+                value={formData.referenceNumber}
+                onChange={(e) => setFormData({ ...formData, referenceNumber: e.target.value })}
                 placeholder={t('payments.referencePlaceholder', 'Transaction reference, check number, etc.')}
               />
             </div>
