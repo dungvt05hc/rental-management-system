@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using RentalManagement.Api.Models.DTOs;
+using RentalManagement.Api.Security;
 using RentalManagement.Api.Services.Interfaces;
 
 namespace RentalManagement.Api.Controllers;
@@ -26,6 +28,7 @@ public class AuthController : ControllerBase
     /// <param name="loginDto">Login credentials</param>
     /// <returns>JWT token and user information</returns>
     [HttpPost("login")]
+    [EnableRateLimiting(RateLimitPolicies.Login)]
     public async Task<ActionResult<ApiResponse<AuthResponseDto>>> Login([FromBody] LoginDto loginDto)
     {
         var result = await _authService.LoginAsync(loginDto);

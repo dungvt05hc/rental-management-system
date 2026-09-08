@@ -1,8 +1,10 @@
 using System;
 using System.Text;
+using System.Threading.RateLimiting;
 
 using FluentValidation.AspNetCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -12,6 +14,7 @@ using RentalManagement.Api.Data;
 using RentalManagement.Api.Mappings;
 using RentalManagement.Api.Middleware;
 using RentalManagement.Api.Models.Entities;
+using RentalManagement.Api.Security;
 using RentalManagement.Api.Services.Implementations;
 using RentalManagement.Api.Services.Interfaces;
 using Serilog;
@@ -192,6 +195,51 @@ builder.Services.AddAuthentication(options =>
     };
 });
 
+// Chạy sau reverse proxy (Render), nên IP thật nằm trong X-Forwarded-For.
+// Không có bước này thì RemoteIpAddress luôn là IP của proxy và rate limiter
+// bên dưới sẽ gộp toàn bộ người dùng vào chung một partition.
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+
+    // IP của proxy do nền tảng cấp phát động nên không liệt kê trước được.
+    // ForwardLimit mặc định là 1, tức là chỉ lấy entry cuối cùng của
+    // X-Forwarded-For — entry do chính proxy ghi thêm — nên client không thể
+    // giả mạo IP bằng cách tự gửi header này.
+    options.KnownNetworks.Clear();
+    options.KnownProxies.Clear();
+});
+
+// Rate limiting cho đăng nhập.
+// Identity lockout chỉ khoá theo tài khoản (5 lần sai / 30 phút) nên không
+// chặn được brute force phân tán: dò một mật khẩu phổ biến trên hàng loạt
+// tài khoản khác nhau không bao giờ chạm ngưỡng lockout của tài khoản nào.
+// Giới hạn theo IP bịt đúng lỗ đó.
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+    options.AddPolicy(RateLimitPolicies.Login, httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                // 10 lần thử/phút: thoải mái cho người gõ nhầm, nhưng cắt
+                // brute force tự động xuống mức vô dụng.
+                PermitLimit = 10,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0
+            }));
+
+    options.OnRejected = (context, _) =>
+    {
+        Log.Warning("Rate limit exceeded for {Path} from {RemoteIp}",
+            context.HttpContext.Request.Path,
+            context.HttpContext.Connection.RemoteIpAddress);
+        return ValueTask.CompletedTask;
+    };
+});
+
 // Add Authorization
 builder.Services.AddAuthorization(options =>
 {
@@ -310,6 +358,10 @@ var app = builder.Build();
 // including CORS, authentication and authorization.
 app.UseMiddleware<ExceptionHandlerMiddleware>();
 
+// Phải đứng trước mọi thứ đọc IP hoặc scheme của request (rate limiter,
+// request logging, HTTPS redirection).
+app.UseForwardedHeaders();
+
 // Configure the HTTP request pipeline
 if (app.Environment.IsDevelopment())
 {
@@ -331,6 +383,8 @@ app.UseCors("AllowFrontend");
 
 // Add request logging
 app.UseSerilogRequestLogging();
+
+app.UseRateLimiter();
 
 app.UseAuthentication();
 app.UseAuthorization();
