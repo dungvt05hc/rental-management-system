@@ -13,12 +13,10 @@ namespace RentalManagement.Api.Controllers;
 public class AuthController : ControllerBase
 {
     private readonly IAuthService _authService;
-    private readonly ILogger<AuthController> _logger;
 
-    public AuthController(IAuthService authService, ILogger<AuthController> logger)
+    public AuthController(IAuthService authService)
     {
         _authService = authService;
-        _logger = logger;
     }
 
     /// <summary>
@@ -29,22 +27,14 @@ public class AuthController : ControllerBase
     [HttpPost("login")]
     public async Task<ActionResult<ApiResponse<AuthResponseDto>>> Login([FromBody] LoginDto loginDto)
     {
-        try
-        {
-            var result = await _authService.LoginAsync(loginDto);
-            
-            if (!result.Success)
-            {
-                return BadRequest(result);
-            }
+        var result = await _authService.LoginAsync(loginDto);
 
-            return Ok(result);
-        }
-        catch (Exception ex)
+        if (!result.Success)
         {
-            _logger.LogError(ex, "Error during login for user {Email}", loginDto.Email);
-            return StatusCode(500, ApiResponse<AuthResponseDto>.ErrorResponse("An error occurred during login"));
+            return BadRequest(result);
         }
+
+        return Ok(result);
     }
 
     /// <summary>
@@ -56,22 +46,14 @@ public class AuthController : ControllerBase
     [Authorize(Roles = "Admin")]
     public async Task<ActionResult<ApiResponse<AuthResponseDto>>> Register([FromBody] RegisterDto registerDto)
     {
-        try
-        {
-            var result = await _authService.RegisterAsync(registerDto);
-            
-            if (!result.Success)
-            {
-                return BadRequest(result);
-            }
+        var result = await _authService.RegisterAsync(registerDto);
 
-            return Ok(result);
-        }
-        catch (Exception ex)
+        if (!result.Success)
         {
-            _logger.LogError(ex, "Error during registration for user {Email}", registerDto.Email);
-            return StatusCode(500, ApiResponse<AuthResponseDto>.ErrorResponse("An error occurred during registration"));
+            return BadRequest(result);
         }
+
+        return Ok(result);
     }
 
     /// <summary>
@@ -82,28 +64,20 @@ public class AuthController : ControllerBase
     [Authorize]
     public async Task<ActionResult<ApiResponse<UserDto>>> GetProfile()
     {
-        try
+        var userId = User.FindFirst("id")?.Value;
+        if (string.IsNullOrEmpty(userId))
         {
-            var userId = User.FindFirst("id")?.Value;
-            if (string.IsNullOrEmpty(userId))
-            {
-                return BadRequest(ApiResponse<UserDto>.ErrorResponse("User not found"));
-            }
-
-            var result = await _authService.GetUserAsync(userId);
-            
-            if (!result.Success)
-            {
-                return BadRequest(result);
-            }
-
-            return Ok(result);
+            return BadRequest(ApiResponse<UserDto>.ErrorResponse("User not found"));
         }
-        catch (Exception ex)
+
+        var result = await _authService.GetUserAsync(userId);
+
+        if (!result.Success)
         {
-            _logger.LogError(ex, "Error retrieving user profile");
-            return StatusCode(500, ApiResponse<UserDto>.ErrorResponse("An error occurred while retrieving profile"));
+            return BadRequest(result);
         }
+
+        return Ok(result);
     }
 
     /// <summary>
@@ -115,37 +89,29 @@ public class AuthController : ControllerBase
     [Authorize]
     public async Task<ActionResult<ApiResponse<UserDto>>> UpdateProfile([FromBody] UpdateUserDto updateUserDto)
     {
-        try
+        var userId = User.FindFirst("id")?.Value;
+        if (string.IsNullOrEmpty(userId))
         {
-            var userId = User.FindFirst("id")?.Value;
-            if (string.IsNullOrEmpty(userId))
-            {
-                return BadRequest(ApiResponse<UserDto>.ErrorResponse("User not found"));
-            }
-
-            // Convert UpdateUserDto to RegisterRequestDto for the service call
-            var registerDto = new RegisterRequestDto
-            {
-                FirstName = updateUserDto.FirstName ?? "",
-                LastName = updateUserDto.LastName ?? "",
-                Email = "", // Email should not be updated through this endpoint
-                PhoneNumber = updateUserDto.PhoneNumber
-            };
-
-            var result = await _authService.UpdateUserAsync(userId, registerDto);
-            
-            if (!result.Success)
-            {
-                return BadRequest(result);
-            }
-
-            return Ok(result);
+            return BadRequest(ApiResponse<UserDto>.ErrorResponse("User not found"));
         }
-        catch (Exception ex)
+
+        // Convert UpdateUserDto to RegisterRequestDto for the service call
+        var registerDto = new RegisterRequestDto
         {
-            _logger.LogError(ex, "Error updating user profile");
-            return StatusCode(500, ApiResponse<UserDto>.ErrorResponse("An error occurred while updating profile"));
+            FirstName = updateUserDto.FirstName ?? "",
+            LastName = updateUserDto.LastName ?? "",
+            Email = "", // Email should not be updated through this endpoint
+            PhoneNumber = updateUserDto.PhoneNumber
+        };
+
+        var result = await _authService.UpdateUserAsync(userId, registerDto);
+
+        if (!result.Success)
+        {
+            return BadRequest(result);
         }
+
+        return Ok(result);
     }
 
     /// <summary>
@@ -158,22 +124,14 @@ public class AuthController : ControllerBase
     [Authorize(Roles = "Admin")]
     public async Task<ActionResult<ApiResponse<bool>>> AssignRole(string userId, [FromBody] AssignRoleDto assignRoleDto)
     {
-        try
-        {
-            var result = await _authService.AssignRoleAsync(userId, assignRoleDto.RoleName);
-            
-            if (!result.Success)
-            {
-                return BadRequest(result);
-            }
+        var result = await _authService.AssignRoleAsync(userId, assignRoleDto.RoleName);
 
-            return Ok(result);
-        }
-        catch (Exception ex)
+        if (!result.Success)
         {
-            _logger.LogError(ex, "Error assigning role {Role} to user {UserId}", assignRoleDto.RoleName, userId);
-            return StatusCode(500, ApiResponse<bool>.ErrorResponse("An error occurred while assigning role"));
+            return BadRequest(result);
         }
+
+        return Ok(result);
     }
 
     /// <summary>
@@ -186,22 +144,14 @@ public class AuthController : ControllerBase
     [Authorize(Roles = "Admin")]
     public async Task<ActionResult<ApiResponse<bool>>> RemoveRole(string userId, [FromBody] AssignRoleDto assignRoleDto)
     {
-        try
-        {
-            var result = await _authService.RemoveRoleAsync(userId, assignRoleDto.RoleName);
-            
-            if (!result.Success)
-            {
-                return BadRequest(result);
-            }
+        var result = await _authService.RemoveRoleAsync(userId, assignRoleDto.RoleName);
 
-            return Ok(result);
-        }
-        catch (Exception ex)
+        if (!result.Success)
         {
-            _logger.LogError(ex, "Error removing role {Role} from user {UserId}", assignRoleDto.RoleName, userId);
-            return StatusCode(500, ApiResponse<bool>.ErrorResponse("An error occurred while removing role"));
+            return BadRequest(result);
         }
+
+        return Ok(result);
     }
 
     /// <summary>
@@ -212,21 +162,13 @@ public class AuthController : ControllerBase
     [Authorize(Roles = "Admin,Manager")]
     public async Task<ActionResult<ApiResponse<IEnumerable<UserDto>>>> GetAllUsers()
     {
-        try
-        {
-            var result = await _authService.GetUsersAsync();
-            
-            if (!result.Success)
-            {
-                return BadRequest(result);
-            }
+        var result = await _authService.GetUsersAsync();
 
-            return Ok(result);
-        }
-        catch (Exception ex)
+        if (!result.Success)
         {
-            _logger.LogError(ex, "Error retrieving all users");
-            return StatusCode(500, ApiResponse<IEnumerable<UserDto>>.ErrorResponse("An error occurred while retrieving users"));
+            return BadRequest(result);
         }
+
+        return Ok(result);
     }
 }

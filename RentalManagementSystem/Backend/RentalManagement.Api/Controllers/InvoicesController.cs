@@ -14,16 +14,11 @@ namespace RentalManagement.Api.Controllers;
 public class InvoicesController : ControllerBase
 {
     private readonly IInvoiceService _invoiceService;
-    private readonly ILogger<InvoicesController> _logger;
     private readonly IPdfService _pdfService;
 
-    public InvoicesController(
-        IInvoiceService invoiceService, 
-        ILogger<InvoicesController> logger,
-        IPdfService pdfService)
+    public InvoicesController(IInvoiceService invoiceService, IPdfService pdfService)
     {
         _invoiceService = invoiceService;
-        _logger = logger;
         _pdfService = pdfService;
     }
 
@@ -35,16 +30,8 @@ public class InvoicesController : ControllerBase
     [HttpGet]
     public async Task<ActionResult<ApiResponse<PagedResponse<InvoiceDto>>>> GetInvoices([FromQuery] InvoiceSearchDto searchDto)
     {
-        try
-        {
-            var result = await _invoiceService.GetInvoicesAsync(searchDto);
-            return Ok(result);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error retrieving invoices");
-            return StatusCode(500, ApiResponse<PagedResponse<InvoiceDto>>.ErrorResponse("An error occurred while retrieving invoices"));
-        }
+        var result = await _invoiceService.GetInvoicesAsync(searchDto);
+        return Ok(result);
     }
 
     /// <summary>
@@ -55,22 +42,14 @@ public class InvoicesController : ControllerBase
     [HttpGet("{id}")]
     public async Task<ActionResult<ApiResponse<InvoiceDto>>> GetInvoice(int id)
     {
-        try
-        {
-            var result = await _invoiceService.GetInvoiceByIdAsync(id);
-            
-            if (!result.Success)
-            {
-                return NotFound(result);
-            }
+        var result = await _invoiceService.GetInvoiceByIdAsync(id);
 
-            return Ok(result);
-        }
-        catch (Exception ex)
+        if (!result.Success)
         {
-            _logger.LogError(ex, "Error retrieving invoice {Id}", id);
-            return StatusCode(500, ApiResponse<InvoiceDto>.ErrorResponse("An error occurred while retrieving the invoice"));
+            return NotFound(result);
         }
+
+        return Ok(result);
     }
 
     /// <summary>
@@ -82,22 +61,14 @@ public class InvoicesController : ControllerBase
     [Authorize(Roles = "Admin,Manager,Staff")]
     public async Task<ActionResult<ApiResponse<InvoiceDto>>> CreateInvoice([FromBody] CreateInvoiceDto createInvoiceDto)
     {
-        try
-        {
-            var result = await _invoiceService.CreateInvoiceAsync(createInvoiceDto);
-            
-            if (!result.Success)
-            {
-                return BadRequest(result);
-            }
+        var result = await _invoiceService.CreateInvoiceAsync(createInvoiceDto);
 
-            return CreatedAtAction(nameof(GetInvoice), new { id = result.Data!.Id }, result);
-        }
-        catch (Exception ex)
+        if (!result.Success)
         {
-            _logger.LogError(ex, "Error creating invoice");
-            return StatusCode(500, ApiResponse<InvoiceDto>.ErrorResponse("An error occurred while creating the invoice"));
+            return BadRequest(result);
         }
+
+        return CreatedAtAction(nameof(GetInvoice), new { id = result.Data!.Id }, result);
     }
 
     /// <summary>
@@ -110,22 +81,14 @@ public class InvoicesController : ControllerBase
     [Authorize(Roles = "Admin,Manager,Staff")]
     public async Task<ActionResult<ApiResponse<InvoiceDto>>> UpdateInvoice(int id, [FromBody] UpdateInvoiceDto updateInvoiceDto)
     {
-        try
-        {
-            var result = await _invoiceService.UpdateInvoiceAsync(id, updateInvoiceDto);
-            
-            if (!result.Success)
-            {
-                return BadRequest(result);
-            }
+        var result = await _invoiceService.UpdateInvoiceAsync(id, updateInvoiceDto);
 
-            return Ok(result);
-        }
-        catch (Exception ex)
+        if (!result.Success)
         {
-            _logger.LogError(ex, "Error updating invoice {Id}", id);
-            return StatusCode(500, ApiResponse<InvoiceDto>.ErrorResponse("An error occurred while updating the invoice"));
+            return BadRequest(result);
         }
+
+        return Ok(result);
     }
 
     /// <summary>
@@ -137,22 +100,14 @@ public class InvoicesController : ControllerBase
     [Authorize(Roles = "Admin")]
     public async Task<ActionResult<ApiResponse<bool>>> DeleteInvoice(int id)
     {
-        try
-        {
-            var result = await _invoiceService.DeleteInvoiceAsync(id);
-            
-            if (!result.Success)
-            {
-                return BadRequest(result);
-            }
+        var result = await _invoiceService.DeleteInvoiceAsync(id);
 
-            return Ok(result);
-        }
-        catch (Exception ex)
+        if (!result.Success)
         {
-            _logger.LogError(ex, "Error deleting invoice {Id}", id);
-            return StatusCode(500, ApiResponse<bool>.ErrorResponse("An error occurred while deleting the invoice"));
+            return BadRequest(result);
         }
+
+        return Ok(result);
     }
 
     /// <summary>
@@ -164,22 +119,14 @@ public class InvoicesController : ControllerBase
     [Authorize(Roles = "Admin,Manager")]
     public async Task<ActionResult<ApiResponse<int>>> GenerateMonthlyInvoices([FromQuery] DateTime billingPeriod)
     {
-        try
-        {
-            var result = await _invoiceService.GenerateMonthlyInvoicesAsync(billingPeriod);
-            
-            if (!result.Success)
-            {
-                return BadRequest(result);
-            }
+        var result = await _invoiceService.GenerateMonthlyInvoicesAsync(billingPeriod);
 
-            return Ok(result);
-        }
-        catch (Exception ex)
+        if (!result.Success)
         {
-            _logger.LogError(ex, "Error generating monthly invoices for {BillingPeriod}", billingPeriod);
-            return StatusCode(500, ApiResponse<int>.ErrorResponse("An error occurred while generating monthly invoices"));
+            return BadRequest(result);
         }
+
+        return Ok(result);
     }
 
     /// <summary>
@@ -190,16 +137,8 @@ public class InvoicesController : ControllerBase
     [HttpGet("tenant/{tenantId}")]
     public async Task<ActionResult<ApiResponse<IEnumerable<InvoiceDto>>>> GetInvoicesByTenant(int tenantId)
     {
-        try
-        {
-            var result = await _invoiceService.GetInvoicesByTenantAsync(tenantId);
-            return Ok(result);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error retrieving invoices by tenant {TenantId}", tenantId);
-            return StatusCode(500, ApiResponse<IEnumerable<InvoiceDto>>.ErrorResponse("An error occurred while retrieving invoices by tenant"));
-        }
+        var result = await _invoiceService.GetInvoicesByTenantAsync(tenantId);
+        return Ok(result);
     }
 
     /// <summary>
@@ -210,16 +149,8 @@ public class InvoicesController : ControllerBase
     [Authorize(Roles = "Admin,Manager,Staff")]
     public async Task<ActionResult<ApiResponse<IEnumerable<InvoiceDto>>>> GetOverdueInvoices()
     {
-        try
-        {
-            var result = await _invoiceService.GetOverdueInvoicesAsync();
-            return Ok(result);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error retrieving overdue invoices");
-            return StatusCode(500, ApiResponse<IEnumerable<InvoiceDto>>.ErrorResponse("An error occurred while retrieving overdue invoices"));
-        }
+        var result = await _invoiceService.GetOverdueInvoicesAsync();
+        return Ok(result);
     }
 
     /// <summary>
@@ -232,22 +163,14 @@ public class InvoicesController : ControllerBase
     [Authorize(Roles = "Admin,Manager,Staff")]
     public async Task<ActionResult<ApiResponse<bool>>> MarkInvoiceAsPaid(int id, [FromQuery] DateTime? paidDate = null)
     {
-        try
-        {
-            var result = await _invoiceService.MarkInvoiceAsPaidAsync(id, paidDate);
-            
-            if (!result.Success)
-            {
-                return BadRequest(result);
-            }
+        var result = await _invoiceService.MarkInvoiceAsPaidAsync(id, paidDate);
 
-            return Ok(result);
-        }
-        catch (Exception ex)
+        if (!result.Success)
         {
-            _logger.LogError(ex, "Error marking invoice {Id} as paid", id);
-            return StatusCode(500, ApiResponse<bool>.ErrorResponse("An error occurred while marking invoice as paid"));
+            return BadRequest(result);
         }
+
+        return Ok(result);
     }
 
     /// <summary>
@@ -258,22 +181,14 @@ public class InvoicesController : ControllerBase
     [Authorize(Roles = "Admin,Manager")]
     public async Task<ActionResult<ApiResponse<int>>> SendInvoiceReminders()
     {
-        try
-        {
-            var result = await _invoiceService.SendInvoiceRemindersAsync();
-            
-            if (!result.Success)
-            {
-                return BadRequest(result);
-            }
+        var result = await _invoiceService.SendInvoiceRemindersAsync();
 
-            return Ok(result);
-        }
-        catch (Exception ex)
+        if (!result.Success)
         {
-            _logger.LogError(ex, "Error sending invoice reminders");
-            return StatusCode(500, ApiResponse<int>.ErrorResponse("An error occurred while sending invoice reminders"));
+            return BadRequest(result);
         }
+
+        return Ok(result);
     }
 
     /// <summary>
@@ -284,16 +199,8 @@ public class InvoicesController : ControllerBase
     [Authorize(Roles = "Admin,Manager")]
     public async Task<ActionResult<ApiResponse<object>>> GetInvoiceStats()
     {
-        try
-        {
-            var result = await _invoiceService.GetInvoiceStatsAsync();
-            return Ok(result);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error retrieving invoice statistics");
-            return StatusCode(500, ApiResponse<object>.ErrorResponse("An error occurred while retrieving invoice statistics"));
-        }
+        var result = await _invoiceService.GetInvoiceStatsAsync();
+        return Ok(result);
     }
 
     /// <summary>
@@ -304,20 +211,12 @@ public class InvoicesController : ControllerBase
     [HttpGet("{id}/export-pdf")]
     public async Task<IActionResult> ExportInvoicePdf(int id)
     {
-        try
-        {
-            var pdfBytes = await _pdfService.GenerateInvoicePdfAsync(id);
-            
-            // Get invoice number for filename
-            var invoice = await _invoiceService.GetInvoiceByIdAsync(id);
-            var filename = $"Invoice_{invoice.Data?.InvoiceNumber ?? id.ToString()}_{DateTime.UtcNow:yyyyMMdd}.pdf";
-            
-            return File(pdfBytes, "application/pdf", filename);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error exporting invoice {Id} to PDF", id);
-            return StatusCode(500, ApiResponse<bool>.ErrorResponse("An error occurred while exporting the invoice to PDF"));
-        }
+        var pdfBytes = await _pdfService.GenerateInvoicePdfAsync(id);
+
+        // Get invoice number for filename
+        var invoice = await _invoiceService.GetInvoiceByIdAsync(id);
+        var filename = $"Invoice_{invoice.Data?.InvoiceNumber ?? id.ToString()}_{DateTime.UtcNow:yyyyMMdd}.pdf";
+
+        return File(pdfBytes, "application/pdf", filename);
     }
 }

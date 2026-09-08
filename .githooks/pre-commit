@@ -38,6 +38,16 @@ STAGED_DIFF="$(git diff --cached --unified=0 --no-color \
 # Giá trị được coi là placeholder → cho qua
 PLACEHOLDER='\$\{|\$\(|\{\{|<[A-Za-z_]|__[A-Z_]+__|%[A-Z_]+%|YOUR|CHANGE_?ME|PLACEHOLDER|REPLACE_?ME|EXAMPLE|SAMPLE|DUMMY|process\.env|import\.meta\.env|\*\*\*REMOVED'
 
+# Khai báo biến C# lấy giá trị từ biểu thức (không phải literal) → cho qua.
+#   var password = createDto.Password ?? GenerateRandomPassword();
+#   var seedPassword = Environment.GetEnvironmentVariable("SEED_ADMIN_PASSWORD");
+# Bắt buộc có từ khoá kiểu, tên biến chứa "password", và giá trị KHÔNG mở đầu
+# bằng dấu nháy — nên `var password = "literal";` vẫn bị chặn.
+# Tiền tố '^[0-9]+:\+' là do grep -n trên diff đã thêm số dòng và dấu '+'.
+# Phần giá trị chỉ được chứa code không nháy, hoặc chuỗi VIẾT HOA kiểu tên biến
+# môi trường ("SEED_ADMIN_PASSWORD"). Nhờ vậy `... ?? "literalthatleaks"` vẫn bị chặn.
+CODE_EXPR='^[0-9]+:\+[[:space:]]*(#|//)?[[:space:]]*(var|string\??|const[[:space:]]+string|(static[[:space:]]+)?readonly[[:space:]]+string)[[:space:]]+[A-Za-z0-9_]*[Pp]assword[A-Za-z0-9_]*[[:space:]]*=[[:space:]]*[^"'"'"'[:space:]]([^"'"'"']|"[A-Z0-9_]+")*$'
+
 PATTERNS=(
   # Password= với giá trị >=8 ký tự
   '[Pp]assword[[:space:]]*=[[:space:]]*"?[^[:space:];"'"'"'`,)]{8,}'
@@ -56,6 +66,8 @@ for p in "${PATTERNS[@]}"; do
   matches="$(printf '%s\n' "$STAGED_DIFF" | grep -inE "$p" || true)"
   [ -z "$matches" ] && continue
   matches="$(printf '%s\n' "$matches" | grep -vE "$PLACEHOLDER" || true)"
+  [ -z "$matches" ] && continue
+  matches="$(printf '%s\n' "$matches" | grep -vE "$CODE_EXPR" || true)"
   [ -z "$matches" ] && continue
   HITS=1
   printf '%s\n' "$matches" | sed -E 's/([Pp]assword[[:space:]]*=[[:space:]]*)[^;"'"'"' ]+/\1***/g' >&2

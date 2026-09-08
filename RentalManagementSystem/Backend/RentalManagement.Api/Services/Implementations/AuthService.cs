@@ -44,50 +44,42 @@ public class AuthService : IAuthService
     /// </summary>
     public async Task<ApiResponse<AuthResponseDto>> LoginAsync(LoginRequestDto loginRequest)
     {
-        try
+        var user = await _userManager.FindByEmailAsync(loginRequest.Email);
+        if (user is null)
         {
-            var user = await _userManager.FindByEmailAsync(loginRequest.Email);
-            if (user is null)
-            {
-                _logger.LogWarning("Login attempt with non-existent email: {Email}", loginRequest.Email);
-                return ApiResponse<AuthResponseDto>.ErrorResponse("Invalid email or password");
-            }
-
-            if (!user.IsActive)
-            {
-                _logger.LogWarning("Login attempt with inactive user: {Email}", loginRequest.Email);
-                return ApiResponse<AuthResponseDto>.ErrorResponse("User account is inactive");
-            }
-
-            var result = await _signInManager.CheckPasswordSignInAsync(user, loginRequest.Password, lockoutOnFailure: true);
-            
-            if (!result.Succeeded)
-            {
-                _logger.LogWarning("Failed login attempt for user: {Email}", loginRequest.Email);
-                
-                if (result.IsLockedOut)
-                    return ApiResponse<AuthResponseDto>.ErrorResponse("Account is locked out");
-                
-                return ApiResponse<AuthResponseDto>.ErrorResponse("Invalid email or password");
-            }
-
-            var token = await GenerateJwtTokenAsync(user);
-            var userDto = await MapUserToDtoAsync(user);
-
-            _logger.LogInformation("User logged in successfully: {Email}", loginRequest.Email);
-
-            return ApiResponse<AuthResponseDto>.SuccessResponse(new AuthResponseDto
-            {
-                Token = token,
-                User = userDto,
-                ExpiresAt = DateTime.UtcNow.AddHours(GetTokenExpirationHours())
-            }, "Login successful");
+            _logger.LogWarning("Login attempt with non-existent email: {Email}", loginRequest.Email);
+            return ApiResponse<AuthResponseDto>.ErrorResponse("Invalid email or password");
         }
-        catch (Exception ex)
+
+        if (!user.IsActive)
         {
-            _logger.LogError(ex, "Error during login for email: {Email}", loginRequest.Email);
-            return ApiResponse<AuthResponseDto>.ErrorResponse("An error occurred during login");
+            _logger.LogWarning("Login attempt with inactive user: {Email}", loginRequest.Email);
+            return ApiResponse<AuthResponseDto>.ErrorResponse("User account is inactive");
         }
+
+        var result = await _signInManager.CheckPasswordSignInAsync(user, loginRequest.Password, lockoutOnFailure: true);
+
+        if (!result.Succeeded)
+        {
+            _logger.LogWarning("Failed login attempt for user: {Email}", loginRequest.Email);
+
+            if (result.IsLockedOut)
+                return ApiResponse<AuthResponseDto>.ErrorResponse("Account is locked out");
+
+            return ApiResponse<AuthResponseDto>.ErrorResponse("Invalid email or password");
+        }
+
+        var token = await GenerateJwtTokenAsync(user);
+        var userDto = await MapUserToDtoAsync(user);
+
+        _logger.LogInformation("User logged in successfully: {Email}", loginRequest.Email);
+
+        return ApiResponse<AuthResponseDto>.SuccessResponse(new AuthResponseDto
+        {
+            Token = token,
+            User = userDto,
+            ExpiresAt = DateTime.UtcNow.AddHours(GetTokenExpirationHours())
+        }, "Login successful");
     }
 
     /// <summary>
@@ -95,50 +87,42 @@ public class AuthService : IAuthService
     /// </summary>
     public async Task<ApiResponse<AuthResponseDto>> RegisterAsync(RegisterRequestDto registerRequest)
     {
-        try
+        var existingUser = await _userManager.FindByEmailAsync(registerRequest.Email);
+        if (existingUser is not null)
         {
-            var existingUser = await _userManager.FindByEmailAsync(registerRequest.Email);
-            if (existingUser is not null)
-            {
-                return ApiResponse<AuthResponseDto>.ErrorResponse("User with this email already exists");
-            }
-
-            var user = _mapper.Map<User>(registerRequest);
-            var result = await _userManager.CreateAsync(user, registerRequest.Password);
-
-            if (!result.Succeeded)
-            {
-                var errors = result.Errors.Select(e => e.Description);
-                _logger.LogWarning("User registration failed for {Email}: {Errors}", 
-                    registerRequest.Email, string.Join(", ", errors));
-                return ApiResponse<AuthResponseDto>.ErrorResponse("Registration failed", errors);
-            }
-
-            // Assign role
-            var roleResult = await _userManager.AddToRoleAsync(user, registerRequest.Role);
-            if (!roleResult.Succeeded)
-            {
-                _logger.LogWarning("Failed to assign role {Role} to user {Email}", 
-                    registerRequest.Role, registerRequest.Email);
-            }
-
-            var token = await GenerateJwtTokenAsync(user);
-            var userDto = await MapUserToDtoAsync(user);
-
-            _logger.LogInformation("User registered successfully: {Email}", registerRequest.Email);
-
-            return ApiResponse<AuthResponseDto>.SuccessResponse(new AuthResponseDto
-            {
-                Token = token,
-                User = userDto,
-                ExpiresAt = DateTime.UtcNow.AddHours(GetTokenExpirationHours())
-            }, "Registration successful");
+            return ApiResponse<AuthResponseDto>.ErrorResponse("User with this email already exists");
         }
-        catch (Exception ex)
+
+        var user = _mapper.Map<User>(registerRequest);
+        var result = await _userManager.CreateAsync(user, registerRequest.Password);
+
+        if (!result.Succeeded)
         {
-            _logger.LogError(ex, "Error during registration for email: {Email}", registerRequest.Email);
-            return ApiResponse<AuthResponseDto>.ErrorResponse("An error occurred during registration");
+            var errors = result.Errors.Select(e => e.Description);
+            _logger.LogWarning("User registration failed for {Email}: {Errors}", 
+                registerRequest.Email, string.Join(", ", errors));
+            return ApiResponse<AuthResponseDto>.ErrorResponse("Registration failed", errors);
         }
+
+        // Assign role
+        var roleResult = await _userManager.AddToRoleAsync(user, registerRequest.Role);
+        if (!roleResult.Succeeded)
+        {
+            _logger.LogWarning("Failed to assign role {Role} to user {Email}", 
+                registerRequest.Role, registerRequest.Email);
+        }
+
+        var token = await GenerateJwtTokenAsync(user);
+        var userDto = await MapUserToDtoAsync(user);
+
+        _logger.LogInformation("User registered successfully: {Email}", registerRequest.Email);
+
+        return ApiResponse<AuthResponseDto>.SuccessResponse(new AuthResponseDto
+        {
+            Token = token,
+            User = userDto,
+            ExpiresAt = DateTime.UtcNow.AddHours(GetTokenExpirationHours())
+        }, "Registration successful");
     }
 
     /// <summary>
@@ -146,22 +130,14 @@ public class AuthService : IAuthService
     /// </summary>
     public async Task<ApiResponse<UserDto>> GetUserAsync(string userId)
     {
-        try
+        var user = await _userManager.FindByIdAsync(userId);
+        if (user is null)
         {
-            var user = await _userManager.FindByIdAsync(userId);
-            if (user is null)
-            {
-                return ApiResponse<UserDto>.ErrorResponse("User not found");
-            }
+            return ApiResponse<UserDto>.ErrorResponse("User not found");
+        }
 
-            var userDto = await MapUserToDtoAsync(user);
-            return ApiResponse<UserDto>.SuccessResponse(userDto);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting user: {UserId}", userId);
-            return ApiResponse<UserDto>.ErrorResponse("An error occurred while retrieving user");
-        }
+        var userDto = await MapUserToDtoAsync(user);
+        return ApiResponse<UserDto>.SuccessResponse(userDto);
     }
 
     /// <summary>
@@ -169,24 +145,16 @@ public class AuthService : IAuthService
     /// </summary>
     public async Task<ApiResponse<IEnumerable<UserDto>>> GetUsersAsync()
     {
-        try
-        {
-            var users = _userManager.Users.ToList();
-            var userDtos = new List<UserDto>();
+        var users = _userManager.Users.ToList();
+        var userDtos = new List<UserDto>();
 
-            foreach (var user in users)
-            {
-                var userDto = await MapUserToDtoAsync(user);
-                userDtos.Add(userDto);
-            }
-
-            return ApiResponse<IEnumerable<UserDto>>.SuccessResponse(userDtos);
-        }
-        catch (Exception ex)
+        foreach (var user in users)
         {
-            _logger.LogError(ex, "Error getting all users");
-            return ApiResponse<IEnumerable<UserDto>>.ErrorResponse("An error occurred while retrieving users");
+            var userDto = await MapUserToDtoAsync(user);
+            userDtos.Add(userDto);
         }
+
+        return ApiResponse<IEnumerable<UserDto>>.SuccessResponse(userDtos);
     }
 
     /// <summary>
@@ -194,37 +162,29 @@ public class AuthService : IAuthService
     /// </summary>
     public async Task<ApiResponse<UserDto>> UpdateUserAsync(string userId, RegisterRequestDto updateRequest)
     {
-        try
+        var user = await _userManager.FindByIdAsync(userId);
+        if (user is null)
         {
-            var user = await _userManager.FindByIdAsync(userId);
-            if (user is null)
-            {
-                return ApiResponse<UserDto>.ErrorResponse("User not found");
-            }
-
-            // Update user properties
-            user.FirstName = updateRequest.FirstName;
-            user.LastName = updateRequest.LastName;
-            user.Email = updateRequest.Email;
-            user.UserName = updateRequest.Email;
-            user.PhoneNumber = updateRequest.PhoneNumber;
-            user.UpdatedAt = DateTime.UtcNow;
-
-            var result = await _userManager.UpdateAsync(user);
-            if (!result.Succeeded)
-            {
-                var errors = result.Errors.Select(e => e.Description);
-                return ApiResponse<UserDto>.ErrorResponse("Update failed", errors);
-            }
-
-            var userDto = await MapUserToDtoAsync(user);
-            return ApiResponse<UserDto>.SuccessResponse(userDto, "User updated successfully");
+            return ApiResponse<UserDto>.ErrorResponse("User not found");
         }
-        catch (Exception ex)
+
+        // Update user properties
+        user.FirstName = updateRequest.FirstName;
+        user.LastName = updateRequest.LastName;
+        user.Email = updateRequest.Email;
+        user.UserName = updateRequest.Email;
+        user.PhoneNumber = updateRequest.PhoneNumber;
+        user.UpdatedAt = DateTime.UtcNow;
+
+        var result = await _userManager.UpdateAsync(user);
+        if (!result.Succeeded)
         {
-            _logger.LogError(ex, "Error updating user: {UserId}", userId);
-            return ApiResponse<UserDto>.ErrorResponse("An error occurred while updating user");
+            var errors = result.Errors.Select(e => e.Description);
+            return ApiResponse<UserDto>.ErrorResponse("Update failed", errors);
         }
+
+        var userDto = await MapUserToDtoAsync(user);
+        return ApiResponse<UserDto>.SuccessResponse(userDto, "User updated successfully");
     }
 
     /// <summary>
@@ -232,28 +192,20 @@ public class AuthService : IAuthService
     /// </summary>
     public async Task<ApiResponse<bool>> DeleteUserAsync(string userId)
     {
-        try
+        var user = await _userManager.FindByIdAsync(userId);
+        if (user is null)
         {
-            var user = await _userManager.FindByIdAsync(userId);
-            if (user is null)
-            {
-                return ApiResponse<bool>.ErrorResponse("User not found");
-            }
-
-            var result = await _userManager.DeleteAsync(user);
-            if (!result.Succeeded)
-            {
-                var errors = result.Errors.Select(e => e.Description);
-                return ApiResponse<bool>.ErrorResponse("Delete failed", errors);
-            }
-
-            return ApiResponse<bool>.SuccessResponse(true, "User deleted successfully");
+            return ApiResponse<bool>.ErrorResponse("User not found");
         }
-        catch (Exception ex)
+
+        var result = await _userManager.DeleteAsync(user);
+        if (!result.Succeeded)
         {
-            _logger.LogError(ex, "Error deleting user: {UserId}", userId);
-            return ApiResponse<bool>.ErrorResponse("An error occurred while deleting user");
+            var errors = result.Errors.Select(e => e.Description);
+            return ApiResponse<bool>.ErrorResponse("Delete failed", errors);
         }
+
+        return ApiResponse<bool>.SuccessResponse(true, "User deleted successfully");
     }
 
     /// <summary>
@@ -261,33 +213,25 @@ public class AuthService : IAuthService
     /// </summary>
     public async Task<ApiResponse<bool>> AssignRoleAsync(string userId, string role)
     {
-        try
+        var user = await _userManager.FindByIdAsync(userId);
+        if (user is null)
         {
-            var user = await _userManager.FindByIdAsync(userId);
-            if (user is null)
-            {
-                return ApiResponse<bool>.ErrorResponse("User not found");
-            }
-
-            if (!await _roleManager.RoleExistsAsync(role))
-            {
-                return ApiResponse<bool>.ErrorResponse("Role does not exist");
-            }
-
-            var result = await _userManager.AddToRoleAsync(user, role);
-            if (!result.Succeeded)
-            {
-                var errors = result.Errors.Select(e => e.Description);
-                return ApiResponse<bool>.ErrorResponse("Role assignment failed", errors);
-            }
-
-            return ApiResponse<bool>.SuccessResponse(true, "Role assigned successfully");
+            return ApiResponse<bool>.ErrorResponse("User not found");
         }
-        catch (Exception ex)
+
+        if (!await _roleManager.RoleExistsAsync(role))
         {
-            _logger.LogError(ex, "Error assigning role {Role} to user: {UserId}", role, userId);
-            return ApiResponse<bool>.ErrorResponse("An error occurred while assigning role");
+            return ApiResponse<bool>.ErrorResponse("Role does not exist");
         }
+
+        var result = await _userManager.AddToRoleAsync(user, role);
+        if (!result.Succeeded)
+        {
+            var errors = result.Errors.Select(e => e.Description);
+            return ApiResponse<bool>.ErrorResponse("Role assignment failed", errors);
+        }
+
+        return ApiResponse<bool>.SuccessResponse(true, "Role assigned successfully");
     }
 
     /// <summary>
@@ -295,28 +239,20 @@ public class AuthService : IAuthService
     /// </summary>
     public async Task<ApiResponse<bool>> RemoveRoleAsync(string userId, string role)
     {
-        try
+        var user = await _userManager.FindByIdAsync(userId);
+        if (user is null)
         {
-            var user = await _userManager.FindByIdAsync(userId);
-            if (user is null)
-            {
-                return ApiResponse<bool>.ErrorResponse("User not found");
-            }
-
-            var result = await _userManager.RemoveFromRoleAsync(user, role);
-            if (!result.Succeeded)
-            {
-                var errors = result.Errors.Select(e => e.Description);
-                return ApiResponse<bool>.ErrorResponse("Role removal failed", errors);
-            }
-
-            return ApiResponse<bool>.SuccessResponse(true, "Role removed successfully");
+            return ApiResponse<bool>.ErrorResponse("User not found");
         }
-        catch (Exception ex)
+
+        var result = await _userManager.RemoveFromRoleAsync(user, role);
+        if (!result.Succeeded)
         {
-            _logger.LogError(ex, "Error removing role {Role} from user: {UserId}", role, userId);
-            return ApiResponse<bool>.ErrorResponse("An error occurred while removing role");
+            var errors = result.Errors.Select(e => e.Description);
+            return ApiResponse<bool>.ErrorResponse("Role removal failed", errors);
         }
+
+        return ApiResponse<bool>.SuccessResponse(true, "Role removed successfully");
     }
 
     /// <summary>

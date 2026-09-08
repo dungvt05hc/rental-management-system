@@ -13,13 +13,11 @@ namespace RentalManagement.Api.Services.Implementations;
 public class PdfService : IPdfService
 {
     private readonly RentalManagementContext _context;
-    private readonly ILogger<PdfService> _logger;
 
-    public PdfService(RentalManagementContext context, ILogger<PdfService> logger)
+    public PdfService(RentalManagementContext context)
     {
         _context = context;
-        _logger = logger;
-        
+
         // Configure QuestPDF license (Community license for free use)
         QuestPDF.Settings.License = LicenseType.Community;
     }
@@ -29,43 +27,35 @@ public class PdfService : IPdfService
     /// </summary>
     public async Task<byte[]> GenerateInvoicePdfAsync(int invoiceId)
     {
-        try
+        // Fetch invoice with related data
+        var invoice = await _context.Invoices
+            .Include(i => i.Tenant)
+            .Include(i => i.Room)
+            .Include(i => i.Payments)
+            .Include(i => i.InvoiceItems)
+            .FirstOrDefaultAsync(i => i.Id == invoiceId);
+
+        if (invoice == null)
         {
-            // Fetch invoice with related data
-            var invoice = await _context.Invoices
-                .Include(i => i.Tenant)
-                .Include(i => i.Room)
-                .Include(i => i.Payments)
-                .Include(i => i.InvoiceItems)
-                .FirstOrDefaultAsync(i => i.Id == invoiceId);
+            throw new KeyNotFoundException($"Invoice with ID {invoiceId} not found");
+        }
 
-            if (invoice == null)
+        // Generate PDF
+        var document = Document.Create(container =>
+        {
+            container.Page(page =>
             {
-                throw new Exception($"Invoice with ID {invoiceId} not found");
-            }
+                page.Size(PageSizes.A4);
+                page.Margin(50);
+                page.DefaultTextStyle(x => x.FontSize(11).FontFamily("Arial"));
 
-            // Generate PDF
-            var document = Document.Create(container =>
-            {
-                container.Page(page =>
-                {
-                    page.Size(PageSizes.A4);
-                    page.Margin(50);
-                    page.DefaultTextStyle(x => x.FontSize(11).FontFamily("Arial"));
-
-                    page.Header().Element(c => ComposeHeader(c, invoice));
-                    page.Content().Element(c => ComposeContent(c, invoice));
-                    page.Footer().Element(c => ComposeFooter(c, invoice));
-                });
+                page.Header().Element(c => ComposeHeader(c, invoice));
+                page.Content().Element(c => ComposeContent(c, invoice));
+                page.Footer().Element(c => ComposeFooter(c, invoice));
             });
+        });
 
-            return document.GeneratePdf();
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error generating PDF for invoice {InvoiceId}", invoiceId);
-            throw;
-        }
+        return document.GeneratePdf();
     }
 
     private void ComposeHeader(IContainer container, Models.Entities.Invoice invoice)

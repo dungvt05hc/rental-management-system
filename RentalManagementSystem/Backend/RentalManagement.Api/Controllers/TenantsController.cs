@@ -14,12 +14,10 @@ namespace RentalManagement.Api.Controllers;
 public class TenantsController : ControllerBase
 {
     private readonly ITenantService _tenantService;
-    private readonly ILogger<TenantsController> _logger;
 
-    public TenantsController(ITenantService tenantService, ILogger<TenantsController> logger)
+    public TenantsController(ITenantService tenantService)
     {
         _tenantService = tenantService;
-        _logger = logger;
     }
 
     /// <summary>
@@ -30,16 +28,8 @@ public class TenantsController : ControllerBase
     [HttpGet]
     public async Task<ActionResult<ApiResponse<PagedResponse<TenantDto>>>> GetTenants([FromQuery] TenantSearchDto searchDto)
     {
-        try
-        {
-            var result = await _tenantService.GetTenantsAsync(searchDto);
-            return Ok(result);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error retrieving tenants");
-            return StatusCode(500, ApiResponse<PagedResponse<TenantDto>>.ErrorResponse("An error occurred while retrieving tenants"));
-        }
+        var result = await _tenantService.GetTenantsAsync(searchDto);
+        return Ok(result);
     }
 
     /// <summary>
@@ -50,22 +40,14 @@ public class TenantsController : ControllerBase
     [HttpGet("{id}")]
     public async Task<ActionResult<ApiResponse<TenantDto>>> GetTenant(int id)
     {
-        try
-        {
-            var result = await _tenantService.GetTenantByIdAsync(id);
-            
-            if (!result.Success)
-            {
-                return NotFound(result);
-            }
+        var result = await _tenantService.GetTenantByIdAsync(id);
 
-            return Ok(result);
-        }
-        catch (Exception ex)
+        if (!result.Success)
         {
-            _logger.LogError(ex, "Error retrieving tenant {Id}", id);
-            return StatusCode(500, ApiResponse<TenantDto>.ErrorResponse("An error occurred while retrieving the tenant"));
+            return NotFound(result);
         }
+
+        return Ok(result);
     }
 
     /// <summary>
@@ -77,22 +59,14 @@ public class TenantsController : ControllerBase
     [Authorize(Roles = "Admin,Manager,Staff")]
     public async Task<ActionResult<ApiResponse<TenantDto>>> CreateTenant([FromBody] CreateTenantDto createTenantDto)
     {
-        try
-        {
-            var result = await _tenantService.CreateTenantAsync(createTenantDto);
-            
-            if (!result.Success)
-            {
-                return BadRequest(result);
-            }
+        var result = await _tenantService.CreateTenantAsync(createTenantDto);
 
-            return CreatedAtAction(nameof(GetTenant), new { id = result.Data!.Id }, result);
-        }
-        catch (Exception ex)
+        if (!result.Success)
         {
-            _logger.LogError(ex, "Error creating tenant");
-            return StatusCode(500, ApiResponse<TenantDto>.ErrorResponse("An error occurred while creating the tenant"));
+            return BadRequest(result);
         }
+
+        return CreatedAtAction(nameof(GetTenant), new { id = result.Data!.Id }, result);
     }
 
     /// <summary>
@@ -105,22 +79,14 @@ public class TenantsController : ControllerBase
     [Authorize(Roles = "Admin,Manager,Staff")]
     public async Task<ActionResult<ApiResponse<TenantDto>>> UpdateTenant(int id, [FromBody] UpdateTenantDto updateTenantDto)
     {
-        try
-        {
-            var result = await _tenantService.UpdateTenantAsync(id, updateTenantDto);
-            
-            if (!result.Success)
-            {
-                return BadRequest(result);
-            }
+        var result = await _tenantService.UpdateTenantAsync(id, updateTenantDto);
 
-            return Ok(result);
-        }
-        catch (Exception ex)
+        if (!result.Success)
         {
-            _logger.LogError(ex, "Error updating tenant {Id}", id);
-            return StatusCode(500, ApiResponse<TenantDto>.ErrorResponse("An error occurred while updating the tenant"));
+            return BadRequest(result);
         }
+
+        return Ok(result);
     }
 
     /// <summary>
@@ -132,22 +98,14 @@ public class TenantsController : ControllerBase
     [Authorize(Roles = "Admin")]
     public async Task<ActionResult<ApiResponse<bool>>> DeleteTenant(int id)
     {
-        try
-        {
-            var result = await _tenantService.DeleteTenantAsync(id);
-            
-            if (!result.Success)
-            {
-                return BadRequest(result);
-            }
+        var result = await _tenantService.DeleteTenantAsync(id);
 
-            return Ok(result);
-        }
-        catch (Exception ex)
+        if (!result.Success)
         {
-            _logger.LogError(ex, "Error deleting tenant {Id}", id);
-            return StatusCode(500, ApiResponse<bool>.ErrorResponse("An error occurred while deleting the tenant"));
+            return BadRequest(result);
         }
+
+        return Ok(result);
     }
 
     /// <summary>
@@ -160,22 +118,14 @@ public class TenantsController : ControllerBase
     [Authorize(Roles = "Admin,Manager,Staff")]
     public async Task<ActionResult<ApiResponse<bool>>> AssignTenantToRoom(int tenantId, [FromBody] AssignTenantToRoomDto assignmentDto)
     {
-        try
-        {
-            var result = await _tenantService.AssignTenantToRoomAsync(tenantId, assignmentDto);
-            
-            if (!result.Success)
-            {
-                return BadRequest(result);
-            }
+        var result = await _tenantService.AssignTenantToRoomAsync(tenantId, assignmentDto);
 
-            return Ok(result);
-        }
-        catch (Exception ex)
+        if (!result.Success)
         {
-            _logger.LogError(ex, "Error assigning tenant {TenantId} to room", tenantId);
-            return StatusCode(500, ApiResponse<bool>.ErrorResponse("An error occurred while assigning tenant to room"));
+            return BadRequest(result);
         }
+
+        return Ok(result);
     }
 
     /// <summary>
@@ -187,22 +137,14 @@ public class TenantsController : ControllerBase
     [Authorize(Roles = "Admin,Manager,Staff")]
     public async Task<ActionResult<ApiResponse<bool>>> UnassignTenantFromRoom(int tenantId)
     {
-        try
-        {
-            var result = await _tenantService.UnassignTenantFromRoomAsync(tenantId);
-            
-            if (!result.Success)
-            {
-                return BadRequest(result);
-            }
+        var result = await _tenantService.UnassignTenantFromRoomAsync(tenantId);
 
-            return Ok(result);
-        }
-        catch (Exception ex)
+        if (!result.Success)
         {
-            _logger.LogError(ex, "Error unassigning tenant {TenantId} from room", tenantId);
-            return StatusCode(500, ApiResponse<bool>.ErrorResponse("An error occurred while unassigning tenant from room"));
+            return BadRequest(result);
         }
+
+        return Ok(result);
     }
 
     /// <summary>
@@ -212,16 +154,8 @@ public class TenantsController : ControllerBase
     [HttpGet("active")]
     public async Task<ActionResult<ApiResponse<IEnumerable<TenantDto>>>> GetActiveTenants()
     {
-        try
-        {
-            var result = await _tenantService.GetActiveTenantsAsync();
-            return Ok(result);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error retrieving active tenants");
-            return StatusCode(500, ApiResponse<IEnumerable<TenantDto>>.ErrorResponse("An error occurred while retrieving active tenants"));
-        }
+        var result = await _tenantService.GetActiveTenantsAsync();
+        return Ok(result);
     }
 
     /// <summary>
@@ -231,16 +165,8 @@ public class TenantsController : ControllerBase
     [HttpGet("unassigned")]
     public async Task<ActionResult<ApiResponse<IEnumerable<TenantDto>>>> GetUnassignedTenants()
     {
-        try
-        {
-            var result = await _tenantService.GetUnassignedTenantsAsync();
-            return Ok(result);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error retrieving unassigned tenants");
-            return StatusCode(500, ApiResponse<IEnumerable<TenantDto>>.ErrorResponse("An error occurred while retrieving unassigned tenants"));
-        }
+        var result = await _tenantService.GetUnassignedTenantsAsync();
+        return Ok(result);
     }
 
     /// <summary>
@@ -251,16 +177,8 @@ public class TenantsController : ControllerBase
     [HttpGet("room/{roomId}")]
     public async Task<ActionResult<ApiResponse<IEnumerable<TenantDto>>>> GetTenantsByRoom(int roomId)
     {
-        try
-        {
-            var result = await _tenantService.GetTenantsByRoomAsync(roomId);
-            return Ok(result);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error retrieving tenants by room {RoomId}", roomId);
-            return StatusCode(500, ApiResponse<IEnumerable<TenantDto>>.ErrorResponse("An error occurred while retrieving tenants by room"));
-        }
+        var result = await _tenantService.GetTenantsByRoomAsync(roomId);
+        return Ok(result);
     }
 
     /// <summary>
@@ -271,15 +189,7 @@ public class TenantsController : ControllerBase
     [Authorize(Roles = "Admin,Manager")]
     public async Task<ActionResult<ApiResponse<object>>> GetTenantStats()
     {
-        try
-        {
-            var result = await _tenantService.GetTenantStatsAsync();
-            return Ok(result);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error retrieving tenant statistics");
-            return StatusCode(500, ApiResponse<object>.ErrorResponse("An error occurred while retrieving tenant statistics"));
-        }
+        var result = await _tenantService.GetTenantStatsAsync();
+        return Ok(result);
     }
 }

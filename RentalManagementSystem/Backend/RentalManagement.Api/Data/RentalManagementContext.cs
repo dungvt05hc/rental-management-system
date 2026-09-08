@@ -60,6 +60,11 @@ public class RentalManagementContext : IdentityDbContext<User>
     /// </summary>
     public DbSet<SystemSetting> SystemSettings { get; set; } = null!;
 
+    /// <summary>
+    /// Per-month counters backing invoice number generation
+    /// </summary>
+    public DbSet<InvoiceNumberCounter> InvoiceNumberCounters { get; set; } = null!;
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -113,6 +118,15 @@ public class RentalManagementContext : IdentityDbContext<User>
                   .WithMany(r => r.Tenants)
                   .HasForeignKey(t => t.RoomId)
                   .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        // Configure invoice number counter entity
+        modelBuilder.Entity<InvoiceNumberCounter>(entity =>
+        {
+            entity.HasKey(c => c.Period);
+
+            entity.Property(c => c.Period)
+                  .HasMaxLength(6);
         });
 
         // Configure Invoice entity

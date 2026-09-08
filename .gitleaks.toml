@@ -23,6 +23,18 @@ regexes = [
   '''\*\*\*REMOVED''',
 ]
 
+# Khai báo biến C# nhận giá trị từ biểu thức (member access, gọi hàm, ??) chứ
+# không phải literal — ví dụ:
+#   var password = createDto.Password ?? GenerateRandomPassword();
+#   var seedPassword = Environment.GetEnvironmentVariable("SEED_ADMIN_PASSWORD");
+# Soi cả dòng (regexTarget = "line") để bắt buộc có ngữ cảnh khai báo biến, và
+# yêu cầu giá trị không mở đầu bằng dấu nháy — `var password = "literal";` vẫn bị bắt.
+[[rules.allowlist]]
+regexTarget = "line"
+regexes = [
+  '''^\s*(?:#|//)?\s*(?:var|string\??|const\s+string|(?:static\s+)?readonly\s+string)\s+[A-Za-z0-9_]*(?i:password)[A-Za-z0-9_]*\s*=\s*[^"'\s](?:[^"']|"[A-Z0-9_]+")*$''',
+]
+
 [[rules]]
 id = "postgres-url-password"
 description = "Password nhúng trong URL postgres/postgresql/mysql/mongodb"

@@ -14,12 +14,10 @@ namespace RentalManagement.Api.Controllers;
 public class ReportsController : ControllerBase
 {
     private readonly IReportingService _reportingService;
-    private readonly ILogger<ReportsController> _logger;
 
-    public ReportsController(IReportingService reportingService, ILogger<ReportsController> logger)
+    public ReportsController(IReportingService reportingService)
     {
         _reportingService = reportingService;
-        _logger = logger;
     }
 
     /// <summary>
@@ -30,19 +28,11 @@ public class ReportsController : ControllerBase
     /// <returns>Occupancy rate statistics</returns>
     [HttpGet("occupancy-rate")]
     public async Task<ActionResult<ApiResponse<object>>> GetOccupancyRateReport(
-        [FromQuery] DateTime? fromDate = null, 
+        [FromQuery] DateTime? fromDate = null,
         [FromQuery] DateTime? toDate = null)
     {
-        try
-        {
-            var result = await _reportingService.GetOccupancyRateReportAsync(fromDate, toDate);
-            return Ok(result);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error retrieving occupancy rate report");
-            return StatusCode(500, ApiResponse<object>.ErrorResponse("An error occurred while retrieving occupancy rate report"));
-        }
+        var result = await _reportingService.GetOccupancyRateReportAsync(fromDate, toDate);
+        return Ok(result);
     }
 
     /// <summary>
@@ -53,16 +43,8 @@ public class ReportsController : ControllerBase
     [HttpGet("monthly-revenue/{year}")]
     public async Task<ActionResult<ApiResponse<object>>> GetMonthlyRevenueReport(int year)
     {
-        try
-        {
-            var result = await _reportingService.GetMonthlyRevenueReportAsync(year);
-            return Ok(result);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error retrieving monthly revenue report for year {Year}", year);
-            return StatusCode(500, ApiResponse<object>.ErrorResponse("An error occurred while retrieving monthly revenue report"));
-        }
+        var result = await _reportingService.GetMonthlyRevenueReportAsync(year);
+        return Ok(result);
     }
 
     /// <summary>
@@ -72,16 +54,8 @@ public class ReportsController : ControllerBase
     [HttpGet("outstanding-payments")]
     public async Task<ActionResult<ApiResponse<object>>> GetOutstandingPaymentsReport()
     {
-        try
-        {
-            var result = await _reportingService.GetOutstandingPaymentsReportAsync();
-            return Ok(result);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error retrieving outstanding payments report");
-            return StatusCode(500, ApiResponse<object>.ErrorResponse("An error occurred while retrieving outstanding payments report"));
-        }
+        var result = await _reportingService.GetOutstandingPaymentsReportAsync();
+        return Ok(result);
     }
 
     /// <summary>
@@ -92,19 +66,11 @@ public class ReportsController : ControllerBase
     /// <returns>Financial summary</returns>
     [HttpGet("financial-summary")]
     public async Task<ActionResult<ApiResponse<object>>> GetFinancialSummary(
-        [FromQuery] DateTime fromDate, 
+        [FromQuery] DateTime fromDate,
         [FromQuery] DateTime toDate)
     {
-        try
-        {
-            var result = await _reportingService.GetFinancialSummaryAsync(fromDate, toDate);
-            return Ok(result);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error retrieving financial summary from {FromDate} to {ToDate}", fromDate, toDate);
-            return StatusCode(500, ApiResponse<object>.ErrorResponse("An error occurred while retrieving financial summary"));
-        }
+        var result = await _reportingService.GetFinancialSummaryAsync(fromDate, toDate);
+        return Ok(result);
     }
 
     /// <summary>
@@ -114,16 +80,8 @@ public class ReportsController : ControllerBase
     [HttpGet("tenant-statistics")]
     public async Task<ActionResult<ApiResponse<object>>> GetTenantStatistics()
     {
-        try
-        {
-            var result = await _reportingService.GetTenantStatisticsAsync();
-            return Ok(result);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error retrieving tenant statistics");
-            return StatusCode(500, ApiResponse<object>.ErrorResponse("An error occurred while retrieving tenant statistics"));
-        }
+        var result = await _reportingService.GetTenantStatisticsAsync();
+        return Ok(result);
     }
 
     /// <summary>
@@ -133,16 +91,8 @@ public class ReportsController : ControllerBase
     [HttpGet("room-utilization")]
     public async Task<ActionResult<ApiResponse<object>>> GetRoomUtilizationReport()
     {
-        try
-        {
-            var result = await _reportingService.GetRoomUtilizationReportAsync();
-            return Ok(result);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error retrieving room utilization report");
-            return StatusCode(500, ApiResponse<object>.ErrorResponse("An error occurred while retrieving room utilization report"));
-        }
+        var result = await _reportingService.GetRoomUtilizationReportAsync();
+        return Ok(result);
     }
 
     /// <summary>
@@ -153,19 +103,11 @@ public class ReportsController : ControllerBase
     /// <returns>Payment method distribution</returns>
     [HttpGet("payment-method-distribution")]
     public async Task<ActionResult<ApiResponse<object>>> GetPaymentMethodDistribution(
-        [FromQuery] DateTime? fromDate = null, 
+        [FromQuery] DateTime? fromDate = null,
         [FromQuery] DateTime? toDate = null)
     {
-        try
-        {
-            var result = await _reportingService.GetPaymentMethodDistributionAsync(fromDate, toDate);
-            return Ok(result);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error retrieving payment method distribution report");
-            return StatusCode(500, ApiResponse<object>.ErrorResponse("An error occurred while retrieving payment method distribution report"));
-        }
+        var result = await _reportingService.GetPaymentMethodDistributionAsync(fromDate, toDate);
+        return Ok(result);
     }
 
     /// <summary>
@@ -175,16 +117,8 @@ public class ReportsController : ControllerBase
     [HttpGet("dashboard-summary")]
     public async Task<ActionResult<ApiResponse<object>>> GetDashboardSummary()
     {
-        try
-        {
-            var result = await _reportingService.GetDashboardSummaryAsync();
-            return Ok(result);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error retrieving dashboard summary");
-            return StatusCode(500, ApiResponse<object>.ErrorResponse("An error occurred while retrieving dashboard summary"));
-        }
+        var result = await _reportingService.GetDashboardSummaryAsync();
+        return Ok(result);
     }
 
     /// <summary>
@@ -196,26 +130,18 @@ public class ReportsController : ControllerBase
     /// <returns>CSV file content</returns>
     [HttpGet("export/{reportType}")]
     public async Task<ActionResult> ExportToCsv(
-        string reportType, 
-        [FromQuery] DateTime? fromDate = null, 
+        string reportType,
+        [FromQuery] DateTime? fromDate = null,
         [FromQuery] DateTime? toDate = null)
     {
-        try
-        {
-            var result = await _reportingService.ExportToCsvAsync(reportType, fromDate, toDate);
-            
-            if (!result.Success)
-            {
-                return BadRequest(result);
-            }
+        var result = await _reportingService.ExportToCsvAsync(reportType, fromDate, toDate);
 
-            var fileName = $"{reportType}_report_{DateTime.Now:yyyyMMdd_HHmmss}.csv";
-            return File(result.Data!, "text/csv", fileName);
-        }
-        catch (Exception ex)
+        if (!result.Success)
         {
-            _logger.LogError(ex, "Error exporting {ReportType} report to CSV", reportType);
-            return StatusCode(500, ApiResponse<byte[]>.ErrorResponse("An error occurred while exporting report to CSV"));
+            return BadRequest(result);
         }
+
+        var fileName = $"{reportType}_report_{DateTime.UtcNow:yyyyMMdd_HHmmss}.csv";
+        return File(result.Data!, "text/csv", fileName);
     }
 }

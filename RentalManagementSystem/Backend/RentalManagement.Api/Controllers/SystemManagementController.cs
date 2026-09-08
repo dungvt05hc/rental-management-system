@@ -15,16 +15,13 @@ public class SystemManagementController : ControllerBase
 {
     private readonly ISystemManagementService _systemManagementService;
     private readonly IUserManagementService _userManagementService;
-    private readonly ILogger<SystemManagementController> _logger;
 
     public SystemManagementController(
         ISystemManagementService systemManagementService,
-        IUserManagementService userManagementService,
-        ILogger<SystemManagementController> logger)
+        IUserManagementService userManagementService)
     {
         _systemManagementService = systemManagementService;
         _userManagementService = userManagementService;
-        _logger = logger;
     }
 
     /// <summary>
@@ -34,16 +31,8 @@ public class SystemManagementController : ControllerBase
     [ProducesResponseType(typeof(SystemInfoDto), StatusCodes.Status200OK)]
     public async Task<ActionResult<SystemInfoDto>> GetSystemInfo()
     {
-        try
-        {
-            var systemInfo = await _systemManagementService.GetSystemInfoAsync();
-            return Ok(systemInfo);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error retrieving system information");
-            return StatusCode(500, new { message = "An error occurred while retrieving system information" });
-        }
+        var systemInfo = await _systemManagementService.GetSystemInfoAsync();
+        return Ok(systemInfo);
     }
 
     /// <summary>
@@ -53,16 +42,8 @@ public class SystemManagementController : ControllerBase
     [ProducesResponseType(typeof(IEnumerable<SystemSettingDto>), StatusCodes.Status200OK)]
     public async Task<ActionResult<IEnumerable<SystemSettingDto>>> GetAllSettings()
     {
-        try
-        {
-            var settings = await _systemManagementService.GetAllSettingsAsync();
-            return Ok(settings);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error retrieving system settings");
-            return StatusCode(500, new { message = "An error occurred while retrieving settings" });
-        }
+        var settings = await _systemManagementService.GetAllSettingsAsync();
+        return Ok(settings);
     }
 
     /// <summary>
@@ -72,16 +53,8 @@ public class SystemManagementController : ControllerBase
     [ProducesResponseType(typeof(IEnumerable<SystemSettingsByCategoryDto>), StatusCodes.Status200OK)]
     public async Task<ActionResult<IEnumerable<SystemSettingsByCategoryDto>>> GetSettingsByCategory()
     {
-        try
-        {
-            var settings = await _systemManagementService.GetSettingsByCategoryAsync();
-            return Ok(settings);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error retrieving settings by category");
-            return StatusCode(500, new { message = "An error occurred while retrieving settings" });
-        }
+        var settings = await _systemManagementService.GetSettingsByCategoryAsync();
+        return Ok(settings);
     }
 
     /// <summary>
@@ -92,22 +65,14 @@ public class SystemManagementController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<SystemSettingDto>> GetSettingByKey(string key)
     {
-        try
-        {
-            var setting = await _systemManagementService.GetSettingByKeyAsync(key);
-            
-            if (setting is null)
-            {
-                return NotFound(new { message = $"Setting with key '{key}' not found" });
-            }
+        var setting = await _systemManagementService.GetSettingByKeyAsync(key);
 
-            return Ok(setting);
-        }
-        catch (Exception ex)
+        if (setting is null)
         {
-            _logger.LogError(ex, "Error retrieving setting {Key}", key);
-            return StatusCode(500, new { message = "An error occurred while retrieving the setting" });
+            return NotFound(new { message = $"Setting with key '{key}' not found" });
         }
+
+        return Ok(setting);
     }
 
     /// <summary>
@@ -117,16 +82,8 @@ public class SystemManagementController : ControllerBase
     [ProducesResponseType(typeof(IEnumerable<SystemSettingDto>), StatusCodes.Status200OK)]
     public async Task<ActionResult<IEnumerable<SystemSettingDto>>> GetSettingsByCategoryName(string category)
     {
-        try
-        {
-            var settings = await _systemManagementService.GetSettingsByCategoryNameAsync(category);
-            return Ok(settings);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error retrieving settings for category {Category}", category);
-            return StatusCode(500, new { message = "An error occurred while retrieving settings" });
-        }
+        var settings = await _systemManagementService.GetSettingsByCategoryNameAsync(category);
+        return Ok(settings);
     }
 
     /// <summary>
@@ -137,21 +94,18 @@ public class SystemManagementController : ControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<SystemSettingDto>> CreateSetting([FromBody] CreateSystemSettingDto createDto)
     {
+        var userId = User.FindFirst("id")?.Value ?? "Unknown";
+
         try
         {
-            var userId = User.FindFirst("id")?.Value ?? "Unknown";
             var setting = await _systemManagementService.CreateSettingAsync(createDto, userId);
-            
             return CreatedAtAction(nameof(GetSettingByKey), new { key = setting.Key }, setting);
         }
         catch (InvalidOperationException ex)
         {
+            // Domain rule violation (duplicate key, read-only setting, …) — the service
+            // message is written for the caller, so it is safe to surface.
             return BadRequest(new { message = ex.Message });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error creating system setting");
-            return StatusCode(500, new { message = "An error occurred while creating the setting" });
         }
     }
 
@@ -164,21 +118,16 @@ public class SystemManagementController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<SystemSettingDto>> UpdateSetting(string key, [FromBody] UpdateSystemSettingDto updateDto)
     {
+        var userId = User.FindFirst("id")?.Value ?? "Unknown";
+
         try
         {
-            var userId = User.FindFirst("id")?.Value ?? "Unknown";
             var setting = await _systemManagementService.UpdateSettingAsync(key, updateDto, userId);
-            
             return Ok(setting);
         }
         catch (InvalidOperationException ex)
         {
             return BadRequest(new { message = ex.Message });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error updating system setting {Key}", key);
-            return StatusCode(500, new { message = "An error occurred while updating the setting" });
         }
     }
 
@@ -190,18 +139,10 @@ public class SystemManagementController : ControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> BulkUpdateSettings([FromBody] BulkUpdateSettingsDto bulkUpdateDto)
     {
-        try
-        {
-            var userId = User.FindFirst("id")?.Value ?? "Unknown";
-            var updatedCount = await _systemManagementService.BulkUpdateSettingsAsync(bulkUpdateDto, userId);
-            
-            return Ok(new { message = $"Successfully updated {updatedCount} settings", count = updatedCount });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error bulk updating system settings");
-            return StatusCode(500, new { message = "An error occurred while updating settings" });
-        }
+        var userId = User.FindFirst("id")?.Value ?? "Unknown";
+        var updatedCount = await _systemManagementService.BulkUpdateSettingsAsync(bulkUpdateDto, userId);
+
+        return Ok(new { message = $"Successfully updated {updatedCount} settings", count = updatedCount });
     }
 
     /// <summary>
@@ -216,7 +157,7 @@ public class SystemManagementController : ControllerBase
         try
         {
             var result = await _systemManagementService.DeleteSettingAsync(key);
-            
+
             if (!result)
             {
                 return NotFound(new { message = $"Setting with key '{key}' not found" });
@@ -228,11 +169,6 @@ public class SystemManagementController : ControllerBase
         {
             return BadRequest(new { message = ex.Message });
         }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error deleting system setting {Key}", key);
-            return StatusCode(500, new { message = "An error occurred while deleting the setting" });
-        }
     }
 
     /// <summary>
@@ -242,16 +178,8 @@ public class SystemManagementController : ControllerBase
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> SeedDefaultSettings()
     {
-        try
-        {
-            await _systemManagementService.SeedDefaultSettingsAsync();
-            return Ok(new { message = "Default system settings seeded successfully" });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error seeding default settings");
-            return StatusCode(500, new { message = "An error occurred while seeding settings" });
-        }
+        await _systemManagementService.SeedDefaultSettingsAsync();
+        return Ok(new { message = "Default system settings seeded successfully" });
     }
 
     /// <summary>
@@ -261,20 +189,12 @@ public class SystemManagementController : ControllerBase
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> ExportSettings()
     {
-        try
-        {
-            var json = await _systemManagementService.ExportSettingsAsync();
-            return File(
-                System.Text.Encoding.UTF8.GetBytes(json),
-                "application/json",
-                $"system-settings-{DateTime.UtcNow:yyyyMMdd-HHmmss}.json"
-            );
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error exporting system settings");
-            return StatusCode(500, new { message = "An error occurred while exporting settings" });
-        }
+        var json = await _systemManagementService.ExportSettingsAsync();
+        return File(
+            System.Text.Encoding.UTF8.GetBytes(json),
+            "application/json",
+            $"system-settings-{DateTime.UtcNow:yyyyMMdd-HHmmss}.json"
+        );
     }
 
     /// <summary>
@@ -285,21 +205,16 @@ public class SystemManagementController : ControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> ImportSettings([FromBody] string jsonData)
     {
+        var userId = User.FindFirst("id")?.Value ?? "Unknown";
+
         try
         {
-            var userId = User.FindFirst("id")?.Value ?? "Unknown";
             var importedCount = await _systemManagementService.ImportSettingsAsync(jsonData, userId);
-            
             return Ok(new { message = $"Successfully imported {importedCount} settings", count = importedCount });
         }
         catch (InvalidOperationException ex)
         {
             return BadRequest(new { message = ex.Message });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error importing system settings");
-            return StatusCode(500, new { message = "An error occurred while importing settings" });
         }
     }
 
@@ -312,16 +227,8 @@ public class SystemManagementController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<PaginatedUsersDto>), StatusCodes.Status200OK)]
     public async Task<ActionResult<ApiResponse<PaginatedUsersDto>>> GetUsers([FromQuery] UserFilterDto filter)
     {
-        try
-        {
-            var result = await _userManagementService.GetUsersAsync(filter);
-            return Ok(result);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error retrieving users");
-            return StatusCode(500, ApiResponse<PaginatedUsersDto>.ErrorResponse("An error occurred while retrieving users"));
-        }
+        var result = await _userManagementService.GetUsersAsync(filter);
+        return Ok(result);
     }
 
     /// <summary>
@@ -332,22 +239,14 @@ public class SystemManagementController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<ApiResponse<UserDto>>> GetUserById(string userId)
     {
-        try
-        {
-            var result = await _userManagementService.GetUserByIdAsync(userId);
-            
-            if (!result.Success)
-            {
-                return NotFound(result);
-            }
+        var result = await _userManagementService.GetUserByIdAsync(userId);
 
-            return Ok(result);
-        }
-        catch (Exception ex)
+        if (!result.Success)
         {
-            _logger.LogError(ex, "Error retrieving user {UserId}", userId);
-            return StatusCode(500, ApiResponse<UserDto>.ErrorResponse("An error occurred while retrieving user"));
+            return NotFound(result);
         }
+
+        return Ok(result);
     }
 
     /// <summary>
@@ -358,23 +257,15 @@ public class SystemManagementController : ControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<ApiResponse<UserDto>>> CreateUser([FromBody] CreateUserDto createDto)
     {
-        try
-        {
-            var userId = User.FindFirst("id")?.Value ?? "Unknown";
-            var result = await _userManagementService.CreateUserAsync(createDto, userId);
-            
-            if (!result.Success)
-            {
-                return BadRequest(result);
-            }
+        var userId = User.FindFirst("id")?.Value ?? "Unknown";
+        var result = await _userManagementService.CreateUserAsync(createDto, userId);
 
-            return CreatedAtAction(nameof(GetUserById), new { userId = result.Data!.Id }, result);
-        }
-        catch (Exception ex)
+        if (!result.Success)
         {
-            _logger.LogError(ex, "Error creating user");
-            return StatusCode(500, ApiResponse<UserDto>.ErrorResponse("An error occurred while creating user"));
+            return BadRequest(result);
         }
+
+        return CreatedAtAction(nameof(GetUserById), new { userId = result.Data!.Id }, result);
     }
 
     /// <summary>
@@ -386,23 +277,15 @@ public class SystemManagementController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<ApiResponse<UserDto>>> UpdateUser(string userId, [FromBody] UpdateUserProfileDto updateDto)
     {
-        try
-        {
-            var currentUserId = User.FindFirst("id")?.Value ?? "Unknown";
-            var result = await _userManagementService.UpdateUserAsync(userId, updateDto, currentUserId);
-            
-            if (!result.Success)
-            {
-                return result.Message.Contains("not found") ? NotFound(result) : BadRequest(result);
-            }
+        var currentUserId = User.FindFirst("id")?.Value ?? "Unknown";
+        var result = await _userManagementService.UpdateUserAsync(userId, updateDto, currentUserId);
 
-            return Ok(result);
-        }
-        catch (Exception ex)
+        if (!result.Success)
         {
-            _logger.LogError(ex, "Error updating user {UserId}", userId);
-            return StatusCode(500, ApiResponse<UserDto>.ErrorResponse("An error occurred while updating user"));
+            return result.Message.Contains("not found") ? NotFound(result) : BadRequest(result);
         }
+
+        return Ok(result);
     }
 
     /// <summary>
@@ -414,23 +297,15 @@ public class SystemManagementController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<ApiResponse<bool>>> DeleteUser(string userId)
     {
-        try
-        {
-            var currentUserId = User.FindFirst("id")?.Value ?? "Unknown";
-            var result = await _userManagementService.DeleteUserAsync(userId, currentUserId);
-            
-            if (!result.Success)
-            {
-                return result.Message.Contains("not found") ? NotFound(result) : BadRequest(result);
-            }
+        var currentUserId = User.FindFirst("id")?.Value ?? "Unknown";
+        var result = await _userManagementService.DeleteUserAsync(userId, currentUserId);
 
-            return Ok(result);
-        }
-        catch (Exception ex)
+        if (!result.Success)
         {
-            _logger.LogError(ex, "Error deleting user {UserId}", userId);
-            return StatusCode(500, ApiResponse<bool>.ErrorResponse("An error occurred while deleting user"));
+            return result.Message.Contains("not found") ? NotFound(result) : BadRequest(result);
         }
+
+        return Ok(result);
     }
 
     /// <summary>
@@ -442,23 +317,15 @@ public class SystemManagementController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<ApiResponse<bool>>> SetUserActivation(string userId, [FromBody] UserActivationDto activationDto)
     {
-        try
-        {
-            var currentUserId = User.FindFirst("id")?.Value ?? "Unknown";
-            var result = await _userManagementService.SetUserActivationAsync(userId, activationDto, currentUserId);
-            
-            if (!result.Success)
-            {
-                return result.Message.Contains("not found") ? NotFound(result) : BadRequest(result);
-            }
+        var currentUserId = User.FindFirst("id")?.Value ?? "Unknown";
+        var result = await _userManagementService.SetUserActivationAsync(userId, activationDto, currentUserId);
 
-            return Ok(result);
-        }
-        catch (Exception ex)
+        if (!result.Success)
         {
-            _logger.LogError(ex, "Error setting user activation for {UserId}", userId);
-            return StatusCode(500, ApiResponse<bool>.ErrorResponse("An error occurred while updating user activation"));
+            return result.Message.Contains("not found") ? NotFound(result) : BadRequest(result);
         }
+
+        return Ok(result);
     }
 
     /// <summary>
@@ -470,23 +337,15 @@ public class SystemManagementController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<ApiResponse<bool>>> ResetUserPassword(string userId, [FromBody] ResetUserPasswordDto resetDto)
     {
-        try
-        {
-            var currentUserId = User.FindFirst("id")?.Value ?? "Unknown";
-            var result = await _userManagementService.ResetUserPasswordAsync(userId, resetDto, currentUserId);
-            
-            if (!result.Success)
-            {
-                return result.Message.Contains("not found") ? NotFound(result) : BadRequest(result);
-            }
+        var currentUserId = User.FindFirst("id")?.Value ?? "Unknown";
+        var result = await _userManagementService.ResetUserPasswordAsync(userId, resetDto, currentUserId);
 
-            return Ok(result);
-        }
-        catch (Exception ex)
+        if (!result.Success)
         {
-            _logger.LogError(ex, "Error resetting password for user {UserId}", userId);
-            return StatusCode(500, ApiResponse<bool>.ErrorResponse("An error occurred while resetting password"));
+            return result.Message.Contains("not found") ? NotFound(result) : BadRequest(result);
         }
+
+        return Ok(result);
     }
 
     /// <summary>
@@ -498,23 +357,15 @@ public class SystemManagementController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<ApiResponse<bool>>> AssignRoles(string userId, [FromBody] List<string> roles)
     {
-        try
-        {
-            var currentUserId = User.FindFirst("id")?.Value ?? "Unknown";
-            var result = await _userManagementService.AssignRolesAsync(userId, roles, currentUserId);
-            
-            if (!result.Success)
-            {
-                return result.Message.Contains("not found") ? NotFound(result) : BadRequest(result);
-            }
+        var currentUserId = User.FindFirst("id")?.Value ?? "Unknown";
+        var result = await _userManagementService.AssignRolesAsync(userId, roles, currentUserId);
 
-            return Ok(result);
-        }
-        catch (Exception ex)
+        if (!result.Success)
         {
-            _logger.LogError(ex, "Error assigning roles to user {UserId}", userId);
-            return StatusCode(500, ApiResponse<bool>.ErrorResponse("An error occurred while assigning roles"));
+            return result.Message.Contains("not found") ? NotFound(result) : BadRequest(result);
         }
+
+        return Ok(result);
     }
 
     /// <summary>
@@ -526,23 +377,15 @@ public class SystemManagementController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<ApiResponse<bool>>> RemoveRoles(string userId, [FromBody] List<string> roles)
     {
-        try
-        {
-            var currentUserId = User.FindFirst("id")?.Value ?? "Unknown";
-            var result = await _userManagementService.RemoveRolesAsync(userId, roles, currentUserId);
-            
-            if (!result.Success)
-            {
-                return result.Message.Contains("not found") ? NotFound(result) : BadRequest(result);
-            }
+        var currentUserId = User.FindFirst("id")?.Value ?? "Unknown";
+        var result = await _userManagementService.RemoveRolesAsync(userId, roles, currentUserId);
 
-            return Ok(result);
-        }
-        catch (Exception ex)
+        if (!result.Success)
         {
-            _logger.LogError(ex, "Error removing roles from user {UserId}", userId);
-            return StatusCode(500, ApiResponse<bool>.ErrorResponse("An error occurred while removing roles"));
+            return result.Message.Contains("not found") ? NotFound(result) : BadRequest(result);
         }
+
+        return Ok(result);
     }
 
     /// <summary>
@@ -552,16 +395,8 @@ public class SystemManagementController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<IEnumerable<RoleDto>>), StatusCodes.Status200OK)]
     public async Task<ActionResult<ApiResponse<IEnumerable<RoleDto>>>> GetAvailableRoles()
     {
-        try
-        {
-            var result = await _userManagementService.GetAvailableRolesAsync();
-            return Ok(result);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error retrieving available roles");
-            return StatusCode(500, ApiResponse<IEnumerable<RoleDto>>.ErrorResponse("An error occurred while retrieving roles"));
-        }
+        var result = await _userManagementService.GetAvailableRolesAsync();
+        return Ok(result);
     }
 
     /// <summary>
@@ -571,16 +406,8 @@ public class SystemManagementController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<UserStatisticsDto>), StatusCodes.Status200OK)]
     public async Task<ActionResult<ApiResponse<UserStatisticsDto>>> GetUserStatistics()
     {
-        try
-        {
-            var result = await _userManagementService.GetUserStatisticsAsync();
-            return Ok(result);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error retrieving user statistics");
-            return StatusCode(500, ApiResponse<UserStatisticsDto>.ErrorResponse("An error occurred while retrieving statistics"));
-        }
+        var result = await _userManagementService.GetUserStatisticsAsync();
+        return Ok(result);
     }
 
     /// <summary>
@@ -591,23 +418,15 @@ public class SystemManagementController : ControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<ApiResponse<int>>> BulkUserOperation([FromBody] BulkUserOperationDto bulkOperation)
     {
-        try
-        {
-            var currentUserId = User.FindFirst("id")?.Value ?? "Unknown";
-            var result = await _userManagementService.BulkUserOperationAsync(bulkOperation, currentUserId);
-            
-            if (!result.Success)
-            {
-                return BadRequest(result);
-            }
+        var currentUserId = User.FindFirst("id")?.Value ?? "Unknown";
+        var result = await _userManagementService.BulkUserOperationAsync(bulkOperation, currentUserId);
 
-            return Ok(result);
-        }
-        catch (Exception ex)
+        if (!result.Success)
         {
-            _logger.LogError(ex, "Error performing bulk user operation");
-            return StatusCode(500, ApiResponse<int>.ErrorResponse("An error occurred during bulk operation"));
+            return BadRequest(result);
         }
+
+        return Ok(result);
     }
 
     /// <summary>
@@ -618,22 +437,14 @@ public class SystemManagementController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<ApiResponse<IEnumerable<string>>>> GetUserAuditLog(string userId, [FromQuery] int limit = 50)
     {
-        try
-        {
-            var result = await _userManagementService.GetUserAuditLogAsync(userId, limit);
-            
-            if (!result.Success)
-            {
-                return NotFound(result);
-            }
+        var result = await _userManagementService.GetUserAuditLogAsync(userId, limit);
 
-            return Ok(result);
-        }
-        catch (Exception ex)
+        if (!result.Success)
         {
-            _logger.LogError(ex, "Error retrieving audit log for user {UserId}", userId);
-            return StatusCode(500, ApiResponse<IEnumerable<string>>.ErrorResponse("An error occurred while retrieving audit log"));
+            return NotFound(result);
         }
+
+        return Ok(result);
     }
 
     #endregion

@@ -10,6 +10,7 @@ using Microsoft.OpenApi.Models;
 using Npgsql;
 using RentalManagement.Api.Data;
 using RentalManagement.Api.Mappings;
+using RentalManagement.Api.Middleware;
 using RentalManagement.Api.Models.Entities;
 using RentalManagement.Api.Services.Implementations;
 using RentalManagement.Api.Services.Interfaces;
@@ -313,6 +314,10 @@ builder.Services.AddSwaggerGen(c =>
 });
 
 var app = builder.Build();
+
+// Must be first: catches exceptions thrown anywhere further down the pipeline,
+// including CORS, authentication and authorization.
+app.UseMiddleware<ExceptionHandlerMiddleware>();
 
 // Configure the HTTP request pipeline
 if (app.Environment.IsDevelopment())

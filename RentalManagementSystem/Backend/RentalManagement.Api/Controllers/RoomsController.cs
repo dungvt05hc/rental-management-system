@@ -15,12 +15,10 @@ namespace RentalManagement.Api.Controllers;
 public class RoomsController : ControllerBase
 {
     private readonly IRoomService _roomService;
-    private readonly ILogger<RoomsController> _logger;
 
-    public RoomsController(IRoomService roomService, ILogger<RoomsController> logger)
+    public RoomsController(IRoomService roomService)
     {
         _roomService = roomService;
-        _logger = logger;
     }
 
     /// <summary>
@@ -31,16 +29,8 @@ public class RoomsController : ControllerBase
     [HttpGet]
     public async Task<ActionResult<ApiResponse<PagedResponse<RoomDto>>>> GetRooms([FromQuery] RoomSearchDto searchDto)
     {
-        try
-        {
-            var result = await _roomService.GetRoomsAsync(searchDto);
-            return Ok(result);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error retrieving rooms");
-            return StatusCode(500, ApiResponse<PagedResponse<RoomDto>>.ErrorResponse("An error occurred while retrieving rooms"));
-        }
+        var result = await _roomService.GetRoomsAsync(searchDto);
+        return Ok(result);
     }
 
     /// <summary>
@@ -51,22 +41,14 @@ public class RoomsController : ControllerBase
     [HttpGet("{id}")]
     public async Task<ActionResult<ApiResponse<RoomDto>>> GetRoom(int id)
     {
-        try
-        {
-            var result = await _roomService.GetRoomByIdAsync(id);
-            
-            if (!result.Success)
-            {
-                return NotFound(result);
-            }
+        var result = await _roomService.GetRoomByIdAsync(id);
 
-            return Ok(result);
-        }
-        catch (Exception ex)
+        if (!result.Success)
         {
-            _logger.LogError(ex, "Error retrieving room {Id}", id);
-            return StatusCode(500, ApiResponse<RoomDto>.ErrorResponse("An error occurred while retrieving the room"));
+            return NotFound(result);
         }
+
+        return Ok(result);
     }
 
     /// <summary>
@@ -78,22 +60,14 @@ public class RoomsController : ControllerBase
     [Authorize(Roles = "Admin,Manager")]
     public async Task<ActionResult<ApiResponse<RoomDto>>> CreateRoom([FromBody] CreateRoomDto createRoomDto)
     {
-        try
-        {
-            var result = await _roomService.CreateRoomAsync(createRoomDto);
-            
-            if (!result.Success)
-            {
-                return BadRequest(result);
-            }
+        var result = await _roomService.CreateRoomAsync(createRoomDto);
 
-            return CreatedAtAction(nameof(GetRoom), new { id = result.Data!.Id }, result);
-        }
-        catch (Exception ex)
+        if (!result.Success)
         {
-            _logger.LogError(ex, "Error creating room");
-            return StatusCode(500, ApiResponse<RoomDto>.ErrorResponse("An error occurred while creating the room"));
+            return BadRequest(result);
         }
+
+        return CreatedAtAction(nameof(GetRoom), new { id = result.Data!.Id }, result);
     }
 
     /// <summary>
@@ -106,22 +80,14 @@ public class RoomsController : ControllerBase
     [Authorize(Roles = "Admin,Manager")]
     public async Task<ActionResult<ApiResponse<RoomDto>>> UpdateRoom(int id, [FromBody] UpdateRoomDto updateRoomDto)
     {
-        try
-        {
-            var result = await _roomService.UpdateRoomAsync(id, updateRoomDto);
-            
-            if (!result.Success)
-            {
-                return BadRequest(result);
-            }
+        var result = await _roomService.UpdateRoomAsync(id, updateRoomDto);
 
-            return Ok(result);
-        }
-        catch (Exception ex)
+        if (!result.Success)
         {
-            _logger.LogError(ex, "Error updating room {Id}", id);
-            return StatusCode(500, ApiResponse<RoomDto>.ErrorResponse("An error occurred while updating the room"));
+            return BadRequest(result);
         }
+
+        return Ok(result);
     }
 
     /// <summary>
@@ -133,22 +99,14 @@ public class RoomsController : ControllerBase
     [Authorize(Roles = "Admin")]
     public async Task<ActionResult<ApiResponse<bool>>> DeleteRoom(int id)
     {
-        try
-        {
-            var result = await _roomService.DeleteRoomAsync(id);
-            
-            if (!result.Success)
-            {
-                return BadRequest(result);
-            }
+        var result = await _roomService.DeleteRoomAsync(id);
 
-            return Ok(result);
-        }
-        catch (Exception ex)
+        if (!result.Success)
         {
-            _logger.LogError(ex, "Error deleting room {Id}", id);
-            return StatusCode(500, ApiResponse<bool>.ErrorResponse("An error occurred while deleting the room"));
+            return BadRequest(result);
         }
+
+        return Ok(result);
     }
 
     /// <summary>
@@ -158,16 +116,8 @@ public class RoomsController : ControllerBase
     [HttpGet("available")]
     public async Task<ActionResult<ApiResponse<IEnumerable<RoomDto>>>> GetAvailableRooms()
     {
-        try
-        {
-            var result = await _roomService.GetAvailableRoomsAsync();
-            return Ok(result);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error retrieving available rooms");
-            return StatusCode(500, ApiResponse<IEnumerable<RoomDto>>.ErrorResponse("An error occurred while retrieving available rooms"));
-        }
+        var result = await _roomService.GetAvailableRoomsAsync();
+        return Ok(result);
     }
 
     /// <summary>
@@ -178,16 +128,8 @@ public class RoomsController : ControllerBase
     [HttpGet("status/{status}")]
     public async Task<ActionResult<ApiResponse<IEnumerable<RoomDto>>>> GetRoomsByStatus(RoomStatus status)
     {
-        try
-        {
-            var result = await _roomService.GetRoomsByStatusAsync(status);
-            return Ok(result);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error retrieving rooms by status {Status}", status);
-            return StatusCode(500, ApiResponse<IEnumerable<RoomDto>>.ErrorResponse("An error occurred while retrieving rooms by status"));
-        }
+        var result = await _roomService.GetRoomsByStatusAsync(status);
+        return Ok(result);
     }
 
     /// <summary>
@@ -200,22 +142,14 @@ public class RoomsController : ControllerBase
     [Authorize(Roles = "Admin,Manager,Staff")]
     public async Task<ActionResult<ApiResponse<bool>>> ChangeRoomStatus(int id, RoomStatus status)
     {
-        try
-        {
-            var result = await _roomService.ChangeRoomStatusAsync(id, status);
-            
-            if (!result.Success)
-            {
-                return BadRequest(result);
-            }
+        var result = await _roomService.ChangeRoomStatusAsync(id, status);
 
-            return Ok(result);
-        }
-        catch (Exception ex)
+        if (!result.Success)
         {
-            _logger.LogError(ex, "Error changing room {Id} status to {Status}", id, status);
-            return StatusCode(500, ApiResponse<bool>.ErrorResponse("An error occurred while changing room status"));
+            return BadRequest(result);
         }
+
+        return Ok(result);
     }
 
     /// <summary>
@@ -226,15 +160,7 @@ public class RoomsController : ControllerBase
     [Authorize(Roles = "Admin,Manager")]
     public async Task<ActionResult<ApiResponse<object>>> GetRoomOccupancyStats()
     {
-        try
-        {
-            var result = await _roomService.GetRoomOccupancyStatsAsync();
-            return Ok(result);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error retrieving room occupancy statistics");
-            return StatusCode(500, ApiResponse<object>.ErrorResponse("An error occurred while retrieving room statistics"));
-        }
+        var result = await _roomService.GetRoomOccupancyStatsAsync();
+        return Ok(result);
     }
 }

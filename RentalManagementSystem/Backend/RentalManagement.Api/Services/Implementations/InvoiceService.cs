@@ -31,26 +31,38 @@ public class InvoiceService : IInvoiceService
     /// </summary>
     public async Task<ApiResponse<InvoiceDto>> CreateInvoiceAsync(CreateInvoiceDto createInvoiceDto)
     {
-        try
+        // Validate tenant exists
+        var tenant = await _context.Tenants
+            .Include(t => t.Room)
+            .FirstOrDefaultAsync(t => t.Id == createInvoiceDto.TenantId);
+
+        if (tenant == null)
         {
-            // Validate tenant exists
-            var tenant = await _context.Tenants
-                .Include(t => t.Room)
-                .FirstOrDefaultAsync(t => t.Id == createInvoiceDto.TenantId);
+            return ApiResponse<InvoiceDto>.ErrorResponse("Tenant not found");
+        }
 
-            if (tenant == null)
-            {
-                return ApiResponse<InvoiceDto>.ErrorResponse("Tenant not found");
-            }
+        if (tenant.Room == null)
+        {
+            return ApiResponse<InvoiceDto>.ErrorResponse("Tenant must be assigned to a room");
+        }
 
-            if (tenant.Room == null)
-            {
-                return ApiResponse<InvoiceDto>.ErrorResponse("Tenant must be assigned to a room");
-            }
+        // Get monthly rent from the room
+        var monthlyRent = tenant.Room.MonthlyRent;
+        var tenantId = tenant.Id;
 
-            // Get monthly rent from the room
-            var monthlyRent = tenant.Room.MonthlyRent;
-            
+        // The three writes below must land together: a failure between them would
+        // otherwise leave an invoice with no line items, or a total that does not
+        // match the items that were written.
+        var strategy = _context.Database.CreateExecutionStrategy();
+
+        return await strategy.ExecuteAsync(async () =>
+        {
+            // A retried attempt must not re-send entities left tracked by the
+            // attempt that failed, so start each attempt from a clean tracker.
+            _context.ChangeTracker.Clear();
+
+            await using var transaction = await _context.Database.BeginTransactionAsync();
+
             // Initialize total amount (will be recalculated from line items if they exist)
             var totalAmount = monthlyRent + createInvoiceDto.AdditionalCharges - createInvoiceDto.Discount;
 
@@ -79,44 +91,41 @@ public class InvoiceService : IInvoiceService
             if (createInvoiceDto.InvoiceItems != null && createInvoiceDto.InvoiceItems.Any())
             {
                 decimal lineItemsTotal = 0m;
-                
+
                 foreach (var itemDto in createInvoiceDto.InvoiceItems)
                 {
                     var invoiceItem = _mapper.Map<InvoiceItem>(itemDto);
                     invoiceItem.InvoiceId = invoice.Id;
-                    
+
                     // Calculate totals for the invoice item
                     invoiceItem.CalculateTotals();
-                    
+
                     _context.InvoiceItems.Add(invoiceItem);
-                    
+
                     // Sum up the line item totals
                     lineItemsTotal += invoiceItem.LineTotalWithTax;
                 }
-                
+
                 await _context.SaveChangesAsync();
-                
+
                 // Recalculate invoice total from line items
                 invoice.TotalAmount = lineItemsTotal;
                 invoice.RemainingBalance = lineItemsTotal;
                 await _context.SaveChangesAsync();
-                
+
                 // Reload invoice with items to include in response
                 await _context.Entry(invoice).Collection(i => i.InvoiceItems).LoadAsync();
             }
 
+            await transaction.CommitAsync();
+
             var invoiceDto = _mapper.Map<InvoiceDto>(invoice);
-            
-            _logger.LogInformation("Created invoice {InvoiceNumber} for tenant {TenantId} with total amount {TotalAmount}", 
-                invoice.InvoiceNumber, tenant.Id, invoice.TotalAmount);
+
+            _logger.LogInformation("Created invoice {InvoiceNumber} for tenant {TenantId} with total amount {TotalAmount}",
+                invoice.InvoiceNumber, tenantId, invoice.TotalAmount);
 
             return ApiResponse<InvoiceDto>.SuccessResponse(invoiceDto, "Invoice created successfully");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error creating invoice for tenant {TenantId}", createInvoiceDto.TenantId);
-            return ApiResponse<InvoiceDto>.ErrorResponse("An error occurred while creating the invoice");
-        }
+        });
     }
 
     /// <summary>
@@ -124,28 +133,20 @@ public class InvoiceService : IInvoiceService
     /// </summary>
     public async Task<ApiResponse<InvoiceDto>> GetInvoiceByIdAsync(int id)
     {
-        try
-        {
-            var invoice = await _context.Invoices
-                .Include(i => i.Tenant)
-                .Include(i => i.Room)
-                .Include(i => i.Payments)
-                .Include(i => i.InvoiceItems)
-                .FirstOrDefaultAsync(i => i.Id == id);
+        var invoice = await _context.Invoices
+            .Include(i => i.Tenant)
+            .Include(i => i.Room)
+            .Include(i => i.Payments)
+            .Include(i => i.InvoiceItems)
+            .FirstOrDefaultAsync(i => i.Id == id);
 
-            if (invoice == null)
-            {
-                return ApiResponse<InvoiceDto>.ErrorResponse("Invoice not found");
-            }
-
-            var invoiceDto = _mapper.Map<InvoiceDto>(invoice);
-            return ApiResponse<InvoiceDto>.SuccessResponse(invoiceDto);
-        }
-        catch (Exception ex)
+        if (invoice == null)
         {
-            _logger.LogError(ex, "Error retrieving invoice {InvoiceId}", id);
-            return ApiResponse<InvoiceDto>.ErrorResponse("An error occurred while retrieving the invoice");
+            return ApiResponse<InvoiceDto>.ErrorResponse("Invoice not found");
         }
+
+        var invoiceDto = _mapper.Map<InvoiceDto>(invoice);
+        return ApiResponse<InvoiceDto>.SuccessResponse(invoiceDto);
     }
 
     /// <summary>
@@ -153,93 +154,85 @@ public class InvoiceService : IInvoiceService
     /// </summary>
     public async Task<ApiResponse<PagedResponse<InvoiceDto>>> GetInvoicesAsync(InvoiceSearchDto searchDto)
     {
-        try
+        var query = _context.Invoices
+            .Include(i => i.Tenant)
+            .Include(i => i.Room)
+            .Include(i => i.Payments)
+            .Include(i => i.InvoiceItems)
+            .AsQueryable();
+
+        // Apply filters
+        if (searchDto.TenantId.HasValue)
         {
-            var query = _context.Invoices
-                .Include(i => i.Tenant)
-                .Include(i => i.Room)
-                .Include(i => i.Payments)
-                .Include(i => i.InvoiceItems)
-                .AsQueryable();
-
-            // Apply filters
-            if (searchDto.TenantId.HasValue)
-            {
-                query = query.Where(i => i.TenantId == searchDto.TenantId.Value);
-            }
-
-            if (searchDto.Status.HasValue)
-            {
-                query = query.Where(i => i.Status == searchDto.Status.Value);
-            }
-
-            if (searchDto.RoomId.HasValue)
-            {
-                query = query.Where(i => i.RoomId == searchDto.RoomId.Value);
-            }
-
-            if (searchDto.BillingPeriod.HasValue)
-            {
-                var billingMonth = new DateTime(searchDto.BillingPeriod.Value.Year, searchDto.BillingPeriod.Value.Month, 1);
-                query = query.Where(i => i.BillingPeriod.Year == billingMonth.Year && i.BillingPeriod.Month == billingMonth.Month);
-            }
-
-            if (searchDto.DueDateFrom.HasValue)
-            {
-                query = query.Where(i => i.DueDate >= searchDto.DueDateFrom.Value);
-            }
-
-            if (searchDto.DueDateTo.HasValue)
-            {
-                query = query.Where(i => i.DueDate <= searchDto.DueDateTo.Value);
-            }
-
-            if (!string.IsNullOrEmpty(searchDto.SearchTerm))
-            {
-                query = query.Where(i => i.InvoiceNumber.Contains(searchDto.SearchTerm) ||
-                                       i.Tenant.FullName.Contains(searchDto.SearchTerm) ||
-                                       i.Room.RoomNumber.Contains(searchDto.SearchTerm));
-            }
-
-            if (searchDto.IsOverdue.HasValue && searchDto.IsOverdue.Value)
-            {
-                query = query.Where(i => i.Status != InvoiceStatus.Paid && i.DueDate < DateTime.UtcNow);
-            }
-
-            // Apply sorting
-            var isDescending = searchDto.SortDirection?.ToLower() == "desc";
-            query = searchDto.SortBy?.ToLower() switch
-            {
-                "invoicenumber" => isDescending ? query.OrderByDescending(i => i.InvoiceNumber) : query.OrderBy(i => i.InvoiceNumber),
-                "totalamount" => isDescending ? query.OrderByDescending(i => i.TotalAmount) : query.OrderBy(i => i.TotalAmount),
-                "duedate" => isDescending ? query.OrderByDescending(i => i.DueDate) : query.OrderBy(i => i.DueDate),
-                "status" => isDescending ? query.OrderByDescending(i => i.Status) : query.OrderBy(i => i.Status),
-                "issuedate" => isDescending ? query.OrderByDescending(i => i.IssueDate) : query.OrderBy(i => i.IssueDate),
-                _ => query.OrderByDescending(i => i.IssueDate)
-            };
-
-            var totalCount = await query.CountAsync();
-            var invoices = await query
-                .Skip((searchDto.Page - 1) * searchDto.PageSize)
-                .Take(searchDto.PageSize)
-                .ToListAsync();
-
-            var invoiceDtos = _mapper.Map<List<InvoiceDto>>(invoices);
-
-            var pagedResponse = PagedResponse<InvoiceDto>.Create(
-                invoiceDtos,
-                searchDto.Page,
-                searchDto.PageSize,
-                totalCount
-            );
-
-            return ApiResponse<PagedResponse<InvoiceDto>>.SuccessResponse(pagedResponse);
+            query = query.Where(i => i.TenantId == searchDto.TenantId.Value);
         }
-        catch (Exception ex)
+
+        if (searchDto.Status.HasValue)
         {
-            _logger.LogError(ex, "Error retrieving invoices");
-            return ApiResponse<PagedResponse<InvoiceDto>>.ErrorResponse("An error occurred while retrieving invoices");
+            query = query.Where(i => i.Status == searchDto.Status.Value);
         }
+
+        if (searchDto.RoomId.HasValue)
+        {
+            query = query.Where(i => i.RoomId == searchDto.RoomId.Value);
+        }
+
+        if (searchDto.BillingPeriod.HasValue)
+        {
+            var billingMonth = new DateTime(searchDto.BillingPeriod.Value.Year, searchDto.BillingPeriod.Value.Month, 1);
+            query = query.Where(i => i.BillingPeriod.Year == billingMonth.Year && i.BillingPeriod.Month == billingMonth.Month);
+        }
+
+        if (searchDto.DueDateFrom.HasValue)
+        {
+            query = query.Where(i => i.DueDate >= searchDto.DueDateFrom.Value);
+        }
+
+        if (searchDto.DueDateTo.HasValue)
+        {
+            query = query.Where(i => i.DueDate <= searchDto.DueDateTo.Value);
+        }
+
+        if (!string.IsNullOrEmpty(searchDto.SearchTerm))
+        {
+            query = query.Where(i => i.InvoiceNumber.Contains(searchDto.SearchTerm) ||
+                                   i.Tenant.FullName.Contains(searchDto.SearchTerm) ||
+                                   i.Room.RoomNumber.Contains(searchDto.SearchTerm));
+        }
+
+        if (searchDto.IsOverdue.HasValue && searchDto.IsOverdue.Value)
+        {
+            query = query.Where(i => i.Status != InvoiceStatus.Paid && i.DueDate < DateTime.UtcNow);
+        }
+
+        // Apply sorting
+        var isDescending = searchDto.SortDirection?.ToLower() == "desc";
+        query = searchDto.SortBy?.ToLower() switch
+        {
+            "invoicenumber" => isDescending ? query.OrderByDescending(i => i.InvoiceNumber) : query.OrderBy(i => i.InvoiceNumber),
+            "totalamount" => isDescending ? query.OrderByDescending(i => i.TotalAmount) : query.OrderBy(i => i.TotalAmount),
+            "duedate" => isDescending ? query.OrderByDescending(i => i.DueDate) : query.OrderBy(i => i.DueDate),
+            "status" => isDescending ? query.OrderByDescending(i => i.Status) : query.OrderBy(i => i.Status),
+            "issuedate" => isDescending ? query.OrderByDescending(i => i.IssueDate) : query.OrderBy(i => i.IssueDate),
+            _ => query.OrderByDescending(i => i.IssueDate)
+        };
+
+        var totalCount = await query.CountAsync();
+        var invoices = await query
+            .Skip((searchDto.Page - 1) * searchDto.PageSize)
+            .Take(searchDto.PageSize)
+            .ToListAsync();
+
+        var invoiceDtos = _mapper.Map<List<InvoiceDto>>(invoices);
+
+        var pagedResponse = PagedResponse<InvoiceDto>.Create(
+            invoiceDtos,
+            searchDto.Page,
+            searchDto.PageSize,
+            totalCount
+        );
+
+        return ApiResponse<PagedResponse<InvoiceDto>>.SuccessResponse(pagedResponse);
     }
 
     /// <summary>
@@ -247,106 +240,98 @@ public class InvoiceService : IInvoiceService
     /// </summary>
     public async Task<ApiResponse<InvoiceDto>> UpdateInvoiceAsync(int id, UpdateInvoiceDto updateInvoiceDto)
     {
-        try
+        var invoice = await _context.Invoices
+            .Include(i => i.InvoiceItems)
+            .FirstOrDefaultAsync(i => i.Id == id);
+
+        if (invoice == null)
         {
-            var invoice = await _context.Invoices
-                .Include(i => i.InvoiceItems)
-                .FirstOrDefaultAsync(i => i.Id == id);
-                
-            if (invoice == null)
+            return ApiResponse<InvoiceDto>.ErrorResponse("Invoice not found");
+        }
+
+        // Don't allow updates to paid invoices
+        if (invoice.Status == InvoiceStatus.Paid)
+        {
+            return ApiResponse<InvoiceDto>.ErrorResponse("Cannot update a paid invoice");
+        }
+
+        // Update properties if provided
+        if (updateInvoiceDto.AdditionalCharges.HasValue)
+            invoice.AdditionalCharges = updateInvoiceDto.AdditionalCharges.Value;
+
+        if (updateInvoiceDto.Discount.HasValue)
+            invoice.Discount = updateInvoiceDto.Discount.Value;
+
+        if (updateInvoiceDto.DueDate.HasValue)
+            invoice.DueDate = NormalizeToUtc(updateInvoiceDto.DueDate.Value);
+
+        if (updateInvoiceDto.Status.HasValue)
+            invoice.Status = updateInvoiceDto.Status.Value;
+
+        // Allow updating these fields even if they are empty strings (to clear them)
+        if (updateInvoiceDto.AdditionalChargesDescription != null)
+            invoice.AdditionalChargesDescription = updateInvoiceDto.AdditionalChargesDescription;
+
+        if (updateInvoiceDto.Notes != null)
+            invoice.Notes = updateInvoiceDto.Notes;
+
+        // Handle invoice items update if provided
+        if (updateInvoiceDto.InvoiceItems != null)
+        {
+            // Remove all existing invoice items
+            if (invoice.InvoiceItems != null && invoice.InvoiceItems.Any())
             {
-                return ApiResponse<InvoiceDto>.ErrorResponse("Invoice not found");
+                _context.InvoiceItems.RemoveRange(invoice.InvoiceItems);
             }
 
-            // Don't allow updates to paid invoices
-            if (invoice.Status == InvoiceStatus.Paid)
+            // Add new invoice items
+            decimal lineItemsTotal = 0m;
+            foreach (var itemDto in updateInvoiceDto.InvoiceItems)
             {
-                return ApiResponse<InvoiceDto>.ErrorResponse("Cannot update a paid invoice");
+                var invoiceItem = _mapper.Map<InvoiceItem>(itemDto);
+                invoiceItem.InvoiceId = invoice.Id;
+
+                // Calculate totals for the invoice item
+                invoiceItem.CalculateTotals();
+
+                _context.InvoiceItems.Add(invoiceItem);
+
+                // Sum up the line item totals
+                lineItemsTotal += invoiceItem.LineTotalWithTax;
             }
 
-            // Update properties if provided
-            if (updateInvoiceDto.AdditionalCharges.HasValue)
-                invoice.AdditionalCharges = updateInvoiceDto.AdditionalCharges.Value;
-
-            if (updateInvoiceDto.Discount.HasValue)
-                invoice.Discount = updateInvoiceDto.Discount.Value;
-
-            if (updateInvoiceDto.DueDate.HasValue)
-                invoice.DueDate = NormalizeToUtc(updateInvoiceDto.DueDate.Value);
-
-            if (updateInvoiceDto.Status.HasValue)
-                invoice.Status = updateInvoiceDto.Status.Value;
-
-            // Allow updating these fields even if they are empty strings (to clear them)
-            if (updateInvoiceDto.AdditionalChargesDescription != null)
-                invoice.AdditionalChargesDescription = updateInvoiceDto.AdditionalChargesDescription;
-
-            if (updateInvoiceDto.Notes != null)
-                invoice.Notes = updateInvoiceDto.Notes;
-
-            // Handle invoice items update if provided
-            if (updateInvoiceDto.InvoiceItems != null)
+            // Recalculate invoice total from line items
+            invoice.TotalAmount = lineItemsTotal + invoice.AdditionalCharges - invoice.Discount;
+        }
+        else
+        {
+            // Recalculate total amount from existing line items if they exist
+            if (invoice.InvoiceItems != null && invoice.InvoiceItems.Any())
             {
-                // Remove all existing invoice items
-                if (invoice.InvoiceItems != null && invoice.InvoiceItems.Any())
-                {
-                    _context.InvoiceItems.RemoveRange(invoice.InvoiceItems);
-                }
-
-                // Add new invoice items
-                decimal lineItemsTotal = 0m;
-                foreach (var itemDto in updateInvoiceDto.InvoiceItems)
-                {
-                    var invoiceItem = _mapper.Map<InvoiceItem>(itemDto);
-                    invoiceItem.InvoiceId = invoice.Id;
-                    
-                    // Calculate totals for the invoice item
-                    invoiceItem.CalculateTotals();
-                    
-                    _context.InvoiceItems.Add(invoiceItem);
-                    
-                    // Sum up the line item totals
-                    lineItemsTotal += invoiceItem.LineTotalWithTax;
-                }
-
-                // Recalculate invoice total from line items
+                decimal lineItemsTotal = invoice.InvoiceItems.Sum(item => item.LineTotalWithTax);
                 invoice.TotalAmount = lineItemsTotal + invoice.AdditionalCharges - invoice.Discount;
             }
             else
             {
-                // Recalculate total amount from existing line items if they exist
-                if (invoice.InvoiceItems != null && invoice.InvoiceItems.Any())
-                {
-                    decimal lineItemsTotal = invoice.InvoiceItems.Sum(item => item.LineTotalWithTax);
-                    invoice.TotalAmount = lineItemsTotal + invoice.AdditionalCharges - invoice.Discount;
-                }
-                else
-                {
-                    invoice.TotalAmount = invoice.MonthlyRent + invoice.AdditionalCharges - invoice.Discount;
-                }
+                invoice.TotalAmount = invoice.MonthlyRent + invoice.AdditionalCharges - invoice.Discount;
             }
-            
-            invoice.RemainingBalance = invoice.TotalAmount - invoice.PaidAmount;
-            invoice.UpdatedAt = DateTime.UtcNow;
-
-            await _context.SaveChangesAsync();
-
-            // Reload the invoice with all related data for the response
-            await _context.Entry(invoice).Reference(i => i.Tenant).LoadAsync();
-            await _context.Entry(invoice).Reference(i => i.Room).LoadAsync();
-            await _context.Entry(invoice).Collection(i => i.Payments).LoadAsync();
-            await _context.Entry(invoice).Collection(i => i.InvoiceItems).LoadAsync();
-
-            var invoiceDto = _mapper.Map<InvoiceDto>(invoice);
-            
-            _logger.LogInformation("Updated invoice {InvoiceId} with total amount {TotalAmount}", id, invoice.TotalAmount);
-            return ApiResponse<InvoiceDto>.SuccessResponse(invoiceDto, "Invoice updated successfully");
         }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error updating invoice {InvoiceId}", id);
-            return ApiResponse<InvoiceDto>.ErrorResponse("An error occurred while updating the invoice");
-        }
+
+        invoice.RemainingBalance = invoice.TotalAmount - invoice.PaidAmount;
+        invoice.UpdatedAt = DateTime.UtcNow;
+
+        await _context.SaveChangesAsync();
+
+        // Reload the invoice with all related data for the response
+        await _context.Entry(invoice).Reference(i => i.Tenant).LoadAsync();
+        await _context.Entry(invoice).Reference(i => i.Room).LoadAsync();
+        await _context.Entry(invoice).Collection(i => i.Payments).LoadAsync();
+        await _context.Entry(invoice).Collection(i => i.InvoiceItems).LoadAsync();
+
+        var invoiceDto = _mapper.Map<InvoiceDto>(invoice);
+
+        _logger.LogInformation("Updated invoice {InvoiceId} with total amount {TotalAmount}", id, invoice.TotalAmount);
+        return ApiResponse<InvoiceDto>.SuccessResponse(invoiceDto, "Invoice updated successfully");
     }
 
     /// <summary>
@@ -354,34 +339,26 @@ public class InvoiceService : IInvoiceService
     /// </summary>
     public async Task<ApiResponse<bool>> DeleteInvoiceAsync(int id)
     {
-        try
+        var invoice = await _context.Invoices
+            .Include(i => i.Payments)
+            .FirstOrDefaultAsync(i => i.Id == id);
+
+        if (invoice == null)
         {
-            var invoice = await _context.Invoices
-                .Include(i => i.Payments)
-                .FirstOrDefaultAsync(i => i.Id == id);
-
-            if (invoice == null)
-            {
-                return ApiResponse<bool>.ErrorResponse("Invoice not found");
-            }
-
-            // Don't allow deletion if there are payments
-            if (invoice.Payments.Any())
-            {
-                return ApiResponse<bool>.ErrorResponse("Cannot delete invoice with existing payments");
-            }
-
-            _context.Invoices.Remove(invoice);
-            await _context.SaveChangesAsync();
-
-            _logger.LogInformation("Deleted invoice {InvoiceId}", id);
-            return ApiResponse<bool>.SuccessResponse(true, "Invoice deleted successfully");
+            return ApiResponse<bool>.ErrorResponse("Invoice not found");
         }
-        catch (Exception ex)
+
+        // Don't allow deletion if there are payments
+        if (invoice.Payments.Any())
         {
-            _logger.LogError(ex, "Error deleting invoice {InvoiceId}", id);
-            return ApiResponse<bool>.ErrorResponse("An error occurred while deleting the invoice");
+            return ApiResponse<bool>.ErrorResponse("Cannot delete invoice with existing payments");
         }
+
+        _context.Invoices.Remove(invoice);
+        await _context.SaveChangesAsync();
+
+        _logger.LogInformation("Deleted invoice {InvoiceId}", id);
+        return ApiResponse<bool>.SuccessResponse(true, "Invoice deleted successfully");
     }
 
     /// <summary>
@@ -389,22 +366,31 @@ public class InvoiceService : IInvoiceService
     /// </summary>
     public async Task<ApiResponse<int>> GenerateMonthlyInvoicesAsync(DateTime billingPeriod)
     {
-        try
-        {
-            var activeTenantsWithRooms = await _context.Tenants
-                .Include(t => t.Room)
-                .Where(t => t.IsActive && t.RoomId.HasValue)
-                .ToListAsync();
+        var activeTenantsWithRooms = await _context.Tenants
+            .Include(t => t.Room)
+            .Where(t => t.IsActive && t.RoomId.HasValue)
+            .ToListAsync();
 
-            var generatedCount = 0;
-            var billingMonth = NormalizeToUtc(new DateTime(billingPeriod.Year, billingPeriod.Month, 1));
+        var billingMonth = NormalizeToUtc(new DateTime(billingPeriod.Year, billingPeriod.Month, 1));
+
+        // A partially generated billing run is worse than none at all, so the whole
+        // batch commits or nothing does.
+        var strategy = _context.Database.CreateExecutionStrategy();
+
+        var generatedCount = await strategy.ExecuteAsync(async () =>
+        {
+            _context.ChangeTracker.Clear();
+
+            await using var transaction = await _context.Database.BeginTransactionAsync();
+
+            var count = 0;
 
             foreach (var tenant in activeTenantsWithRooms)
             {
                 // Check if invoice already exists for this billing period
                 var existingInvoice = await _context.Invoices
-                    .AnyAsync(i => i.TenantId == tenant.Id && 
-                                  i.BillingPeriod.Year == billingMonth.Year && 
+                    .AnyAsync(i => i.TenantId == tenant.Id &&
+                                  i.BillingPeriod.Year == billingMonth.Year &&
                                   i.BillingPeriod.Month == billingMonth.Month);
 
                 if (!existingInvoice && tenant.Room != null)
@@ -413,6 +399,7 @@ public class InvoiceService : IInvoiceService
                     {
                         TenantId = tenant.Id,
                         RoomId = tenant.RoomId!.Value,
+                        // Drawn per invoice: every row in the batch gets its own number.
                         InvoiceNumber = await GenerateInvoiceNumberAsync(),
                         MonthlyRent = tenant.Room.MonthlyRent,
                         AdditionalCharges = 0,
@@ -427,22 +414,20 @@ public class InvoiceService : IInvoiceService
                     };
 
                     _context.Invoices.Add(invoice);
-                    generatedCount++;
+                    count++;
                 }
             }
 
             await _context.SaveChangesAsync();
+            await transaction.CommitAsync();
 
-            _logger.LogInformation("Generated {Count} invoices for billing period {BillingPeriod}", 
-                generatedCount, billingMonth.ToString("MMMM yyyy"));
+            return count;
+        });
 
-            return ApiResponse<int>.SuccessResponse(generatedCount, $"Generated {generatedCount} invoices successfully");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error generating monthly invoices for {BillingPeriod}", billingPeriod);
-            return ApiResponse<int>.ErrorResponse("An error occurred while generating monthly invoices");
-        }
+        _logger.LogInformation("Generated {Count} invoices for billing period {BillingPeriod}",
+            generatedCount, billingMonth.ToString("MMMM yyyy"));
+
+        return ApiResponse<int>.SuccessResponse(generatedCount, $"Generated {generatedCount} invoices successfully");
     }
 
     /// <summary>
@@ -450,25 +435,17 @@ public class InvoiceService : IInvoiceService
     /// </summary>
     public async Task<ApiResponse<IEnumerable<InvoiceDto>>> GetInvoicesByTenantAsync(int tenantId)
     {
-        try
-        {
-            var invoices = await _context.Invoices
-                .Include(i => i.Tenant)
-                .Include(i => i.Room)
-                .Include(i => i.Payments)
-                .Include(i => i.InvoiceItems)
-                .Where(i => i.TenantId == tenantId)
-                .OrderByDescending(i => i.IssueDate)
-                .ToListAsync();
+        var invoices = await _context.Invoices
+            .Include(i => i.Tenant)
+            .Include(i => i.Room)
+            .Include(i => i.Payments)
+            .Include(i => i.InvoiceItems)
+            .Where(i => i.TenantId == tenantId)
+            .OrderByDescending(i => i.IssueDate)
+            .ToListAsync();
 
-            var invoiceDtos = _mapper.Map<List<InvoiceDto>>(invoices);
-            return ApiResponse<IEnumerable<InvoiceDto>>.SuccessResponse(invoiceDtos);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error retrieving invoices for tenant {TenantId}", tenantId);
-            return ApiResponse<IEnumerable<InvoiceDto>>.ErrorResponse("An error occurred while retrieving tenant invoices");
-        }
+        var invoiceDtos = _mapper.Map<List<InvoiceDto>>(invoices);
+        return ApiResponse<IEnumerable<InvoiceDto>>.SuccessResponse(invoiceDtos);
     }
 
     /// <summary>
@@ -476,25 +453,17 @@ public class InvoiceService : IInvoiceService
     /// </summary>
     public async Task<ApiResponse<IEnumerable<InvoiceDto>>> GetOverdueInvoicesAsync()
     {
-        try
-        {
-            var overdueInvoices = await _context.Invoices
-                .Include(i => i.Tenant)
-                .Include(i => i.Room)
-                .Include(i => i.Payments)
-                .Include(i => i.InvoiceItems)
-                .Where(i => i.Status != InvoiceStatus.Paid && i.DueDate < DateTime.UtcNow)
-                .OrderBy(i => i.DueDate)
-                .ToListAsync();
+        var overdueInvoices = await _context.Invoices
+            .Include(i => i.Tenant)
+            .Include(i => i.Room)
+            .Include(i => i.Payments)
+            .Include(i => i.InvoiceItems)
+            .Where(i => i.Status != InvoiceStatus.Paid && i.DueDate < DateTime.UtcNow)
+            .OrderBy(i => i.DueDate)
+            .ToListAsync();
 
-            var invoiceDtos = _mapper.Map<List<InvoiceDto>>(overdueInvoices);
-            return ApiResponse<IEnumerable<InvoiceDto>>.SuccessResponse(invoiceDtos);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error retrieving overdue invoices");
-            return ApiResponse<IEnumerable<InvoiceDto>>.ErrorResponse("An error occurred while retrieving overdue invoices");
-        }
+        var invoiceDtos = _mapper.Map<List<InvoiceDto>>(overdueInvoices);
+        return ApiResponse<IEnumerable<InvoiceDto>>.SuccessResponse(invoiceDtos);
     }
 
     /// <summary>
@@ -502,30 +471,22 @@ public class InvoiceService : IInvoiceService
     /// </summary>
     public async Task<ApiResponse<bool>> MarkInvoiceAsPaidAsync(int id, DateTime? paidDate = null)
     {
-        try
+        var invoice = await _context.Invoices.FindAsync(id);
+        if (invoice == null)
         {
-            var invoice = await _context.Invoices.FindAsync(id);
-            if (invoice == null)
-            {
-                return ApiResponse<bool>.ErrorResponse("Invoice not found");
-            }
-
-            invoice.Status = InvoiceStatus.Paid;
-            invoice.PaidAmount = invoice.TotalAmount;
-            invoice.RemainingBalance = 0;
-            invoice.PaidDate = paidDate.HasValue ? NormalizeToUtc(paidDate.Value) : DateTime.UtcNow;
-            invoice.UpdatedAt = DateTime.UtcNow;
-
-            await _context.SaveChangesAsync();
-
-            _logger.LogInformation("Marked invoice {InvoiceId} as paid", id);
-            return ApiResponse<bool>.SuccessResponse(true, "Invoice marked as paid successfully");
+            return ApiResponse<bool>.ErrorResponse("Invoice not found");
         }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error marking invoice {InvoiceId} as paid", id);
-            return ApiResponse<bool>.ErrorResponse("An error occurred while updating the invoice");
-        }
+
+        invoice.Status = InvoiceStatus.Paid;
+        invoice.PaidAmount = invoice.TotalAmount;
+        invoice.RemainingBalance = 0;
+        invoice.PaidDate = paidDate.HasValue ? NormalizeToUtc(paidDate.Value) : DateTime.UtcNow;
+        invoice.UpdatedAt = DateTime.UtcNow;
+
+        await _context.SaveChangesAsync();
+
+        _logger.LogInformation("Marked invoice {InvoiceId} as paid", id);
+        return ApiResponse<bool>.SuccessResponse(true, "Invoice marked as paid successfully");
     }
 
     /// <summary>
@@ -533,35 +494,27 @@ public class InvoiceService : IInvoiceService
     /// </summary>
     public async Task<ApiResponse<object>> GetInvoiceStatsAsync()
     {
-        try
-        {
-            var currentMonth = DateTime.UtcNow.Date.AddDays(1 - DateTime.UtcNow.Day);
-            var lastMonth = currentMonth.AddMonths(-1);
+        var currentMonth = DateTime.UtcNow.Date.AddDays(1 - DateTime.UtcNow.Day);
+        var lastMonth = currentMonth.AddMonths(-1);
 
-            var stats = new
-            {
-                TotalInvoices = await _context.Invoices.CountAsync(),
-                PaidInvoices = await _context.Invoices.CountAsync(i => i.Status == InvoiceStatus.Paid),
-                OverdueInvoices = await _context.Invoices.CountAsync(i => i.Status != InvoiceStatus.Paid && i.DueDate < DateTime.UtcNow),
-                TotalRevenue = await _context.Invoices.Where(i => i.Status == InvoiceStatus.Paid).SumAsync(i => i.TotalAmount),
-                CurrentMonthRevenue = await _context.Invoices
-                    .Where(i => i.Status == InvoiceStatus.Paid && i.PaidDate >= currentMonth)
-                    .SumAsync(i => i.TotalAmount),
-                LastMonthRevenue = await _context.Invoices
-                    .Where(i => i.Status == InvoiceStatus.Paid && i.PaidDate >= lastMonth && i.PaidDate < currentMonth)
-                    .SumAsync(i => i.TotalAmount),
-                OutstandingAmount = await _context.Invoices
-                    .Where(i => i.Status != InvoiceStatus.Paid)
-                    .SumAsync(i => i.RemainingBalance)
-            };
-
-            return ApiResponse<object>.SuccessResponse(stats);
-        }
-        catch (Exception ex)
+        var stats = new
         {
-            _logger.LogError(ex, "Error retrieving invoice statistics");
-            return ApiResponse<object>.ErrorResponse("An error occurred while retrieving invoice statistics");
-        }
+            TotalInvoices = await _context.Invoices.CountAsync(),
+            PaidInvoices = await _context.Invoices.CountAsync(i => i.Status == InvoiceStatus.Paid),
+            OverdueInvoices = await _context.Invoices.CountAsync(i => i.Status != InvoiceStatus.Paid && i.DueDate < DateTime.UtcNow),
+            TotalRevenue = await _context.Invoices.Where(i => i.Status == InvoiceStatus.Paid).SumAsync(i => i.TotalAmount),
+            CurrentMonthRevenue = await _context.Invoices
+                .Where(i => i.Status == InvoiceStatus.Paid && i.PaidDate >= currentMonth)
+                .SumAsync(i => i.TotalAmount),
+            LastMonthRevenue = await _context.Invoices
+                .Where(i => i.Status == InvoiceStatus.Paid && i.PaidDate >= lastMonth && i.PaidDate < currentMonth)
+                .SumAsync(i => i.TotalAmount),
+            OutstandingAmount = await _context.Invoices
+                .Where(i => i.Status != InvoiceStatus.Paid)
+                .SumAsync(i => i.RemainingBalance)
+        };
+
+        return ApiResponse<object>.SuccessResponse(stats);
     }
 
     /// <summary>
@@ -569,35 +522,27 @@ public class InvoiceService : IInvoiceService
     /// </summary>
     public async Task<ApiResponse<int>> SendInvoiceRemindersAsync()
     {
-        try
+        // Get invoices due in the next 3 days or overdue
+        var reminderDate = DateTime.UtcNow.AddDays(3);
+        var invoicesNeedingReminders = await _context.Invoices
+            .Include(i => i.Tenant)
+            .Where(i => i.Status != InvoiceStatus.Paid && i.DueDate <= reminderDate)
+            .ToListAsync();
+
+        var remindersSent = 0;
+
+        foreach (var invoice in invoicesNeedingReminders)
         {
-            // Get invoices due in the next 3 days or overdue
-            var reminderDate = DateTime.UtcNow.AddDays(3);
-            var invoicesNeedingReminders = await _context.Invoices
-                .Include(i => i.Tenant)
-                .Where(i => i.Status != InvoiceStatus.Paid && i.DueDate <= reminderDate)
-                .ToListAsync();
+            // TODO: Implement email sending logic here
+            // For now, just log the reminder
+            _logger.LogInformation("Reminder needed for invoice {InvoiceNumber} for tenant {TenantEmail}", 
+                invoice.InvoiceNumber, invoice.Tenant.Email);
 
-            var remindersSent = 0;
-
-            foreach (var invoice in invoicesNeedingReminders)
-            {
-                // TODO: Implement email sending logic here
-                // For now, just log the reminder
-                _logger.LogInformation("Reminder needed for invoice {InvoiceNumber} for tenant {TenantEmail}", 
-                    invoice.InvoiceNumber, invoice.Tenant.Email);
-                
-                remindersSent++;
-            }
-
-            _logger.LogInformation("Processed {Count} invoice reminders", remindersSent);
-            return ApiResponse<int>.SuccessResponse(remindersSent, $"Processed {remindersSent} invoice reminders");
+            remindersSent++;
         }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error sending invoice reminders");
-            return ApiResponse<int>.ErrorResponse("An error occurred while sending invoice reminders");
-        }
+
+        _logger.LogInformation("Processed {Count} invoice reminders", remindersSent);
+        return ApiResponse<int>.SuccessResponse(remindersSent, $"Processed {remindersSent} invoice reminders");
     }
 
     /// <summary>
@@ -614,16 +559,29 @@ public class InvoiceService : IInvoiceService
     }
 
     /// <summary>
-    /// Generates a unique invoice number
+    /// Generates a unique invoice number in the form INV-yyyyMM-NNNN.
+    /// The sequence restarts at 0001 each month and is drawn from a counter row
+    /// that is incremented atomically, so concurrent callers never share a number
+    /// and deleting an invoice never puts its number back into circulation.
     /// </summary>
     private async Task<string> GenerateInvoiceNumberAsync()
     {
-        var year = DateTime.UtcNow.Year;
-        var month = DateTime.UtcNow.Month;
-        
-        var count = await _context.Invoices
-            .CountAsync(i => i.IssueDate.Year == year && i.IssueDate.Month == month);
-        
-        return $"INV-{year}{month:D2}-{(count + 1):D4}";
+        var period = DateTime.UtcNow.ToString("yyyyMM");
+
+        // Single round-trip upsert: the ON CONFLICT branch takes a row lock, so
+        // parallel callers queue up on it and each observes a distinct LastValue.
+        // Materialised with ToListAsync rather than SingleAsync: an INSERT ... RETURNING
+        // is not composable, so EF must not wrap it in a subquery to apply a limit.
+        var rows = await _context.Database
+            .SqlQuery<int>($"""
+                INSERT INTO "InvoiceNumberCounters" ("Period", "LastValue")
+                VALUES ({period}, 1)
+                ON CONFLICT ("Period") DO UPDATE
+                    SET "LastValue" = "InvoiceNumberCounters"."LastValue" + 1
+                RETURNING "LastValue" AS "Value"
+                """)
+            .ToListAsync();
+
+        return $"INV-{period}-{rows.Single():D4}";
     }
 }

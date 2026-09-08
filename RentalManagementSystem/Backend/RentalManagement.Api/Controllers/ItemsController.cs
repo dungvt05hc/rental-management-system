@@ -14,12 +14,10 @@ namespace RentalManagement.Api.Controllers;
 public class ItemsController : ControllerBase
 {
     private readonly IItemService _itemService;
-    private readonly ILogger<ItemsController> _logger;
 
-    public ItemsController(IItemService itemService, ILogger<ItemsController> logger)
+    public ItemsController(IItemService itemService)
     {
         _itemService = itemService;
-        _logger = logger;
     }
 
     /// <summary>
@@ -30,16 +28,8 @@ public class ItemsController : ControllerBase
     [HttpGet]
     public async Task<ActionResult<ApiResponse<PagedResponse<ItemDto>>>> GetItems([FromQuery] ItemSearchDto searchDto)
     {
-        try
-        {
-            var result = await _itemService.GetItemsAsync(searchDto);
-            return Ok(result);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error retrieving items");
-            return StatusCode(500, ApiResponse<PagedResponse<ItemDto>>.ErrorResponse("An error occurred while retrieving items"));
-        }
+        var result = await _itemService.GetItemsAsync(searchDto);
+        return Ok(result);
     }
 
     /// <summary>
@@ -50,22 +40,14 @@ public class ItemsController : ControllerBase
     [HttpGet("{id}")]
     public async Task<ActionResult<ApiResponse<ItemDto>>> GetItem(int id)
     {
-        try
-        {
-            var result = await _itemService.GetItemByIdAsync(id);
-            
-            if (!result.Success)
-            {
-                return NotFound(result);
-            }
+        var result = await _itemService.GetItemByIdAsync(id);
 
-            return Ok(result);
-        }
-        catch (Exception ex)
+        if (!result.Success)
         {
-            _logger.LogError(ex, "Error retrieving item {Id}", id);
-            return StatusCode(500, ApiResponse<ItemDto>.ErrorResponse("An error occurred while retrieving the item"));
+            return NotFound(result);
         }
+
+        return Ok(result);
     }
 
     /// <summary>
@@ -77,22 +59,14 @@ public class ItemsController : ControllerBase
     [Authorize(Roles = "Admin,Manager,Staff")]
     public async Task<ActionResult<ApiResponse<ItemDto>>> CreateItem([FromBody] CreateItemDto createItemDto)
     {
-        try
-        {
-            var result = await _itemService.CreateItemAsync(createItemDto);
-            
-            if (!result.Success)
-            {
-                return BadRequest(result);
-            }
+        var result = await _itemService.CreateItemAsync(createItemDto);
 
-            return CreatedAtAction(nameof(GetItem), new { id = result.Data!.Id }, result);
-        }
-        catch (Exception ex)
+        if (!result.Success)
         {
-            _logger.LogError(ex, "Error creating item");
-            return StatusCode(500, ApiResponse<ItemDto>.ErrorResponse("An error occurred while creating the item"));
+            return BadRequest(result);
         }
+
+        return CreatedAtAction(nameof(GetItem), new { id = result.Data!.Id }, result);
     }
 
     /// <summary>
@@ -105,22 +79,14 @@ public class ItemsController : ControllerBase
     [Authorize(Roles = "Admin,Manager,Staff")]
     public async Task<ActionResult<ApiResponse<ItemDto>>> UpdateItem(int id, [FromBody] UpdateItemDto updateItemDto)
     {
-        try
-        {
-            var result = await _itemService.UpdateItemAsync(id, updateItemDto);
-            
-            if (!result.Success)
-            {
-                return BadRequest(result);
-            }
+        var result = await _itemService.UpdateItemAsync(id, updateItemDto);
 
-            return Ok(result);
-        }
-        catch (Exception ex)
+        if (!result.Success)
         {
-            _logger.LogError(ex, "Error updating item {Id}", id);
-            return StatusCode(500, ApiResponse<ItemDto>.ErrorResponse("An error occurred while updating the item"));
+            return BadRequest(result);
         }
+
+        return Ok(result);
     }
 
     /// <summary>
@@ -132,22 +98,14 @@ public class ItemsController : ControllerBase
     [Authorize(Roles = "Admin")]
     public async Task<ActionResult<ApiResponse<bool>>> DeleteItem(int id)
     {
-        try
-        {
-            var result = await _itemService.DeleteItemAsync(id);
-            
-            if (!result.Success)
-            {
-                return BadRequest(result);
-            }
+        var result = await _itemService.DeleteItemAsync(id);
 
-            return Ok(result);
-        }
-        catch (Exception ex)
+        if (!result.Success)
         {
-            _logger.LogError(ex, "Error deleting item {Id}", id);
-            return StatusCode(500, ApiResponse<bool>.ErrorResponse("An error occurred while deleting the item"));
+            return BadRequest(result);
         }
+
+        return Ok(result);
     }
 
     /// <summary>
@@ -157,16 +115,8 @@ public class ItemsController : ControllerBase
     [HttpGet("active")]
     public async Task<ActionResult<ApiResponse<IEnumerable<ItemDto>>>> GetActiveItems()
     {
-        try
-        {
-            var result = await _itemService.GetActiveItemsAsync();
-            return Ok(result);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error retrieving active items");
-            return StatusCode(500, ApiResponse<IEnumerable<ItemDto>>.ErrorResponse("An error occurred while retrieving active items"));
-        }
+        var result = await _itemService.GetActiveItemsAsync();
+        return Ok(result);
     }
 
     /// <summary>
@@ -177,16 +127,8 @@ public class ItemsController : ControllerBase
     [HttpGet("category/{category}")]
     public async Task<ActionResult<ApiResponse<IEnumerable<ItemDto>>>> GetItemsByCategory(string category)
     {
-        try
-        {
-            var result = await _itemService.GetItemsByCategoryAsync(category);
-            return Ok(result);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error retrieving items by category {Category}", category);
-            return StatusCode(500, ApiResponse<IEnumerable<ItemDto>>.ErrorResponse("An error occurred while retrieving items by category"));
-        }
+        var result = await _itemService.GetItemsByCategoryAsync(category);
+        return Ok(result);
     }
 
     /// <summary>
@@ -196,15 +138,7 @@ public class ItemsController : ControllerBase
     [HttpGet("categories")]
     public async Task<ActionResult<ApiResponse<IEnumerable<string>>>> GetCategories()
     {
-        try
-        {
-            var result = await _itemService.GetCategoriesAsync();
-            return Ok(result);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error retrieving categories");
-            return StatusCode(500, ApiResponse<IEnumerable<string>>.ErrorResponse("An error occurred while retrieving categories"));
-        }
+        var result = await _itemService.GetCategoriesAsync();
+        return Ok(result);
     }
 }
