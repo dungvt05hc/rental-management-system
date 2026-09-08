@@ -36,7 +36,7 @@ export function PaymentsPage() {
         pageSize: pageSize,
       });
       if (response.data) {
-        setPayments(response.data.data || []);
+        setPayments(response.data.items || []);
       }
     } catch (error) {
       showError(

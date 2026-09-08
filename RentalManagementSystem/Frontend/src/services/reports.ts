@@ -1,9 +1,14 @@
 import { apiService } from './api';
-import type { 
+import type {
   OccupancyReport,
   RevenueReport,
-  MonthlyReport,
-  ApiResponse 
+  OutstandingPaymentsReport,
+  FinancialSummaryReport,
+  TenantStatisticsReport,
+  RoomUtilizationReport,
+  PaymentMethodDistributionReport,
+  DashboardSummaryReport,
+  ApiResponse
 } from '../types';
 
 export const reportService = {
@@ -21,47 +26,46 @@ export const reportService = {
   },
 
   // Get outstanding payments report
-  async getOutstandingPaymentsReport(): Promise<ApiResponse<any>> {
-    return apiService.get<any>('/reports/outstanding-payments');
+  async getOutstandingPaymentsReport(): Promise<ApiResponse<OutstandingPaymentsReport>> {
+    return apiService.get<OutstandingPaymentsReport>('/reports/outstanding-payments');
   },
 
   // Get financial summary
-  async getFinancialSummary(fromDate: string, toDate: string): Promise<ApiResponse<any>> {
-    return apiService.get<any>('/reports/financial-summary', {
+  async getFinancialSummary(fromDate: string, toDate: string): Promise<ApiResponse<FinancialSummaryReport>> {
+    return apiService.get<FinancialSummaryReport>('/reports/financial-summary', {
       fromDate,
       toDate
     });
   },
 
   // Get tenant statistics
-  async getTenantStatistics(): Promise<ApiResponse<any>> {
-    return apiService.get<any>('/reports/tenant-statistics');
+  async getTenantStatistics(): Promise<ApiResponse<TenantStatisticsReport>> {
+    return apiService.get<TenantStatisticsReport>('/reports/tenant-statistics');
   },
 
   // Get room utilization report
-  async getRoomUtilizationReport(): Promise<ApiResponse<any>> {
-    return apiService.get<any>('/reports/room-utilization');
+  async getRoomUtilizationReport(): Promise<ApiResponse<RoomUtilizationReport>> {
+    return apiService.get<RoomUtilizationReport>('/reports/room-utilization');
   },
 
   // Get payment method distribution
-  async getPaymentMethodDistribution(fromDate?: string, toDate?: string): Promise<ApiResponse<any>> {
-    return apiService.get<any>('/reports/payment-method-distribution', {
+  async getPaymentMethodDistribution(fromDate?: string, toDate?: string): Promise<ApiResponse<PaymentMethodDistributionReport>> {
+    return apiService.get<PaymentMethodDistributionReport>('/reports/payment-method-distribution', {
       fromDate,
       toDate
     });
   },
 
   // Get dashboard summary
-  async getDashboardSummary(): Promise<ApiResponse<any>> {
-    return apiService.get<any>('/reports/dashboard-summary');
+  async getDashboardSummary(): Promise<ApiResponse<DashboardSummaryReport>> {
+    return apiService.get<DashboardSummaryReport>('/reports/dashboard-summary');
   },
 
   // Export report as CSV
   async exportReportCsv(reportType: string, fromDate?: string, toDate?: string): Promise<Blob> {
-    const response = await apiService.get(`/reports/export/${reportType}`, {
+    const response = await apiService.get<Blob>(`/reports/export/${reportType}`, {
       fromDate,
-      toDate,
-      responseType: 'blob'
+      toDate
     });
     return response.data;
   }

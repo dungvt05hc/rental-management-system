@@ -43,67 +43,71 @@ apiClient.interceptors.response.use(
   }
 );
 
+// Query string params sent with a GET request
+export type QueryParams = Record<string, string | number | boolean | undefined | null>;
+
 // Generic API methods
 export const apiService = {
   // GET request
-  async get<T = any>(url: string, params?: any): Promise<ApiResponse<T>> {
+  async get<T = unknown>(url: string, params?: QueryParams): Promise<ApiResponse<T>> {
     try {
       const response = await apiClient.get<ApiResponse<T>>(url, { params });
       return response.data;
     } catch (error) {
-      return handleApiError(error);
+      return handleApiError<T>(error);
     }
   },
 
   // POST request
-  async post<T = any>(url: string, data?: any): Promise<ApiResponse<T>> {
+  async post<T = unknown>(url: string, data?: unknown): Promise<ApiResponse<T>> {
     try {
       const response = await apiClient.post<ApiResponse<T>>(url, data);
       return response.data;
     } catch (error) {
-      return handleApiError(error);
+      return handleApiError<T>(error);
     }
   },
 
   // PUT request
-  async put<T = any>(url: string, data?: any): Promise<ApiResponse<T>> {
+  async put<T = unknown>(url: string, data?: unknown): Promise<ApiResponse<T>> {
     try {
       const response = await apiClient.put<ApiResponse<T>>(url, data);
       return response.data;
     } catch (error) {
-      return handleApiError(error);
+      return handleApiError<T>(error);
     }
   },
 
   // PATCH request
-  async patch<T = any>(url: string, data?: any): Promise<ApiResponse<T>> {
+  async patch<T = unknown>(url: string, data?: unknown): Promise<ApiResponse<T>> {
     try {
       const response = await apiClient.patch<ApiResponse<T>>(url, data);
       return response.data;
     } catch (error) {
-      return handleApiError(error);
+      return handleApiError<T>(error);
     }
   },
 
   // DELETE request
-  async delete<T = any>(url: string, data?: any): Promise<ApiResponse<T>> {
+  async delete<T = unknown>(url: string, data?: unknown): Promise<ApiResponse<T>> {
     try {
       const response = await apiClient.delete<ApiResponse<T>>(url, { data });
       return response.data;
     } catch (error) {
-      return handleApiError(error);
+      return handleApiError<T>(error);
     }
   },
 };
 
-// Error handler
-function handleApiError(error: any): ApiResponse {
+// Error handler — mọi nhánh đều trả về lỗi nên không nhánh nào đặt `data`,
+// vì vậy an toàn khi khớp với ApiResponse<T> của lời gọi.
+function handleApiError<T>(error: unknown): ApiResponse<T> {
   if (axios.isAxiosError(error)) {
     const axiosError = error as AxiosError;
     
     if (axiosError.response?.data) {
       // Return API error response
-      return axiosError.response.data as ApiResponse;
+      return axiosError.response.data as ApiResponse<T>;
     }
     
     if (axiosError.code === 'ECONNABORTED') {

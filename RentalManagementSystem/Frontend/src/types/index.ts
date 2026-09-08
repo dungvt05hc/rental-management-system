@@ -1,5 +1,5 @@
 // API Response Types
-export interface ApiResponse<T = any> {
+export interface ApiResponse<T = unknown> {
   data?: T;
   message?: string;
   errors?: string[];
@@ -102,7 +102,7 @@ export interface UpdateRoomRequest extends Partial<CreateRoomRequest> {
   status: RoomStatus;
 }
 
-export interface RoomSearchRequest {
+export type RoomSearchRequest = {
   search?: string;
   searchTerm?: string;
   status?: RoomStatus;
@@ -186,7 +186,7 @@ export interface AssignRoomRequest {
   monthlyRent: number;
 }
 
-export interface TenantSearchRequest {
+export type TenantSearchRequest = {
   search?: string;
   searchTerm?: string;
   status?: TenantStatus;
@@ -262,7 +262,7 @@ export interface UpdateInvoiceRequest {
   notes?: string;
 }
 
-export interface InvoiceSearchRequest {
+export type InvoiceSearchRequest = {
   search?: string;
   searchTerm?: string;
   status?: InvoiceStatus;
@@ -353,7 +353,7 @@ export interface UpdateItemRequest {
   notes?: string;
 }
 
-export interface ItemSearchRequest {
+export type ItemSearchRequest = {
   searchTerm?: string;
   category?: string;
   isActive?: boolean;
@@ -396,7 +396,7 @@ export interface CreatePaymentRequest {
 
 export interface UpdatePaymentRequest extends Partial<CreatePaymentRequest> {}
 
-export interface PaymentSearchRequest {
+export type PaymentSearchRequest = {
   search?: string;
   invoiceId?: string;
   paymentMethod?: PaymentMethod;
@@ -436,12 +436,244 @@ export interface MonthlyReport {
   departedTenants: number;
 }
 
+// Các báo cáo dưới đây được backend trả về dưới dạng anonymous object
+// (ApiResponse<object> trong IReportingService), nên không có DTO để đối chiếu.
+// Các type sau mô tả đúng shape mà ReportingService dựng, ở dạng camelCase —
+// ASP.NET Core serialize theo JsonSerializerDefaults.Web nên tên property
+// PascalCase phía C# lên wire thành camelCase.
+
+export interface ReportPeriod {
+  fromDate: string;
+  toDate: string;
+}
+
+// GET /reports/outstanding-payments
+export interface OutstandingInvoiceRow {
+  invoiceId: string;
+  tenantName: string;
+  amount: number;
+  dueDate: string;
+  status: string;
+}
+
+export interface OverdueInvoiceRow extends OutstandingInvoiceRow {
+  daysOverdue: number;
+}
+
+export interface UpcomingInvoiceRow extends OutstandingInvoiceRow {
+  daysUntilDue: number;
+}
+
+export interface OutstandingPaymentsReport {
+  generatedAt: string;
+  summary: {
+    totalOutstandingAmount: number;
+    totalOverdueAmount: number;
+    totalUpcomingAmount: number;
+    overdueCount: number;
+    upcomingCount: number;
+  };
+  overdueInvoices: OverdueInvoiceRow[];
+  upcomingInvoices: UpcomingInvoiceRow[];
+  ageAnalysis: {
+    overdue0to30Days: number;
+    overdue31to60Days: number;
+    overdue61to90Days: number;
+    overdueOver90Days: number;
+  };
+}
+
+// GET /reports/financial-summary
+export interface FinancialMonthlyBreakdown {
+  period: string;
+  year: number;
+  month: number;
+  totalInvoiced: number;
+  paidAmount: number;
+  outstandingAmount: number;
+  invoiceCount: number;
+  collectionRate: number;
+}
+
+export interface FinancialSummaryReport {
+  reportPeriod: ReportPeriod;
+  revenue: {
+    totalRevenue: number;
+    totalPayments: number;
+    totalOutstanding: number;
+    collectionRate: number;
+  };
+  deposits: {
+    totalSecurityDeposits: number;
+  };
+  monthlyBreakdown: FinancialMonthlyBreakdown[];
+  summary: {
+    averageMonthlyRevenue: number;
+    totalInvoices: number;
+    netIncome: number;
+  };
+}
+
+// GET /reports/tenant-statistics
+export interface TenantStatisticsReport {
+  generatedAt: string;
+  overview: {
+    totalTenants: number;
+    activeTenants: number;
+    inactiveTenants: number;
+    assignedTenants: number;
+    unassignedTenants: number;
+  };
+  contractStatus: {
+    expiringIn30Days: number;
+    expiringIn90Days: number;
+  };
+  recentActivity: {
+    newTenantsLast30Days: number;
+  };
+  demographics: {
+    ageGroups: Record<string, number>;
+    totalWithAgeData: number;
+  };
+  financialSummary: {
+    totalMonthlyRent: number;
+    averageMonthlyRent: number;
+    totalSecurityDeposits: number;
+    averageSecurityDeposit: number;
+  };
+  ratios: {
+    occupancyRate: number;
+    activityRate: number;
+  };
+}
+
+// GET /reports/room-utilization
+export interface RoomUtilizationDetail {
+  roomId: string;
+  roomNumber: string;
+  floor: number;
+  status: string;
+  monthlyRent: number;
+  currentTenant: {
+    id: string;
+    name: string;
+    contractStart?: string;
+    contractEnd?: string;
+    monthlyRent: number;
+  } | null;
+  isOccupied: boolean;
+}
+
+export interface RoomUtilizationReport {
+  generatedAt: string;
+  summary: {
+    totalRooms: number;
+    occupiedRooms: number;
+    vacantRooms: number;
+    occupancyRate: number;
+  };
+  statusDistribution: Array<{
+    status: string;
+    count: number;
+    percentage: number;
+  }>;
+  floorAnalysis: Array<{
+    floor: number;
+    totalRooms: number;
+    occupiedRooms: number;
+    vacantRooms: number;
+    occupancyRate: number;
+    totalRevenue: number;
+    averageRent: number;
+  }>;
+  roomDetails: RoomUtilizationDetail[];
+  revenue: {
+    totalMonthlyRevenue: number;
+    averageRentPerRoom: number;
+    potentialRevenue: number;
+    revenueEfficiency: number;
+  };
+}
+
+// GET /reports/payment-method-distribution
+export interface PaymentMethodDistributionReport {
+  reportPeriod: ReportPeriod;
+  summary: {
+    totalPayments: number;
+    totalAmount: number;
+    averagePayment: number;
+  };
+  distribution: Array<{
+    paymentMethod: string;
+    count: number;
+    totalAmount: number;
+    averageAmount: number;
+    percentage: number;
+  }>;
+}
+
+// GET /payments/statistics
+export interface PaymentStatistics {
+  totalPayments: number;
+  totalAmount: number;
+  verifiedPayments: number;
+  unverifiedPayments: number;
+  currentMonthPayments: number;
+  currentMonthAmount: number;
+  lastMonthPayments: number;
+  lastMonthAmount: number;
+  paymentMethodBreakdown: Array<{
+    method: string;
+    count: number;
+    amount: number;
+  }>;
+}
+
+// GET /reports/dashboard-summary
+export interface ExpiringContractRow {
+  tenantName: string;
+  roomNumber: string;
+  expiryDate?: string;
+}
+
+export interface DashboardSummaryReport {
+  generatedAt: string;
+  occupancy: {
+    totalRooms: number;
+    occupiedRooms: number;
+    vacantRooms: number;
+    occupancyRate: number;
+  };
+  tenants: {
+    totalActive: number;
+    newThisMonth: number;
+  };
+  financials: {
+    monthlyRevenue: number;
+    lastMonthRevenue: number;
+    revenueGrowthRate: number;
+    pendingPayments: number;
+    overdueInvoices: number;
+  };
+  upcomingEvents: {
+    contractsExpiring: number;
+    expiringContracts: ExpiringContractRow[];
+  };
+  alerts: Array<{
+    type: string;
+    message: string;
+  }>;
+}
+
+// Khớp với PagedResponse<T> ở Backend/Models/DTOs/CommonDtos.cs
 export interface PaginatedResult<T> {
-  data: T[];
-  totalCount: number;
-  pageNumber: number;
+  items: T[];
+  page: number;
   pageSize: number;
+  totalItems: number;
   totalPages: number;
+  hasPreviousPage: boolean;
+  hasNextPage: boolean;
 }
 
 // Form Types
@@ -527,5 +759,5 @@ export interface UserStatisticsDto {
 export interface BulkUserOperationDto {
   userIds: string[];
   operation: 'activate' | 'deactivate' | 'delete';
-  data?: Record<string, any>;
+  data?: Record<string, unknown>;
 }

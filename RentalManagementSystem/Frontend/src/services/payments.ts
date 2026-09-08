@@ -4,8 +4,9 @@ import type {
   CreatePaymentRequest, 
   UpdatePaymentRequest, 
   PaymentSearchRequest,
+  PaymentStatistics,
   PaginatedResult,
-  ApiResponse 
+  ApiResponse
 } from '../types';
 
 export const paymentService = {
@@ -53,7 +54,7 @@ export const paymentService = {
   },
 
   // Get payment statistics
-  async getPaymentStatistics(): Promise<ApiResponse<any>> {
-    return apiService.get<any>('/payments/statistics');
+  async getPaymentStatistics(): Promise<ApiResponse<PaymentStatistics>> {
+    return apiService.get<PaymentStatistics>('/payments/statistics');
   }
 };

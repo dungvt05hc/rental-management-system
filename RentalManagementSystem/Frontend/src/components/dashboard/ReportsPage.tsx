@@ -48,13 +48,13 @@ export function ReportsPage() {
   const occupancyData = occupancyResponse?.data as OccupancyReport;
   
   // Map the financial summary response to the RevenueReport structure
-  const revenueData = revenueResponse?.data ? {
-    totalRevenue: revenueResponse.data.Revenue?.TotalRevenue || 0,
-    paidAmount: revenueResponse.data.Revenue?.TotalPayments || 0,
-    pendingAmount: revenueResponse.data.Revenue?.TotalOutstanding || 0,
+  const revenueData: RevenueReport | undefined = revenueResponse?.data ? {
+    totalRevenue: revenueResponse.data.revenue?.totalRevenue || 0,
+    paidAmount: revenueResponse.data.revenue?.totalPayments || 0,
+    pendingAmount: revenueResponse.data.revenue?.totalOutstanding || 0,
     overdueAmount: 0, // Calculate from pending if needed
-    collectionRate: revenueResponse.data.Revenue?.CollectionRate || 0
-  } as RevenueReport : undefined;
+    collectionRate: revenueResponse.data.revenue?.collectionRate || 0
+  } : undefined;
   
   const monthlyData = monthlyResponse?.data; // Use generic data type since we don't have MonthlyReport[] from service
 
@@ -246,11 +246,11 @@ export function ReportsPage() {
     if (!monthlyData) return null;
 
     // Extract the nested structure from the financial summary response
-    const reportPeriod = monthlyData.ReportPeriod || {};
-    const revenue = monthlyData.Revenue || {};
-    const deposits = monthlyData.Deposits || {};
-    const summary = monthlyData.Summary || {};
-    const monthlyBreakdown = monthlyData.MonthlyBreakdown || [];
+    const reportPeriod = monthlyData.reportPeriod;
+    const revenue = monthlyData.revenue;
+    const deposits = monthlyData.deposits;
+    const summary = monthlyData.summary;
+    const monthlyBreakdown = monthlyData.monthlyBreakdown || [];
 
     return (
       <div className="space-y-6">
@@ -267,13 +267,13 @@ export function ReportsPage() {
               <div className="text-center p-4 bg-blue-50 rounded-lg">
                 <h3 className="text-lg font-semibold text-blue-900">From Date</h3>
                 <p className="text-xl font-bold text-blue-600">
-                  {reportPeriod.FromDate ? new Date(reportPeriod.FromDate).toLocaleDateString() : 'N/A'}
+                  {reportPeriod.fromDate ? new Date(reportPeriod.fromDate).toLocaleDateString() : 'N/A'}
                 </p>
               </div>
               <div className="text-center p-4 bg-blue-50 rounded-lg">
                 <h3 className="text-lg font-semibold text-blue-900">To Date</h3>
                 <p className="text-xl font-bold text-blue-600">
-                  {reportPeriod.ToDate ? new Date(reportPeriod.ToDate).toLocaleDateString() : 'N/A'}
+                  {reportPeriod.toDate ? new Date(reportPeriod.toDate).toLocaleDateString() : 'N/A'}
                 </p>
               </div>
             </div>
@@ -293,25 +293,25 @@ export function ReportsPage() {
               <div className="text-center p-4 bg-green-50 rounded-lg">
                 <h3 className="text-lg font-semibold text-green-900">Total Revenue</h3>
                 <p className="text-2xl font-bold text-green-600">
-                  {formatCurrency(revenue.TotalRevenue || 0)}
+                  {formatCurrency(revenue.totalRevenue || 0)}
                 </p>
               </div>
               <div className="text-center p-4 bg-blue-50 rounded-lg">
                 <h3 className="text-lg font-semibold text-blue-900">Total Payments</h3>
                 <p className="text-2xl font-bold text-blue-600">
-                  {formatCurrency(revenue.TotalPayments || 0)}
+                  {formatCurrency(revenue.totalPayments || 0)}
                 </p>
               </div>
               <div className="text-center p-4 bg-yellow-50 rounded-lg">
                 <h3 className="text-lg font-semibold text-yellow-900">Outstanding</h3>
                 <p className="text-2xl font-bold text-yellow-600">
-                  {formatCurrency(revenue.TotalOutstanding || 0)}
+                  {formatCurrency(revenue.totalOutstanding || 0)}
                 </p>
               </div>
               <div className="text-center p-4 bg-purple-50 rounded-lg">
                 <h3 className="text-lg font-semibold text-purple-900">Collection Rate</h3>
                 <p className="text-2xl font-bold text-purple-600">
-                  {formatPercentage(revenue.CollectionRate || 0)}
+                  {formatPercentage(revenue.collectionRate || 0)}
                 </p>
               </div>
             </div>
@@ -330,7 +330,7 @@ export function ReportsPage() {
             <div className="text-center p-4 bg-blue-50 rounded-lg">
               <h3 className="text-lg font-semibold text-blue-900">Total Security Deposits</h3>
               <p className="text-3xl font-bold text-blue-600">
-                {formatCurrency(deposits.TotalSecurityDeposits || 0)}
+                {formatCurrency(deposits.totalSecurityDeposits || 0)}
               </p>
             </div>
           </CardContent>
@@ -349,19 +349,19 @@ export function ReportsPage() {
               <div className="text-center p-4 bg-gray-50 rounded-lg">
                 <h3 className="text-lg font-semibold text-gray-900">Average Monthly Revenue</h3>
                 <p className="text-2xl font-bold text-blue-600">
-                  {formatCurrency(summary.AverageMonthlyRevenue || 0)}
+                  {formatCurrency(summary.averageMonthlyRevenue || 0)}
                 </p>
               </div>
               <div className="text-center p-4 bg-gray-50 rounded-lg">
                 <h3 className="text-lg font-semibold text-gray-900">Total Invoices</h3>
                 <p className="text-2xl font-bold text-blue-600">
-                  {(summary.TotalInvoices || 0).toLocaleString()}
+                  {(summary.totalInvoices || 0).toLocaleString()}
                 </p>
               </div>
               <div className="text-center p-4 bg-gray-50 rounded-lg">
                 <h3 className="text-lg font-semibold text-gray-900">Net Income</h3>
                 <p className="text-2xl font-bold text-blue-600">
-                  {formatCurrency(summary.NetIncome || 0)}
+                  {formatCurrency(summary.netIncome || 0)}
                 </p>
               </div>
             </div>
@@ -400,25 +400,25 @@ export function ReportsPage() {
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {monthlyBreakdown.map((month: any, index: number) => (
+                    {monthlyBreakdown.map((month, index) => (
                       <tr key={index} className="hover:bg-gray-50">
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                          {month.Period || `${month.Year}-${String(month.Month).padStart(2, '0')}`}
+                          {month.period || `${month.year}-${String(month.month).padStart(2, '0')}`}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-gray-900">
-                          {formatCurrency(month.TotalInvoiced || 0)}
+                          {formatCurrency(month.totalInvoiced || 0)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-green-600 font-semibold">
-                          {formatCurrency(month.PaidAmount || 0)}
+                          {formatCurrency(month.paidAmount || 0)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-yellow-600">
-                          {formatCurrency(month.OutstandingAmount || 0)}
+                          {formatCurrency(month.outstandingAmount || 0)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-purple-600 font-semibold">
-                          {formatPercentage(month.CollectionRate || 0)}
+                          {formatPercentage(month.collectionRate || 0)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-gray-900">
-                          {(month.InvoiceCount || 0).toLocaleString()}
+                          {(month.invoiceCount || 0).toLocaleString()}
                         </td>
                       </tr>
                     ))}

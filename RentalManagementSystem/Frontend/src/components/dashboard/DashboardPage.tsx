@@ -94,43 +94,43 @@ export function DashboardPage() {
       // A rooms failure is not fatal for the dashboard — the recent-rooms list
       // simply stays empty (see the guarded assignment below).
 
-      const occupancy = occupancyResponse.data as OccupancyReport;
-      const dashboard = dashboardResponse.data as any;
+      const occupancy = occupancyResponse.data;
+      const dashboard = dashboardResponse.data;
 
-      // Extract financial data from dashboard.Financials (note the capital F)
-      const financials = dashboard?.Financials || dashboard?.financials || {};
-      const occupancyData = dashboard?.Occupancy || dashboard?.occupancy || {};
+      const financials = dashboard?.financials;
+      const occupancyData = dashboard?.occupancy;
+
+      const monthlyRevenue = financials?.monthlyRevenue || 0;
+      const pendingPayments = financials?.pendingPayments || 0;
+      const collectionRate = monthlyRevenue + pendingPayments > 0
+        ? Math.round((monthlyRevenue / (monthlyRevenue + pendingPayments)) * 100)
+        : 0;
 
       setStats({
-        totalRooms: occupancy?.totalRooms || occupancyData?.TotalRooms || occupancyData?.totalRooms || 0,
-        occupiedRooms: occupancy?.occupiedRooms || occupancyData?.OccupiedRooms || occupancyData?.occupiedRooms || 0,
-        availableRooms: occupancy?.availableRooms || occupancyData?.VacantRooms || occupancyData?.vacantRooms || 0,
-        totalRevenue: financials?.MonthlyRevenue || financials?.monthlyRevenue || 0,
-        paidAmount: financials?.MonthlyRevenue || financials?.monthlyRevenue || 0,
-        pendingAmount: financials?.PendingPayments || financials?.pendingPayments || 0,
-        overdueAmount: financials?.OverdueInvoices || financials?.overdueInvoices || 0,
-        occupancyRate: occupancy?.occupancyRate || occupancyData?.OccupancyRate || occupancyData?.occupancyRate || 0,
-        collectionRate: financials?.MonthlyRevenue && (financials?.MonthlyRevenue + (financials?.PendingPayments || 0)) > 0
-          ? Math.round((financials.MonthlyRevenue / (financials.MonthlyRevenue + (financials?.PendingPayments || 0))) * 100)
-          : 0,
+        totalRooms: occupancy?.totalRooms || occupancyData?.totalRooms || 0,
+        occupiedRooms: occupancy?.occupiedRooms || occupancyData?.occupiedRooms || 0,
+        availableRooms: occupancy?.availableRooms || occupancyData?.vacantRooms || 0,
+        totalRevenue: monthlyRevenue,
+        paidAmount: monthlyRevenue,
+        pendingAmount: pendingPayments,
+        overdueAmount: financials?.overdueInvoices || 0,
+        occupancyRate: occupancy?.occupancyRate || occupancyData?.occupancyRate || 0,
+        collectionRate,
       });
 
       // Set recent rooms
       if (roomsResponse.success && roomsResponse.data) {
-        const paginatedData = roomsResponse.data as any;
-        setRecentRooms(paginatedData.items || []);
+        setRecentRooms(roomsResponse.data.items || []);
       }
 
       // Generate system alerts based on data
       if (occupancy && dashboard) {
         generateSystemAlerts(occupancy, {
-          totalRevenue: financials?.MonthlyRevenue || 0,
-          paidAmount: financials?.MonthlyRevenue || 0,
-          pendingAmount: financials?.PendingPayments || 0,
-          overdueAmount: financials?.OverdueInvoices || 0,
-          collectionRate: financials?.MonthlyRevenue && (financials?.MonthlyRevenue + (financials?.PendingPayments || 0)) > 0
-            ? Math.round((financials.MonthlyRevenue / (financials.MonthlyRevenue + (financials?.PendingPayments || 0))) * 100)
-            : 0,
+          totalRevenue: monthlyRevenue,
+          paidAmount: monthlyRevenue,
+          pendingAmount: pendingPayments,
+          overdueAmount: financials?.overdueInvoices || 0,
+          collectionRate,
         } as RevenueReport);
       }
       
