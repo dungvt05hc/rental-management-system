@@ -153,18 +153,6 @@ export function LoginPage() {
             </div>
           </CardContent>
         </Card>
-
-        {/* Demo credentials */}
-        <Card className="bg-blue-50 border-blue-200">
-          <CardContent className="pt-6">
-            <h3 className="text-sm font-medium text-blue-900 mb-2">{t('auth.demoCredentials', 'Demo Credentials')}</h3>
-            <div className="text-xs text-blue-800 space-y-1">
-              <p><strong>{t('auth.admin', 'Admin')}:</strong> admin@rentalmanagement.com / Admin123!</p>
-              <p><strong>{t('auth.manager', 'Manager')}:</strong> manager@rentalms.com / Manager123!</p>
-              <p><strong>{t('auth.staff', 'Staff')}:</strong> staff@rentalms.com / Staff123!</p>
-            </div>
-          </CardContent>
-        </Card>
       </div>
     </div>
   );
