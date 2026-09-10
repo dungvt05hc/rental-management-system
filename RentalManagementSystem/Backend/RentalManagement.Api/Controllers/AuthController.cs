@@ -61,6 +61,58 @@ public class AuthController : ControllerBase
     }
 
     /// <summary>
+    /// Requests a password reset link by email
+    /// </summary>
+    /// <remarks>
+    /// Always returns 200 with the same message, whether or not the address has
+    /// an account. Answering differently — 404, a different message, anything —
+    /// would let anyone test addresses against the system and harvest the list
+    /// of registered users.
+    /// </remarks>
+    /// <param name="forgotPasswordDto">The address to send the link to</param>
+    [HttpPost("forgot-password")]
+    [AllowAnonymous]
+    [EnableRateLimiting(RateLimitPolicies.ForgotPassword)]
+    [ProducesResponseType(typeof(ApiResponse<bool>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
+    public async Task<ActionResult<ApiResponse<bool>>> ForgotPassword(
+        [FromBody] ForgotPasswordDto forgotPasswordDto,
+        CancellationToken ct)
+    {
+        await _authService.SendPasswordResetLinkAsync(forgotPasswordDto, ct);
+
+        return Ok(ApiResponse<bool>.SuccessResponse(
+            true,
+            "If that email address is in our system, we have sent password reset instructions to it"));
+    }
+
+    /// <summary>
+    /// Sets a new password using the token from a password reset link
+    /// </summary>
+    /// <remarks>
+    /// On success every JWT issued before this call stops working, so the user
+    /// has to sign in again with the new password.
+    /// </remarks>
+    /// <param name="resetPasswordDto">Email, reset token and new password</param>
+    [HttpPost("reset-password")]
+    [AllowAnonymous]
+    [ProducesResponseType(typeof(ApiResponse<bool>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<bool>), StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<ApiResponse<bool>>> ResetPassword(
+        [FromBody] ResetPasswordDto resetPasswordDto)
+    {
+        var result = await _authService.ResetPasswordAsync(resetPasswordDto);
+
+        if (!result.Success)
+        {
+            return BadRequest(result);
+        }
+
+        return Ok(result);
+    }
+
+    /// <summary>
     /// Get current user profile
     /// </summary>
     /// <returns>Current user information</returns>

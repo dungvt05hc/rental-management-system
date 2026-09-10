@@ -9,6 +9,7 @@
   <ItemGroup>
     <PackageReference Include="AutoMapper.Extensions.Microsoft.DependencyInjection" Version="12.0.1" />
     <PackageReference Include="FluentValidation.AspNetCore" Version="11.3.1" />
+    <PackageReference Include="MailKit" Version="4.17.0" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="9.0.7" />
     <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="9.0.7" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="9.0.4" />
@@ -25,6 +26,20 @@
     <PackageReference Include="Serilog.AspNetCore" Version="9.0.0" />
     <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="9.0.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Template email đi kèm assembly, nên deploy không phụ thuộc thư mục nội dung.
+         Tên resource là RentalManagement.Api.Resources.EmailTemplates.{template}.{lang}.html
+
+         WithCulture=false là bắt buộc: thấy phần ".vi."/".en." trong tên file,
+         MSBuild mặc định hiểu đó là culture và đẩy file sang satellite assembly
+         (vi/RentalManagement.Api.resources.dll), đồng thời cắt luôn phần ngôn ngữ
+         khỏi tên resource — lúc đó cả hai bản chập vào một tên và không bản nào
+         nằm trong assembly chính. -->
+    <EmbeddedResource Include="Resources/EmailTemplates/*.html">
+      <WithCulture>false</WithCulture>
+    </EmbeddedResource>
   </ItemGroup>
 
 </Project>

@@ -23,6 +23,32 @@ public interface IAuthService
     Task<ApiResponse<AuthResponseDto>> RegisterAsync(RegisterRequestDto registerRequest);
 
     /// <summary>
+    /// Emails a password reset link to the address, if it belongs to an active account.
+    /// </summary>
+    /// <remarks>
+    /// Completes normally whether or not the address is registered, and whether or
+    /// not the email could be queued. The caller must not be able to tell those
+    /// cases apart: any difference in response — status code, message, or timing —
+    /// turns this endpoint into an oracle for which addresses have accounts.
+    /// </remarks>
+    /// <param name="request">The address to send the link to</param>
+    /// <param name="ct">Cancellation token</param>
+    Task SendPasswordResetLinkAsync(ForgotPasswordDto request, CancellationToken ct = default);
+
+    /// <summary>
+    /// Sets a new password using a token from a password reset link.
+    /// </summary>
+    /// <remarks>
+    /// On success every previously issued JWT for the account stops working,
+    /// because the security stamp changes and
+    /// <see cref="Security.JwtSecurityStampValidator"/> rejects tokens carrying
+    /// the old one.
+    /// </remarks>
+    /// <param name="request">Email, reset token and new password</param>
+    /// <returns>Success, or an error naming what was wrong</returns>
+    Task<ApiResponse<bool>> ResetPasswordAsync(ResetPasswordDto request);
+
+    /// <summary>
     /// Gets user information by user ID
     /// </summary>
     /// <param name="userId">User ID</param>

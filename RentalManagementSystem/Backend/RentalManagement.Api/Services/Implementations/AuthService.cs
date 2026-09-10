@@ -1,8 +1,11 @@
 using AutoMapper;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using RentalManagement.Api.Models.DTOs;
+using RentalManagement.Api.Models.Email;
 using RentalManagement.Api.Models.Entities;
+using RentalManagement.Api.Security;
 using RentalManagement.Api.Services.Interfaces;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
@@ -16,11 +19,18 @@ namespace RentalManagement.Api.Services.Implementations;
 /// </summary>
 public class AuthService : IAuthService
 {
+    /// <summary>
+    /// Dùng khi FRONTEND_URL chưa được đặt — đúng cổng mà ./dev.sh chạy frontend.
+    /// </summary>
+    private const string DefaultFrontendBaseUrl = "http://localhost:3000";
+
     private readonly UserManager<User> _userManager;
     private readonly SignInManager<User> _signInManager;
     private readonly RoleManager<IdentityRole> _roleManager;
     private readonly IMapper _mapper;
     private readonly IConfiguration _configuration;
+    private readonly IEmailService _emailService;
+    private readonly DataProtectionTokenProviderOptions _tokenProviderOptions;
     private readonly ILogger<AuthService> _logger;
 
     public AuthService(
@@ -29,6 +39,8 @@ public class AuthService : IAuthService
         RoleManager<IdentityRole> roleManager,
         IMapper mapper,
         IConfiguration configuration,
+        IEmailService emailService,
+        IOptions<DataProtectionTokenProviderOptions> tokenProviderOptions,
         ILogger<AuthService> logger)
     {
         _userManager = userManager;
@@ -36,6 +48,8 @@ public class AuthService : IAuthService
         _roleManager = roleManager;
         _mapper = mapper;
         _configuration = configuration;
+        _emailService = emailService;
+        _tokenProviderOptions = tokenProviderOptions.Value;
         _logger = logger;
     }
 
@@ -123,6 +137,112 @@ public class AuthService : IAuthService
             User = userDto,
             ExpiresAt = DateTime.UtcNow.AddHours(GetTokenExpirationHours())
         }, "Registration successful");
+    }
+
+    /// <summary>
+    /// Emails a password reset link to the address, if it belongs to an active account
+    /// </summary>
+    public async Task SendPasswordResetLinkAsync(ForgotPasswordDto request, CancellationToken ct = default)
+    {
+        var user = await _userManager.FindByEmailAsync(request.Email);
+
+        // Không có tài khoản, hoặc tài khoản đã bị khoá: dừng im lặng. Người gọi
+        // nhận đúng phản hồi như trường hợp gửi thành công, nên không suy ra
+        // được địa chỉ nào đã đăng ký.
+        if (user is null || !user.IsActive || string.IsNullOrEmpty(user.Email))
+        {
+            _logger.LogInformation(
+                "Password reset requested for an address with no active account: {Email}",
+                request.Email);
+            return;
+        }
+
+        var token = await _userManager.GeneratePasswordResetTokenAsync(user);
+
+        try
+        {
+            await _emailService.SendTemplateAsync(
+                user.Email,
+                EmailTemplate.ResetPassword,
+                new
+                {
+                    user.FullName,
+                    ResetLink = BuildPasswordResetLink(user.Email, token),
+                    ExpiryMinutes = (int)_tokenProviderOptions.TokenLifespan.TotalMinutes
+                },
+                ct);
+
+            _logger.LogInformation("Password reset link queued for user {UserId}", user.Id);
+        }
+        catch (EmailRateLimitExceededException)
+        {
+            // Đây là giới hạn theo địa chỉ email. Để ngoại lệ bay lên sẽ thành
+            // 429, mà 429 chỉ xuất hiện khi địa chỉ có tài khoản thật — vừa
+            // đúng cái oracle mà endpoint này phải tránh. Nuốt ngoại lệ và trả
+            // về như mọi lần khác.
+            _logger.LogWarning(
+                "Password reset email for user {UserId} was suppressed by the per-address rate limit",
+                user.Id);
+        }
+    }
+
+    /// <summary>
+    /// Sets a new password using a token from a password reset link
+    /// </summary>
+    public async Task<ApiResponse<bool>> ResetPasswordAsync(ResetPasswordDto request)
+    {
+        var user = await _userManager.FindByEmailAsync(request.Email);
+
+        if (user is null || !user.IsActive)
+        {
+            // Cùng thông điệp với token hỏng: địa chỉ lạ và token hỏng không được
+            // phân biệt được từ phía người gọi.
+            _logger.LogWarning(
+                "Password reset attempted for an address with no active account: {Email}",
+                request.Email);
+            return InvalidResetTokenResponse();
+        }
+
+        var result = await _userManager.ResetPasswordAsync(user, request.Token, request.NewPassword);
+
+        if (!result.Succeeded)
+        {
+            // Identity trả về cùng mã InvalidToken cho token sai chữ ký, token
+            // đã hết hạn và token đã dùng rồi (stamp đã đổi), nên chỉ tách được
+            // lỗi mật khẩu ra khỏi lỗi token.
+            var passwordErrors = result.Errors
+                .Where(e => e.Code.StartsWith("Password", StringComparison.Ordinal))
+                .Select(e => e.Description)
+                .ToArray();
+
+            if (passwordErrors.Length > 0)
+            {
+                _logger.LogInformation(
+                    "Password reset for user {UserId} rejected by the password policy", user.Id);
+                return ApiResponse<bool>.ErrorResponse(
+                    "The new password does not meet the password policy", passwordErrors);
+            }
+
+            _logger.LogWarning(
+                "Password reset for user {UserId} rejected: {Errors}",
+                user.Id,
+                string.Join(", ", result.Errors.Select(e => e.Code)));
+
+            return InvalidResetTokenResponse();
+        }
+
+        // ResetPasswordAsync đã đổi security stamp khi ghi mật khẩu mới; gọi
+        // tường minh ở đây để việc "mọi phiên cũ hết hiệu lực" là một bước thấy
+        // được của luồng này, không phải tác dụng phụ của Identity.
+        await _userManager.UpdateSecurityStampAsync(user);
+
+        user.UpdatedAt = DateTime.UtcNow;
+        await _userManager.UpdateAsync(user);
+
+        _logger.LogInformation(
+            "Password reset completed for user {UserId}; existing sessions invalidated", user.Id);
+
+        return ApiResponse<bool>.SuccessResponse(true, "Your password has been reset");
     }
 
     /// <summary>
@@ -256,6 +376,45 @@ public class AuthService : IAuthService
     }
 
     /// <summary>
+    /// Thông điệp dùng chung cho mọi lý do khiến token đặt lại mật khẩu không
+    /// dùng được, để người gọi không dò được token nào từng hợp lệ.
+    /// </summary>
+    private static ApiResponse<bool> InvalidResetTokenResponse() =>
+        ApiResponse<bool>.ErrorResponse(
+            "This password reset link is not valid. It may have expired or already been used. "
+            + "Request a new one.");
+
+    /// <summary>
+    /// Dựng link đặt lại mật khẩu trỏ về frontend.
+    /// </summary>
+    private string BuildPasswordResetLink(string email, string token)
+    {
+        // Token của Identity là base64 nên chứa '+', '/' và '='; email chứa '@'.
+        // Không escape thì '+' lên URL thành dấu cách và token về tới server đã
+        // sai một ký tự.
+        return $"{ResolveFrontendBaseUrl()}/reset-password"
+            + $"?email={Uri.EscapeDataString(email)}"
+            + $"&token={Uri.EscapeDataString(token)}";
+    }
+
+    /// <summary>
+    /// Địa chỉ gốc của frontend, lấy từ cùng biến môi trường mà CORS dùng.
+    /// </summary>
+    private string ResolveFrontendBaseUrl()
+    {
+        // FRONTEND_URL cho phép nhiều origin ngăn cách bằng dấu phẩy. Link trong
+        // email chỉ có một đích nên lấy origin đầu tiên.
+        var firstOrigin = (Environment.GetEnvironmentVariable("FRONTEND_URL")
+                ?? _configuration["FrontendUrl"])
+            ?.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .FirstOrDefault();
+
+        return string.IsNullOrWhiteSpace(firstOrigin)
+            ? DefaultFrontendBaseUrl
+            : firstOrigin.TrimEnd('/');
+    }
+
+    /// <summary>
     /// Generates a JWT token for the authenticated user
     /// </summary>
     private async Task<string> GenerateJwtTokenAsync(User user)
@@ -274,7 +433,12 @@ public class AuthService : IAuthService
             new(ClaimTypes.Name, user.UserName ?? string.Empty),
             new(ClaimTypes.Email, user.Email ?? string.Empty),
             new("FirstName", user.FirstName),
-            new("LastName", user.LastName)
+            new("LastName", user.LastName),
+
+            // Cho phép huỷ hiệu lực token trước hạn: đổi mật khẩu làm Identity
+            // sinh stamp mới, và JwtSecurityStampValidator từ chối mọi token còn
+            // mang stamp cũ.
+            new(AuthClaimTypes.SecurityStamp, user.SecurityStamp ?? string.Empty)
         };
 
         // Add role claims

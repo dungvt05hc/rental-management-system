@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+
 using Microsoft.AspNetCore.Identity;
 
 namespace RentalManagement.Api.Models.Entities;
@@ -31,6 +33,13 @@ public class User : IdentityUser
     /// Whether the user is active
     /// </summary>
     public bool IsActive { get; set; } = true;
+
+    /// <summary>
+    /// Language code used for messages sent to this user ("vi", "en").
+    /// Null means the system default is used.
+    /// </summary>
+    [MaxLength(10)]
+    public string? PreferredLanguage { get; set; }
 
     /// <summary>
     /// User's full name for display purposes

@@ -6,6 +6,8 @@ import { NotificationContainer } from './components/ui/NotificationContainer';
 import { Layout } from './components/layout/Layout';
 import { LoginPage } from './components/auth/LoginPage';
 import { NoAccessPage } from './components/auth/NoAccessPage';
+import { ForgotPasswordPage } from './components/auth/ForgotPasswordPage';
+import { ResetPasswordPage } from './components/auth/ResetPasswordPage';
 import { DashboardPage } from './components/dashboard/DashboardPage';
 import { RoomsPage } from './components/rooms/RoomsPage';
 import { TenantsPage } from './components/tenants/TenantsPage';
@@ -68,6 +70,10 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      {/* Nằm ngoài ProtectedRoute: người quên mật khẩu thì theo định nghĩa là
+          chưa đăng nhập được. */}
+      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route path="/no-access" element={<NoAccessPage />} />
       <Route
         path="/"

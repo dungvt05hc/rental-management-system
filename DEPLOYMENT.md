@@ -93,12 +93,42 @@ After baselining, deploys apply new migrations normally.
 | `FRONTEND_URL` | yes | Comma-separated list of origins allowed by CORS, e.g. `https://rental-management-web.onrender.com`. Without it, browser requests from the deployed frontend are blocked. |
 | `SEED_ADMIN_PASSWORD` | first deploy | Password for the seeded `admin@rentalmanagement.com` account. If unset, the account is not created and startup logs a warning. |
 | `ASPNETCORE_ENVIRONMENT` | set in blueprint | `Production`. |
+| `SMTP_HOST` | for email | SMTP server hostname. **This variable is the switch**: leave it unset and the API starts normally but only logs the emails it would have sent. Set it and the other five below become required. |
+| `SMTP_PORT` | no | Defaults to `587` (STARTTLS). Use `465` for implicit TLS — the client picks the right mode from the port. |
+| `SMTP_USER` | usually | SMTP username, normally the full sending address. Leave unset only for a relay that accepts unauthenticated mail. |
+| `SMTP_PASSWORD` | with `SMTP_USER` | SMTP password or API key. For Gmail this is an app password, never the account password. |
+| `SMTP_FROM_EMAIL` | for email | Address in the `From` header. Falls back to `SMTP_USER` when unset. Most providers reject a `From` that is not a verified sender. |
+| `SMTP_FROM_NAME` | for email | Display name in the `From` header, e.g. `Quản lý phòng trọ`. |
 
 Generate a signing key with:
 
 ```bash
 openssl rand -base64 48
 ```
+
+### Choosing an email provider
+
+| Provider | Host / port | Notes |
+| --- | --- | --- |
+| Gmail SMTP | `smtp.gmail.com` / `587` | Fastest to set up on an account you already have. Requires 2-Step Verification, then an **app password** (16 characters) as `SMTP_PASSWORD` — a normal password is refused. **Capped at 500 emails per day** for a free account (2,000 for Workspace), and mail from a personal address is more likely to be filtered. Fine for a first deploy, not for volume. |
+| Brevo | `smtp-relay.brevo.com` / `587` | Free tier around 300 emails/day, no card required, and a Vietnamese-language dashboard. `SMTP_USER` is the login shown in the SMTP panel, `SMTP_PASSWORD` is the generated SMTP key. Good middle option. |
+| Resend | `smtp.resend.com` / `587` | `SMTP_USER` is the literal string `resend`, `SMTP_PASSWORD` is the API key. Cleanest deliverability once you verify your own domain via DNS; that verification step is required before real sending. |
+
+Whichever you pick, verify the sending domain (SPF and DKIM records) as soon as the
+system sends to real tenants — unverified senders land in spam.
+
+Check the setup after deploy by calling the admin-only endpoint:
+
+```bash
+curl -X POST https://<api-host>/api/email/test \
+  -H "Authorization: Bearer <admin JWT>" \
+  -H 'Content-Type: application/json' \
+  -d '{"to":"you@example.com","template":"ResetPassword"}'
+```
+
+It returns `202` as soon as the message is queued; delivery happens in the
+background, so read the service logs to confirm the send. The same address is
+limited to 3 emails per 15 minutes — a fourth call returns `429`.
 
 ### Web (`rental-management-web`)
 

@@ -7,12 +7,14 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using Npgsql;
 using RentalManagement.Api.Data;
 using RentalManagement.Api.Mappings;
 using RentalManagement.Api.Middleware;
+using RentalManagement.Api.Models.Email;
 using RentalManagement.Api.Models.Entities;
 using RentalManagement.Api.Security;
 using RentalManagement.Api.Services.Implementations;
@@ -124,6 +126,14 @@ builder.Services.AddIdentity<User, IdentityRole>(options =>
 .AddEntityFrameworkStores<RentalManagementContext>()
 .AddDefaultTokenProviders();
 
+// Thời hạn token sinh bởi DataProtectorTokenProvider — trong đó có token đặt
+// lại mật khẩu. Mặc định của Identity là 1 ngày, quá dài cho một link nằm sẵn
+// trong hộp thư: ai đọc được email cũ trong ngày là đổi được mật khẩu.
+builder.Services.Configure<DataProtectionTokenProviderOptions>(options =>
+{
+    options.TokenLifespan = TimeSpan.FromHours(1);
+});
+
 // Add JWT Authentication - support environment variable override
 var jwtSettings = builder.Configuration.GetSection("JwtSettings");
 var secretKey = Environment.GetEnvironmentVariable("JWT_SECRET_KEY")
@@ -171,11 +181,22 @@ builder.Services.AddAuthentication(options =>
             }
             return Task.CompletedTask;
         },
-        OnTokenValidated = context =>
+        OnTokenValidated = async context =>
         {
+            // Chữ ký hợp lệ mới là điều kiện cần. Bước này đối chiếu security
+            // stamp với database để token phát hành trước lần đổi mật khẩu gần
+            // nhất không còn dùng được.
+            await JwtSecurityStampValidator.ValidateAsync(context);
+
+            if (context.Result?.Succeeded == false)
+            {
+                Log.Warning("JWT rejected after signature check: {Reason}",
+                    context.Result.Failure?.Message);
+                return;
+            }
+
             Log.Debug("JWT Token validated successfully for user: {User}",
                 context.Principal?.Identity?.Name ?? "Unknown");
-            return Task.CompletedTask;
         },
         OnMessageReceived = context =>
         {
@@ -228,6 +249,20 @@ builder.Services.AddRateLimiter(options =>
                 // brute force tự động xuống mức vô dụng.
                 PermitLimit = 10,
                 Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0
+            }));
+
+    // Quên mật khẩu tốn kém hơn đăng nhập — mỗi lần gọi là một email gửi đi —
+    // nên hạn mức chặt hơn nhiều. Đây là lớp chặn theo IP; số email tối đa tới
+    // cùng một địa chỉ do IEmailRateLimiter lo, vì email nằm trong body mà hàm
+    // phân vùng ở đây chạy trước khi body được đọc.
+    options.AddPolicy(RateLimitPolicies.ForgotPassword, httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 10,
+                Window = TimeSpan.FromMinutes(15),
                 QueueLimit = 0
             }));
 
@@ -298,6 +333,45 @@ builder.Services.AddScoped<IPdfService, PdfService>();
 builder.Services.AddScoped<ILocalizationService, LocalizationService>();
 builder.Services.AddScoped<ISystemManagementService, SystemManagementService>();
 builder.Services.AddScoped<IUserManagementService, UserManagementService>();
+
+// Email infrastructure.
+// Cấu hình đọc từ biến môi trường, không có gì trong appsettings, để mật khẩu
+// SMTP không bao giờ nằm trong repo.
+var emailSettings = EmailSettings.FromEnvironment();
+builder.Services.AddSingleton(Options.Create(emailSettings));
+
+builder.Services.AddMemoryCache();
+builder.Services.AddSingleton<IEmailRateLimiter, MemoryCacheEmailRateLimiter>();
+builder.Services.AddSingleton<IEmailTemplateRenderer, EmailTemplateRenderer>();
+builder.Services.AddScoped<IEmailLanguageResolver, UserEmailLanguageResolver>();
+
+if (emailSettings.IsConfigured)
+{
+    // Hàng đợi và tiến trình nền là singleton; chỉ tiến trình nền chờ SMTP nên
+    // request trả về ngay sau khi email được xếp hàng.
+    builder.Services.AddSingleton<IEmailQueue, EmailQueue>();
+    builder.Services.AddSingleton<IEmailSender, MailKitEmailSender>();
+    builder.Services.AddHostedService<EmailQueueProcessor>();
+
+    builder.Services.AddScoped<SmtpEmailService>();
+    builder.Services.AddScoped<IEmailService>(sp => new RateLimitedEmailService(
+        sp.GetRequiredService<SmtpEmailService>(),
+        sp.GetRequiredService<IEmailRateLimiter>()));
+
+    Log.Information("Email configured. Host={Host} Port={Port} From={From}",
+        emailSettings.Host, emailSettings.Port, emailSettings.FromEmail);
+}
+else
+{
+    // Thiếu SMTP_HOST thì chỉ ghi log thay vì ném lỗi, để máy dev chạy được
+    // toàn bộ ứng dụng mà không cần máy chủ SMTP thật.
+    builder.Services.AddScoped<NoOpEmailService>();
+    builder.Services.AddScoped<IEmailService>(sp => new RateLimitedEmailService(
+        sp.GetRequiredService<NoOpEmailService>(),
+        sp.GetRequiredService<IEmailRateLimiter>()));
+
+    Log.Warning("SMTP_HOST is not set. Emails will be logged instead of sent.");
+}
 
 // Add controllers
 builder.Services.AddControllers();

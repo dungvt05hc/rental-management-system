@@ -40,6 +40,18 @@ export interface LoginResponse {
   expiresAt: string;
 }
 
+// POST /auth/forgot-password — khớp ForgotPasswordDto
+export interface ForgotPasswordRequest {
+  email: string;
+}
+
+// POST /auth/reset-password — khớp ResetPasswordDto
+export interface ResetPasswordRequest {
+  email: string;
+  token: string;
+  newPassword: string;
+}
+
 export interface RegisterRequest {
   userName: string;
   email: string;

@@ -1,10 +1,12 @@
 import { apiService } from './api';
-import type { 
-  LoginRequest, 
-  LoginResponse, 
-  RegisterRequest, 
-  User, 
-  ApiResponse 
+import type {
+  LoginRequest,
+  LoginResponse,
+  RegisterRequest,
+  ForgotPasswordRequest,
+  ResetPasswordRequest,
+  User,
+  ApiResponse
 } from '../types';
 
 export const authService = {
@@ -16,6 +18,19 @@ export const authService = {
   // Register new user (Admin only)
   async register(userData: RegisterRequest): Promise<ApiResponse<User>> {
     return apiService.post<User>('/auth/register', userData);
+  },
+
+  // Yêu cầu email chứa link đặt lại mật khẩu.
+  // Luôn thành công dù địa chỉ có tài khoản hay không — backend cố tình trả về
+  // như nhau để không lộ danh sách email đã đăng ký.
+  async forgotPassword(request: ForgotPasswordRequest): Promise<ApiResponse<boolean>> {
+    return apiService.post<boolean>('/auth/forgot-password', request);
+  },
+
+  // Đặt mật khẩu mới bằng token trong link. Mọi phiên đăng nhập cũ hết hiệu lực
+  // khi thành công, nên người dùng phải đăng nhập lại.
+  async resetPassword(request: ResetPasswordRequest): Promise<ApiResponse<boolean>> {
+    return apiService.post<boolean>('/auth/reset-password', request);
   },
 
   // Get current user profile

@@ -198,6 +198,45 @@ public class ChangePasswordDto
 }
 
 /// <summary>
+/// DTO for requesting a password reset link
+/// </summary>
+public class ForgotPasswordDto
+{
+    /// <summary>
+    /// Email address of the account to reset
+    /// </summary>
+    [Required]
+    [EmailAddress]
+    public string Email { get; set; } = string.Empty;
+}
+
+/// <summary>
+/// DTO for completing a password reset with the token from the emailed link
+/// </summary>
+public class ResetPasswordDto
+{
+    /// <summary>
+    /// Email address the reset link was issued for
+    /// </summary>
+    [Required]
+    [EmailAddress]
+    public string Email { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Reset token from the emailed link
+    /// </summary>
+    [Required]
+    public string Token { get; set; } = string.Empty;
+
+    /// <summary>
+    /// New password. Must satisfy the Identity password policy.
+    /// </summary>
+    [Required]
+    [StringLength(100, MinimumLength = 10)]
+    public string NewPassword { get; set; } = string.Empty;
+}
+
+/// <summary>
 /// DTO for updating user information
 /// </summary>
 public class UpdateUserDto

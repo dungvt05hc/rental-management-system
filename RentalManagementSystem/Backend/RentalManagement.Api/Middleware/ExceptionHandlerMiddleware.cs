@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Text.Json;
 
 using RentalManagement.Api.Models.DTOs;
+using RentalManagement.Api.Models.Email;
 
 namespace RentalManagement.Api.Middleware;
 
@@ -90,6 +91,7 @@ public class ExceptionHandlerMiddleware
 
     private static (int StatusCode, string Message) MapException(Exception exception) => exception switch
     {
+        EmailRateLimitExceededException => (StatusCodes.Status429TooManyRequests, "Too many emails have been sent to this address. Please try again later"),
         KeyNotFoundException => (StatusCodes.Status404NotFound, "The requested resource was not found"),
         UnauthorizedAccessException => (StatusCodes.Status403Forbidden, "You are not allowed to perform this operation"),
         ArgumentException => (StatusCodes.Status400BadRequest, "The request is invalid"),
