@@ -53,7 +53,8 @@ public class RoomService : IRoomService
     public async Task<ApiResponse<RoomDto>> GetRoomByIdAsync(int id)
     {
         var room = await _context.Rooms
-            .Include(r => r.Tenants)
+            .Include(r => r.RentalContracts)
+                .ThenInclude(c => c.Customer)
             .FirstOrDefaultAsync(r => r.Id == id);
 
         if (room == null)
@@ -67,13 +68,17 @@ public class RoomService : IRoomService
 
     public async Task<ApiResponse<PagedResponse<RoomDto>>> GetRoomsAsync(RoomSearchDto searchDto)
     {
-        var query = _context.Rooms.Include(r => r.Tenants).AsQueryable();
+        var query = _context.Rooms
+            .Include(r => r.RentalContracts)
+                .ThenInclude(c => c.Customer)
+            .AsQueryable();
 
         // Apply filters
         if (!string.IsNullOrEmpty(searchDto.SearchTerm))
         {
-            query = query.Where(r => r.RoomNumber.Contains(searchDto.SearchTerm) ||
-                                   (r.Description != null && r.Description.Contains(searchDto.SearchTerm)));
+            // Xem ghi chú ở CustomerService: so trên cột đã bỏ dấu.
+            var searchTerm = SearchText.Normalize(searchDto.SearchTerm);
+            query = query.Where(r => r.SearchText.Contains(searchTerm));
         }
 
         if (searchDto.Type.HasValue)
@@ -184,7 +189,8 @@ public class RoomService : IRoomService
     public async Task<ApiResponse<bool>> DeleteRoomAsync(int id)
     {
         var room = await _context.Rooms
-            .Include(r => r.Tenants)
+            .Include(r => r.RentalContracts)
+                .ThenInclude(c => c.Customer)
             .Include(r => r.Invoices)
             .FirstOrDefaultAsync(r => r.Id == id);
 
@@ -193,10 +199,10 @@ public class RoomService : IRoomService
             return ApiResponse<bool>.ErrorResponse("Room not found");
         }
 
-        // Check if room has active tenants
-        if (room.Tenants.Any(t => t.HasActiveContract))
+        // Check if room is under an active contract
+        if (room.RentalContracts.Any(c => c.Status == RentalContractStatus.Active))
         {
-            return ApiResponse<bool>.ErrorResponse("Cannot delete room with active tenants");
+            return ApiResponse<bool>.ErrorResponse("Cannot delete room with active customers");
         }
 
         // Check if room has unpaid invoices
@@ -216,7 +222,8 @@ public class RoomService : IRoomService
     {
         var rooms = await _context.Rooms
             .Where(r => r.Status == status)
-            .Include(r => r.Tenants)
+            .Include(r => r.RentalContracts)
+                .ThenInclude(c => c.Customer)
             .OrderBy(r => r.RoomNumber)
             .ToListAsync();
 
@@ -228,7 +235,8 @@ public class RoomService : IRoomService
     {
         var rooms = await _context.Rooms
             .Where(r => r.Status == RoomStatus.Vacant)
-            .Include(r => r.Tenants)
+            .Include(r => r.RentalContracts)
+                .ThenInclude(c => c.Customer)
             .OrderBy(r => r.RoomNumber)
             .ToListAsync();
 

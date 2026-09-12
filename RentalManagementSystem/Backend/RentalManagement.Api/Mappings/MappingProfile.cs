@@ -14,7 +14,8 @@ public class MappingProfile : Profile
     {
         ConfigureUserMappings();
         ConfigureRoomMappings();
-        ConfigureTenantMappings();
+        ConfigureCustomerMappings();
+        ConfigureRentalContractMappings();
         ConfigureInvoiceMappings();
         ConfigurePaymentMappings();
         ConfigureItemMappings();
@@ -31,8 +32,11 @@ public class MappingProfile : Profile
         CreateMap<User, UserDto>()
             .ForMember(dest => dest.Roles, opt => opt.Ignore()); // Roles will be populated separately
 
-        CreateMap<RegisterRequestDto, User>()
-            .ForMember(dest => dest.UserName, opt => opt.MapFrom(src => src.Email))
+        // Đăng ký bằng mã mời. Không có ánh xạ nào chạm tới role hay IsActive:
+        // role đến từ mã mời, còn EmailConfirmed do AuthService đặt tường minh.
+        CreateMap<SelfRegisterDto, User>()
+            .ForMember(dest => dest.UserName, opt => opt.MapFrom(src => src.Email.Trim()))
+            .ForMember(dest => dest.Email, opt => opt.MapFrom(src => src.Email.Trim()))
             .ForMember(dest => dest.Id, opt => opt.Ignore())
             .ForMember(dest => dest.CreatedAt, opt => opt.MapFrom(_ => DateTime.UtcNow))
             .ForMember(dest => dest.UpdatedAt, opt => opt.MapFrom(_ => DateTime.UtcNow));
@@ -46,8 +50,12 @@ public class MappingProfile : Profile
         CreateMap<Room, RoomDto>()
             .ForMember(dest => dest.TypeName, opt => opt.MapFrom(src => src.Type.ToString()))
             .ForMember(dest => dest.StatusName, opt => opt.MapFrom(src => src.Status.ToString()))
-            .ForMember(dest => dest.CurrentTenant, opt => opt.MapFrom(src => 
-                src.Tenants.FirstOrDefault(t => t.IsActive && t.HasActiveContract)));
+            .ForMember(dest => dest.CurrentCustomer, opt => opt.MapFrom(src =>
+                src.RentalContracts
+                   .Where(c => c.Status == RentalContractStatus.Active)
+                   .OrderByDescending(c => c.StartDate)
+                   .Select(c => c.Customer)
+                   .FirstOrDefault()));
 
         CreateMap<Room, RoomSummaryDto>()
             .ForMember(dest => dest.TypeName, opt => opt.MapFrom(src => src.Type.ToString()));
@@ -57,53 +65,109 @@ public class MappingProfile : Profile
             .ForMember(dest => dest.Status, opt => opt.MapFrom(_ => RoomStatus.Vacant))
             .ForMember(dest => dest.CreatedAt, opt => opt.MapFrom(_ => DateTime.UtcNow))
             .ForMember(dest => dest.UpdatedAt, opt => opt.MapFrom(_ => DateTime.UtcNow))
-            .ForMember(dest => dest.Tenants, opt => opt.Ignore())
+            .ForMember(dest => dest.RentalContracts, opt => opt.Ignore())
             .ForMember(dest => dest.Invoices, opt => opt.Ignore());
 
         CreateMap<UpdateRoomDto, Room>()
             .ForMember(dest => dest.Id, opt => opt.Ignore())
             .ForMember(dest => dest.CreatedAt, opt => opt.Ignore())
             .ForMember(dest => dest.UpdatedAt, opt => opt.MapFrom(_ => DateTime.UtcNow))
-            .ForMember(dest => dest.Tenants, opt => opt.Ignore())
+            .ForMember(dest => dest.RentalContracts, opt => opt.Ignore())
             .ForMember(dest => dest.Invoices, opt => opt.Ignore())
             .ForAllMembers(opt => opt.Condition((src, dest, srcMember) => srcMember is not null));
     }
 
     /// <summary>
-    /// Configures mappings for Tenant entities and DTOs
+    /// Configures mappings for Customer entities and DTOs
     /// </summary>
-    private void ConfigureTenantMappings()
+    private void ConfigureCustomerMappings()
     {
-        CreateMap<Tenant, TenantDto>()
-            .ForMember(dest => dest.Age, opt => opt.MapFrom(src => 
-                src.DateOfBirth.HasValue 
-                    ? DateTime.UtcNow.Year - src.DateOfBirth.Value.Year - 
+        // Rental fields on CustomerDto are derived from the customer's active contract,
+        // so the pre-rename API shape survives the split onto RentalContract.
+        CreateMap<Customer, CustomerDto>()
+            .ForMember(dest => dest.Age, opt => opt.MapFrom(src =>
+                src.DateOfBirth.HasValue
+                    ? DateTime.UtcNow.Year - src.DateOfBirth.Value.Year -
                       (DateTime.UtcNow.DayOfYear < src.DateOfBirth.Value.DayOfYear ? 1 : 0)
-                    : (int?)null));
-
-        CreateMap<Tenant, TenantSummaryDto>();
-
-        CreateMap<CreateTenantDto, Tenant>()
-            .ForMember(dest => dest.Id, opt => opt.Ignore())
-            .ForMember(dest => dest.RoomId, opt => opt.Ignore())
+                    : (int?)null))
+            .ForMember(dest => dest.ActiveContractId, opt => opt.Ignore())
             .ForMember(dest => dest.Room, opt => opt.Ignore())
             .ForMember(dest => dest.ContractStartDate, opt => opt.Ignore())
             .ForMember(dest => dest.ContractEndDate, opt => opt.Ignore())
+            .ForMember(dest => dest.MonthlyRent, opt => opt.Ignore())
+            .ForMember(dest => dest.SecurityDeposit, opt => opt.Ignore())
+            .ForMember(dest => dest.HasActiveContract, opt => opt.Ignore())
+            .ForMember(dest => dest.ContractCount, opt => opt.MapFrom(src => src.RentalContracts.Count))
+            .AfterMap((src, dest, ctx) =>
+            {
+                var contract = ActiveContract(src);
+                if (contract == null)
+                {
+                    return;
+                }
+
+                dest.ActiveContractId = contract.Id;
+                dest.ContractStartDate = contract.StartDate;
+                dest.ContractEndDate = contract.EndDate;
+                dest.MonthlyRent = contract.MonthlyRent;
+                dest.SecurityDeposit = contract.SecurityDeposit;
+                dest.HasActiveContract = true;
+                dest.Room = contract.Room == null ? null : ctx.Mapper.Map<RoomSummaryDto>(contract.Room);
+            });
+
+        CreateMap<Customer, CustomerSummaryDto>()
+            .ForMember(dest => dest.ContractStartDate, opt => opt.Ignore())
+            .ForMember(dest => dest.ContractEndDate, opt => opt.Ignore())
+            .ForMember(dest => dest.HasActiveContract, opt => opt.Ignore())
+            .AfterMap((src, dest) =>
+            {
+                var contract = ActiveContract(src);
+                if (contract == null)
+                {
+                    return;
+                }
+
+                dest.ContractStartDate = contract.StartDate;
+                dest.ContractEndDate = contract.EndDate;
+                dest.HasActiveContract = true;
+            });
+
+        CreateMap<CreateCustomerDto, Customer>()
+            .ForMember(dest => dest.Id, opt => opt.Ignore())
             .ForMember(dest => dest.IsActive, opt => opt.MapFrom(_ => true))
             .ForMember(dest => dest.CreatedAt, opt => opt.MapFrom(_ => DateTime.UtcNow))
             .ForMember(dest => dest.UpdatedAt, opt => opt.MapFrom(_ => DateTime.UtcNow))
+            .ForMember(dest => dest.RentalContracts, opt => opt.Ignore())
             .ForMember(dest => dest.Invoices, opt => opt.Ignore());
 
-        CreateMap<UpdateTenantDto, Tenant>()
+        CreateMap<UpdateCustomerDto, Customer>()
             .ForMember(dest => dest.Id, opt => opt.Ignore())
-            .ForMember(dest => dest.RoomId, opt => opt.Ignore())
-            .ForMember(dest => dest.Room, opt => opt.Ignore())
-            .ForMember(dest => dest.ContractStartDate, opt => opt.Ignore())
-            .ForMember(dest => dest.ContractEndDate, opt => opt.Ignore())
             .ForMember(dest => dest.CreatedAt, opt => opt.Ignore())
             .ForMember(dest => dest.UpdatedAt, opt => opt.MapFrom(_ => DateTime.UtcNow))
+            .ForMember(dest => dest.RentalContracts, opt => opt.Ignore())
             .ForMember(dest => dest.Invoices, opt => opt.Ignore())
             .ForAllMembers(opt => opt.Condition((src, dest, srcMember) => srcMember is not null));
+    }
+
+    /// <summary>
+    /// The customer's currently active contract, or null when they hold none.
+    /// Requires RentalContracts (and their Room) to have been loaded.
+    /// </summary>
+    private static RentalContract? ActiveContract(Customer customer) =>
+        customer.RentalContracts
+            .Where(c => c.Status == RentalContractStatus.Active)
+            .OrderByDescending(c => c.StartDate)
+            .FirstOrDefault();
+
+    /// <summary>
+    /// Configures mappings for RentalContract entities and DTOs
+    /// </summary>
+    private void ConfigureRentalContractMappings()
+    {
+        CreateMap<RentalContract, RentalContractDto>()
+            .ForMember(dest => dest.CustomerName, opt => opt.MapFrom(src => src.Customer.FullName))
+            .ForMember(dest => dest.StatusName, opt => opt.MapFrom(src => src.Status.ToString()))
+            .ForMember(dest => dest.InvoiceCount, opt => opt.Ignore()); // Filled in by the service
     }
 
     /// <summary>
@@ -118,15 +182,15 @@ public class MappingProfile : Profile
 
         CreateMap<Invoice, InvoiceSummaryDto>()
             .ForMember(dest => dest.StatusName, opt => opt.MapFrom(src => src.Status.ToString()))
-            .ForMember(dest => dest.TenantName, opt => opt.MapFrom(src => src.Tenant.FullName))
+            .ForMember(dest => dest.CustomerName, opt => opt.MapFrom(src => src.Customer.FullName))
             .ForMember(dest => dest.RoomNumber, opt => opt.MapFrom(src => src.Room.RoomNumber));
 
         CreateMap<CreateInvoiceDto, Invoice>()
             .ForMember(dest => dest.Id, opt => opt.Ignore())
             .ForMember(dest => dest.InvoiceNumber, opt => opt.Ignore()) // Will be generated
-            .ForMember(dest => dest.Tenant, opt => opt.Ignore())
+            .ForMember(dest => dest.Customer, opt => opt.Ignore())
             .ForMember(dest => dest.Room, opt => opt.Ignore())
-            .ForMember(dest => dest.MonthlyRent, opt => opt.Ignore()) // Will be set from tenant/room
+            .ForMember(dest => dest.MonthlyRent, opt => opt.Ignore()) // Will be set from customer/room
             .ForMember(dest => dest.TotalAmount, opt => opt.Ignore()) // Will be calculated
             .ForMember(dest => dest.PaidAmount, opt => opt.MapFrom(_ => 0m))
             .ForMember(dest => dest.RemainingBalance, opt => opt.Ignore()) // Will be calculated
@@ -141,8 +205,8 @@ public class MappingProfile : Profile
         CreateMap<UpdateInvoiceDto, Invoice>()
             .ForMember(dest => dest.Id, opt => opt.Ignore())
             .ForMember(dest => dest.InvoiceNumber, opt => opt.Ignore())
-            .ForMember(dest => dest.TenantId, opt => opt.Ignore())
-            .ForMember(dest => dest.Tenant, opt => opt.Ignore())
+            .ForMember(dest => dest.CustomerId, opt => opt.Ignore())
+            .ForMember(dest => dest.Customer, opt => opt.Ignore())
             .ForMember(dest => dest.RoomId, opt => opt.Ignore())
             .ForMember(dest => dest.Room, opt => opt.Ignore())
             .ForMember(dest => dest.MonthlyRent, opt => opt.Ignore())

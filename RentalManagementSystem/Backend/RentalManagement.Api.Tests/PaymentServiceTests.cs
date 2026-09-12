@@ -22,7 +22,7 @@ public class PaymentServiceTests : IAsyncLifetime
 
     private static readonly DateTime PaidOn = new(2026, 9, 10, 12, 0, 0, DateTimeKind.Utc);
 
-    private int _tenantId;
+    private int _customerId;
     private int _roomId;
 
     public PaymentServiceTests(PostgresFixture fixture)
@@ -34,7 +34,7 @@ public class PaymentServiceTests : IAsyncLifetime
     public async Task InitializeAsync()
     {
         await using var context = _fixture.CreateContext();
-        (_tenantId, _roomId) = await RentalTestData.ResetAndSeedTenantAsync(context, monthlyRent: 1_000m);
+        (_customerId, _roomId, _) = await RentalTestData.ResetAndSeedCustomerAsync(context, monthlyRent: 1_000m);
     }
 
     public Task DisposeAsync() => Task.CompletedTask;
@@ -51,7 +51,7 @@ public class PaymentServiceTests : IAsyncLifetime
 
         var invoice = new Invoice
         {
-            TenantId = _tenantId,
+            CustomerId = _customerId,
             RoomId = _roomId,
             InvoiceNumber = $"INV-TEST-{Guid.NewGuid():N}"[..20],
             MonthlyRent = totalAmount,

@@ -5,12 +5,17 @@ import { NotificationProvider } from './contexts/NotificationContext';
 import { NotificationContainer } from './components/ui/NotificationContainer';
 import { Layout } from './components/layout/Layout';
 import { LoginPage } from './components/auth/LoginPage';
+import { RegisterPage } from './components/auth/RegisterPage';
+import { ConfirmEmailPage } from './components/auth/ConfirmEmailPage';
 import { NoAccessPage } from './components/auth/NoAccessPage';
 import { ForgotPasswordPage } from './components/auth/ForgotPasswordPage';
 import { ResetPasswordPage } from './components/auth/ResetPasswordPage';
+import { InvitationsPage } from './components/invitations/InvitationsPage';
 import { DashboardPage } from './components/dashboard/DashboardPage';
 import { RoomsPage } from './components/rooms/RoomsPage';
-import { TenantsPage } from './components/tenants/TenantsPage';
+import { CustomersPage } from './components/customers/CustomersPage';
+import { CustomerContractsPage } from './components/customers/CustomerContractsPage';
+import { RentalContractFormPage } from './components/customers/RentalContractFormPage';
 import { InvoicesPage } from './components/invoices/InvoicesPage';
 import { InvoiceFormPage } from './components/invoices/InvoiceFormPage';
 import { InvoiceDetailPage } from './components/invoices/InvoiceDetailPage';
@@ -71,7 +76,10 @@ function AppRoutes() {
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       {/* Nằm ngoài ProtectedRoute: người quên mật khẩu thì theo định nghĩa là
-          chưa đăng nhập được. */}
+          chưa đăng nhập được. Đăng ký và xác nhận email cũng vậy — người được
+          mời còn chưa có tài khoản. */}
+      <Route path="/register" element={<RegisterPage />} />
+      <Route path="/confirm-email" element={<ConfirmEmailPage />} />
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
       <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route path="/no-access" element={<NoAccessPage />} />
@@ -92,13 +100,32 @@ function AppRoutes() {
         }
       />
       <Route
-        path="/tenants"
+        path="/customers"
         element={
-          <ProtectedRoute feature="tenants">
-            <TenantsPage />
+          <ProtectedRoute feature="customers">
+            <CustomersPage />
           </ProtectedRoute>
         }
       />
+      <Route
+        path="/customers/:customerId/contracts"
+        element={
+          <ProtectedRoute feature="customers">
+            <CustomerContractsPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/customers/:customerId/contracts/new"
+        element={
+          <ProtectedRoute feature="customers">
+            <RentalContractFormPage />
+          </ProtectedRoute>
+        }
+      />
+      {/* Đường dẫn cũ trước khi đổi Tenant → Customer. Gỡ sau một phiên bản. */}
+      <Route path="/tenants" element={<Navigate to="/customers" replace />} />
+      <Route path="/tenants/*" element={<Navigate to="/customers" replace />} />
       <Route
         path="/invoices"
         element={
@@ -200,6 +227,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute feature="users">
             <CreateUserPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/invitations"
+        element={
+          <ProtectedRoute feature="invitations">
+            <InvitationsPage />
           </ProtectedRoute>
         }
       />

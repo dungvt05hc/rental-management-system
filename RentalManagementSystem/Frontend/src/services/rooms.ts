@@ -44,13 +44,13 @@ export const roomService = {
     return apiService.get<Room[]>(`/rooms/status/${status}`);
   },
 
-  // Assign tenant to room
-  async assignTenant(roomId: string, tenantId: string): Promise<ApiResponse<Room>> {
-    return apiService.post<Room>(`/rooms/${roomId}/assign`, { tenantId });
+  // Assign customer to room
+  async assignCustomer(roomId: string, customerId: string): Promise<ApiResponse<Room>> {
+    return apiService.post<Room>(`/rooms/${roomId}/assign`, { customerId });
   },
 
-  // Remove tenant from room
-  async removeTenant(roomId: string): Promise<ApiResponse<Room>> {
-    return apiService.post<Room>(`/rooms/${roomId}/remove-tenant`);
+  // Remove customer from room
+  async removeCustomer(roomId: string): Promise<ApiResponse<Room>> {
+    return apiService.post<Room>(`/rooms/${roomId}/remove-customer`);
   }
 };

@@ -10,6 +10,7 @@ import { Switch } from '../ui/Switch';
 import { Card } from '../ui/Card';
 import { MultiSelect } from '../ui/MultiSelect';
 import { useCreateUser, useRoles } from '../../hooks/useUserManagement';
+import { useTranslation } from '../../hooks/useTranslation';
 import { useToast } from '../../contexts/ToastContext';
 import { Loader2, ArrowLeft } from 'lucide-react';
 
@@ -30,6 +31,7 @@ type CreateUserFormValues = z.infer<typeof createUserSchema>;
  * Full page form for creating a new user with role assignment
  */
 export function CreateUserPage() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const toast = useToast();
   const { data: roles, isLoading: rolesLoading } = useRoles();
@@ -83,12 +85,12 @@ export function CreateUserPage() {
             className="flex items-center"
           >
             <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Users
+            {t('users.backToList', 'Back to users')}
           </Button>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Create New User</h1>
+            <h1 className="text-2xl font-bold text-gray-900">{t('users.createUser', 'Create User')}</h1>
             <p className="text-sm text-gray-500 mt-1">
-              Add a new user to the system with role assignments
+              {t('users.createSubtitle', 'Add a user to the system and choose their roles')}
             </p>
           </div>
         </div>
@@ -101,7 +103,7 @@ export function CreateUserPage() {
             {/* Personal Information Section */}
             <div>
               <h2 className="text-lg font-semibold text-gray-900 mb-4">
-                Personal Information
+                {t('users.personalInformation', 'Personal Information')}
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* First Name */}
@@ -110,9 +112,9 @@ export function CreateUserPage() {
                   name="firstName"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>First Name *</FormLabel>
+                      <FormLabel>{t('auth.firstName', 'First name')} *</FormLabel>
                       <FormControl>
-                        <Input placeholder="John" {...field} />
+                        <Input placeholder={t('users.firstNamePlaceholder', 'e.g. An')} {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -125,9 +127,9 @@ export function CreateUserPage() {
                   name="lastName"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Last Name *</FormLabel>
+                      <FormLabel>{t('auth.lastName', 'Last name')} *</FormLabel>
                       <FormControl>
-                        <Input placeholder="Doe" {...field} />
+                        <Input placeholder={t('users.lastNamePlaceholder', 'e.g. Nguyen Van')} {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -139,7 +141,7 @@ export function CreateUserPage() {
             {/* Contact Information Section */}
             <div>
               <h2 className="text-lg font-semibold text-gray-900 mb-4">
-                Contact Information
+                {t('users.contactInformation', 'Contact Information')}
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Email */}
@@ -148,9 +150,9 @@ export function CreateUserPage() {
                   name="email"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Email *</FormLabel>
+                      <FormLabel>{t('auth.email', 'Email Address')} *</FormLabel>
                       <FormControl>
-                        <Input type="email" placeholder="john.doe@example.com" {...field} />
+                        <Input type="email" placeholder={t('users.emailPlaceholder', 'name@example.com')} {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -163,9 +165,9 @@ export function CreateUserPage() {
                   name="phoneNumber"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Phone Number</FormLabel>
+                      <FormLabel>{t('auth.phoneNumber', 'Phone number')}</FormLabel>
                       <FormControl>
-                        <Input type="tel" placeholder="+1234567890" {...field} />
+                        <Input type="tel" placeholder={t('users.phonePlaceholder', '09xxxxxxxx')} {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -177,23 +179,23 @@ export function CreateUserPage() {
             {/* Security Section */}
             <div>
               <h2 className="text-lg font-semibold text-gray-900 mb-4">
-                Security
+                {t('users.security', 'Security')}
               </h2>
               <FormField
                 control={form.control}
                 name="password"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Password</FormLabel>
+                    <FormLabel>{t('auth.password', 'Password')}</FormLabel>
                     <FormControl>
                       <Input 
                         type="password" 
-                        placeholder="Leave empty to auto-generate" 
+                        placeholder={t('users.passwordPlaceholder', 'Leave empty to generate one')} 
                         {...field} 
                       />
                     </FormControl>
                     <FormDescription>
-                      Minimum 10 characters. A secure password will be auto-generated if left empty.
+                      {t('users.passwordHint', 'At least 10 characters. Leave the field empty and a strong password is generated.')}
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -204,23 +206,23 @@ export function CreateUserPage() {
             {/* Roles Section */}
             <div>
               <h2 className="text-lg font-semibold text-gray-900 mb-4">
-                Role Assignment
+                {t('users.roleAssignment', 'Roles')}
               </h2>
               <FormField
                 control={form.control}
                 name="roles"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Roles *</FormLabel>
+                    <FormLabel>{t('invitations.role', 'Role')} *</FormLabel>
                     <FormDescription>
-                      Select one or more roles for the user. Selected roles will appear as badges below.
+                      {t('users.roleHint', 'Pick one or more roles. The roles chosen appear as tags below.')}
                     </FormDescription>
                     <FormControl>
                       <MultiSelect
                         options={roleOptions}
                         value={field.value}
                         onChange={field.onChange}
-                        placeholder="Select roles..."
+                        placeholder={t('users.selectRoles', 'Select roles...')}
                         disabled={rolesLoading}
                       />
                     </FormControl>
@@ -233,7 +235,7 @@ export function CreateUserPage() {
             {/* Account Status Section */}
             <div>
               <h2 className="text-lg font-semibold text-gray-900 mb-4">
-                Account Status
+                {t('users.accountStatus', 'Account Status')}
               </h2>
               <FormField
                 control={form.control}
@@ -241,9 +243,9 @@ export function CreateUserPage() {
                 render={({ field }) => (
                   <FormItem className="flex items-center justify-between rounded-lg border p-4 bg-gray-50">
                     <div className="space-y-0.5">
-                      <FormLabel className="text-base font-medium">Active Status</FormLabel>
+                      <FormLabel className="text-base font-medium">{t('users.activeStatus', 'Account active')}</FormLabel>
                       <FormDescription>
-                        Enable this user account immediately upon creation. Inactive users cannot log in.
+                        {t('users.activeHint', 'An inactive account cannot sign in.')}
                       </FormDescription>
                     </div>
                     <FormControl>
@@ -262,13 +264,13 @@ export function CreateUserPage() {
                 onClick={() => navigate('/users')}
                 disabled={createUserMutation.isPending}
               >
-                Cancel
+                {t('common.cancel', 'Cancel')}
               </Button>
               <Button type="submit" disabled={createUserMutation.isPending}>
                 {createUserMutation.isPending && (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 )}
-                Create User
+                {t('users.createUser', 'Create User')}
               </Button>
             </div>
           </form>

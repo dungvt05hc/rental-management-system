@@ -14,8 +14,10 @@ import { useQuery } from '@tanstack/react-query';
 import { reportService } from '../../services';
 import { formatCurrency, formatPercentage } from '../../utils';
 import type { OccupancyReport, RevenueReport } from '../../types';
+import { useTranslation } from '../../hooks/useTranslation';
 
 export function ReportsPage() {
+  const { t } = useTranslation();
   const [selectedReport, setSelectedReport] = useState<string>('occupancy');
   const [dateRange, setDateRange] = useState<string>('current');
 
@@ -61,24 +63,24 @@ export function ReportsPage() {
   const reportTypes = [
     {
       id: 'occupancy',
-      name: 'Occupancy Report',
-      description: 'Room occupancy rates and availability',
+      name: t('reports.occupancyReport', 'Occupancy Report'),
+      description: t('reports.occupancyReportHint', 'How full the rooms are and what is still free'),
       icon: Building,
       color: 'text-blue-600',
       bgColor: 'bg-blue-100'
     },
     {
       id: 'revenue',
-      name: 'Revenue Report',
-      description: 'Financial performance and collections',
+      name: t('reports.revenueReport', 'Revenue Report'),
+      description: t('reports.revenueReportHint', 'Money coming in and how much is collected'),
       icon: DollarSign,
       color: 'text-green-600',
       bgColor: 'bg-green-100'
     },
     {
       id: 'monthly',
-      name: 'Monthly Summary',
-      description: 'Month-by-month performance overview',
+      name: t('reports.monthlySummary', 'Monthly Summary'),
+      description: t('reports.monthlySummaryHint', 'How each month went, side by side'),
       icon: BarChart3,
       color: 'text-purple-600',
       bgColor: 'bg-purple-100'
@@ -101,25 +103,25 @@ export function ReportsPage() {
           <CardHeader>
             <CardTitle className="flex items-center">
               <Building className="h-5 w-5 mr-2" />
-              Occupancy Overview
+              {t('reports.occupancyOverview', 'Occupancy Overview')}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               <div className="text-center p-4 bg-blue-50 rounded-lg">
-                <h3 className="text-lg font-semibold text-blue-900">Total Rooms</h3>
+                <h3 className="text-lg font-semibold text-blue-900">{t('dashboard.totalRooms', 'Total Rooms')}</h3>
                 <p className="text-3xl font-bold text-blue-600">{occupancyData.totalRooms}</p>
               </div>
               <div className="text-center p-4 bg-green-50 rounded-lg">
-                <h3 className="text-lg font-semibold text-green-900">Occupied</h3>
+                <h3 className="text-lg font-semibold text-green-900">{t('rooms.occupied', 'Occupied')}</h3>
                 <p className="text-3xl font-bold text-green-600">{occupancyData.occupiedRooms}</p>
               </div>
               <div className="text-center p-4 bg-yellow-50 rounded-lg">
-                <h3 className="text-lg font-semibold text-yellow-900">Available</h3>
+                <h3 className="text-lg font-semibold text-yellow-900">{t('rooms.available', 'Available')}</h3>
                 <p className="text-3xl font-bold text-yellow-600">{occupancyData.availableRooms}</p>
               </div>
               <div className="text-center p-4 bg-purple-50 rounded-lg">
-                <h3 className="text-lg font-semibold text-purple-900">Occupancy Rate</h3>
+                <h3 className="text-lg font-semibold text-purple-900">{t('reports.occupancyRate', 'Occupancy Rate')}</h3>
                 <p className="text-3xl font-bold text-purple-600">{formatPercentage(occupancyData.occupancyRate)}</p>
               </div>
             </div>
@@ -128,12 +130,12 @@ export function ReportsPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Room Distribution</CardTitle>
+            <CardTitle>{t('reports.roomDistribution', 'Room Distribution')}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <span>Occupied Rooms</span>
+                <span>{t('dashboard.occupiedRooms', 'Occupied Rooms')}</span>
                 <div className="flex items-center space-x-2">
                   <div className="w-32 bg-gray-200 rounded-full h-2">
                     <div 
@@ -145,7 +147,7 @@ export function ReportsPage() {
                 </div>
               </div>
               <div className="flex items-center justify-between">
-                <span>Available Rooms</span>
+                <span>{t('reports.availableRooms', 'Available Rooms')}</span>
                 <div className="flex items-center space-x-2">
                   <div className="w-32 bg-gray-200 rounded-full h-2">
                     <div 
@@ -174,25 +176,25 @@ export function ReportsPage() {
           <CardHeader>
             <CardTitle className="flex items-center">
               <DollarSign className="h-5 w-5 mr-2" />
-              Revenue Overview
+              {t('reports.revenueOverview', 'Revenue Overview')}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               <div className="text-center p-4 bg-blue-50 rounded-lg">
-                <h3 className="text-lg font-semibold text-blue-900">Total Revenue</h3>
+                <h3 className="text-lg font-semibold text-blue-900">{t('dashboard.totalRevenue', 'Total Revenue')}</h3>
                 <p className="text-2xl font-bold text-blue-600">{formatCurrency(revenueData.totalRevenue)}</p>
               </div>
               <div className="text-center p-4 bg-green-50 rounded-lg">
-                <h3 className="text-lg font-semibold text-green-900">Paid Amount</h3>
+                <h3 className="text-lg font-semibold text-green-900">{t('invoices.paidAmount', 'Paid Amount')}</h3>
                 <p className="text-2xl font-bold text-green-600">{formatCurrency(revenueData.paidAmount)}</p>
               </div>
               <div className="text-center p-4 bg-yellow-50 rounded-lg">
-                <h3 className="text-lg font-semibold text-yellow-900">Pending</h3>
+                <h3 className="text-lg font-semibold text-yellow-900">{t('invoices.pending', 'Pending')}</h3>
                 <p className="text-2xl font-bold text-yellow-600">{formatCurrency(revenueData.pendingAmount)}</p>
               </div>
               <div className="text-center p-4 bg-red-50 rounded-lg">
-                <h3 className="text-lg font-semibold text-red-900">Overdue</h3>
+                <h3 className="text-lg font-semibold text-red-900">{t('invoices.overdue', 'Overdue')}</h3>
                 <p className="text-2xl font-bold text-red-600">{formatCurrency(revenueData.overdueAmount)}</p>
               </div>
             </div>
@@ -201,12 +203,12 @@ export function ReportsPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Collection Performance</CardTitle>
+            <CardTitle>{t('reports.collectionPerformance', 'Collection Performance')}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-6">
               <div className="flex items-center justify-between">
-                <span className="text-lg font-medium">Collection Rate</span>
+                <span className="text-lg font-medium">{t('dashboard.collectionRate', 'Collection Rate')}</span>
                 <span className="text-2xl font-bold text-green-600">{formatPercentage(revenueData.collectionRate)}</span>
               </div>
               <div className="w-full bg-gray-200 rounded-full h-4">
@@ -217,19 +219,19 @@ export function ReportsPage() {
               </div>
               <div className="grid grid-cols-3 gap-4 text-center">
                 <div>
-                  <p className="text-sm text-gray-500">Collected</p>
+                  <p className="text-sm text-gray-500">{t('dashboard.collected', 'Collected')}</p>
                   <p className="font-semibold text-green-600">
                     {formatPercentage((revenueData.paidAmount / revenueData.totalRevenue) * 100)}
                   </p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-500">Pending</p>
+                  <p className="text-sm text-gray-500">{t('invoices.pending', 'Pending')}</p>
                   <p className="font-semibold text-yellow-600">
                     {formatPercentage((revenueData.pendingAmount / revenueData.totalRevenue) * 100)}
                   </p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-500">Overdue</p>
+                  <p className="text-sm text-gray-500">{t('invoices.overdue', 'Overdue')}</p>
                   <p className="font-semibold text-red-600">
                     {formatPercentage((revenueData.overdueAmount / revenueData.totalRevenue) * 100)}
                   </p>
@@ -259,19 +261,19 @@ export function ReportsPage() {
           <CardHeader>
             <CardTitle className="flex items-center">
               <Calendar className="h-5 w-5 mr-2" />
-              Report Period
+              {t('reports.reportPeriod', 'Report Period')}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="text-center p-4 bg-blue-50 rounded-lg">
-                <h3 className="text-lg font-semibold text-blue-900">From Date</h3>
+                <h3 className="text-lg font-semibold text-blue-900">{t('reports.fromDate', 'From Date')}</h3>
                 <p className="text-xl font-bold text-blue-600">
                   {reportPeriod.fromDate ? new Date(reportPeriod.fromDate).toLocaleDateString() : 'N/A'}
                 </p>
               </div>
               <div className="text-center p-4 bg-blue-50 rounded-lg">
-                <h3 className="text-lg font-semibold text-blue-900">To Date</h3>
+                <h3 className="text-lg font-semibold text-blue-900">{t('reports.toDate', 'To Date')}</h3>
                 <p className="text-xl font-bold text-blue-600">
                   {reportPeriod.toDate ? new Date(reportPeriod.toDate).toLocaleDateString() : 'N/A'}
                 </p>
@@ -285,31 +287,31 @@ export function ReportsPage() {
           <CardHeader>
             <CardTitle className="flex items-center">
               <DollarSign className="h-5 w-5 mr-2" />
-              Revenue Summary
+              {t('reports.revenueSummary', 'Revenue Summary')}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               <div className="text-center p-4 bg-green-50 rounded-lg">
-                <h3 className="text-lg font-semibold text-green-900">Total Revenue</h3>
+                <h3 className="text-lg font-semibold text-green-900">{t('dashboard.totalRevenue', 'Total Revenue')}</h3>
                 <p className="text-2xl font-bold text-green-600">
                   {formatCurrency(revenue.totalRevenue || 0)}
                 </p>
               </div>
               <div className="text-center p-4 bg-blue-50 rounded-lg">
-                <h3 className="text-lg font-semibold text-blue-900">Total Payments</h3>
+                <h3 className="text-lg font-semibold text-blue-900">{t('reports.totalPayments', 'Total Payments')}</h3>
                 <p className="text-2xl font-bold text-blue-600">
                   {formatCurrency(revenue.totalPayments || 0)}
                 </p>
               </div>
               <div className="text-center p-4 bg-yellow-50 rounded-lg">
-                <h3 className="text-lg font-semibold text-yellow-900">Outstanding</h3>
+                <h3 className="text-lg font-semibold text-yellow-900">{t('reports.outstanding', 'Outstanding')}</h3>
                 <p className="text-2xl font-bold text-yellow-600">
                   {formatCurrency(revenue.totalOutstanding || 0)}
                 </p>
               </div>
               <div className="text-center p-4 bg-purple-50 rounded-lg">
-                <h3 className="text-lg font-semibold text-purple-900">Collection Rate</h3>
+                <h3 className="text-lg font-semibold text-purple-900">{t('dashboard.collectionRate', 'Collection Rate')}</h3>
                 <p className="text-2xl font-bold text-purple-600">
                   {formatPercentage(revenue.collectionRate || 0)}
                 </p>
@@ -323,12 +325,12 @@ export function ReportsPage() {
           <CardHeader>
             <CardTitle className="flex items-center">
               <Building className="h-5 w-5 mr-2" />
-              Security Deposits
+              {t('reports.securityDeposits', 'Security Deposits')}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-center p-4 bg-blue-50 rounded-lg">
-              <h3 className="text-lg font-semibold text-blue-900">Total Security Deposits</h3>
+              <h3 className="text-lg font-semibold text-blue-900">{t('reports.totalSecurityDeposits', 'Total Security Deposits')}</h3>
               <p className="text-3xl font-bold text-blue-600">
                 {formatCurrency(deposits.totalSecurityDeposits || 0)}
               </p>
@@ -341,25 +343,25 @@ export function ReportsPage() {
           <CardHeader>
             <CardTitle className="flex items-center">
               <BarChart3 className="h-5 w-5 mr-2" />
-              Financial Summary
+              {t('reports.financialSummary', 'Financial Summary')}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className="text-center p-4 bg-gray-50 rounded-lg">
-                <h3 className="text-lg font-semibold text-gray-900">Average Monthly Revenue</h3>
+                <h3 className="text-lg font-semibold text-gray-900">{t('reports.averageMonthlyRevenue', 'Average Monthly Revenue')}</h3>
                 <p className="text-2xl font-bold text-blue-600">
                   {formatCurrency(summary.averageMonthlyRevenue || 0)}
                 </p>
               </div>
               <div className="text-center p-4 bg-gray-50 rounded-lg">
-                <h3 className="text-lg font-semibold text-gray-900">Total Invoices</h3>
+                <h3 className="text-lg font-semibold text-gray-900">{t('reports.totalInvoices', 'Total Invoices')}</h3>
                 <p className="text-2xl font-bold text-blue-600">
                   {(summary.totalInvoices || 0).toLocaleString()}
                 </p>
               </div>
               <div className="text-center p-4 bg-gray-50 rounded-lg">
-                <h3 className="text-lg font-semibold text-gray-900">Net Income</h3>
+                <h3 className="text-lg font-semibold text-gray-900">{t('reports.netIncome', 'Net Income')}</h3>
                 <p className="text-2xl font-bold text-blue-600">
                   {formatCurrency(summary.netIncome || 0)}
                 </p>
@@ -372,7 +374,7 @@ export function ReportsPage() {
         {monthlyBreakdown.length > 0 && (
           <Card>
             <CardHeader>
-              <CardTitle>Monthly Breakdown</CardTitle>
+              <CardTitle>{t('reports.monthlyBreakdown', 'Monthly Breakdown')}</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="overflow-x-auto">
@@ -380,22 +382,22 @@ export function ReportsPage() {
                   <thead className="bg-gray-50">
                     <tr>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Period
+                        {t('reports.period', 'Period')}
                       </th>
                       <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Total Invoiced
+                        {t('reports.totalInvoiced', 'Total Invoiced')}
                       </th>
                       <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Paid Amount
+                        {t('invoices.paidAmount', 'Paid Amount')}
                       </th>
                       <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Outstanding
+                        {t('reports.outstanding', 'Outstanding')}
                       </th>
                       <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Collection Rate
+                        {t('dashboard.collectionRate', 'Collection Rate')}
                       </th>
                       <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Invoices
+                        {t('invoices.title', 'Invoices')}
                       </th>
                     </tr>
                   </thead>
@@ -437,8 +439,8 @@ export function ReportsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Reports</h1>
-          <p className="text-gray-500">Generate and view detailed business reports</p>
+          <h1 className="text-2xl font-bold text-gray-900">{t('reports.title', 'Reports')}</h1>
+          <p className="text-gray-500">{t('reports.subtitle', 'Build and read detailed business reports')}</p>
         </div>
         <div className="flex items-center space-x-3">
           <button 
@@ -446,14 +448,14 @@ export function ReportsPage() {
             className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center space-x-2"
           >
             <Download className="h-4 w-4" />
-            <span>Export PDF</span>
+            <span>{t('reports.exportPdf', 'Export PDF')}</span>
           </button>
           <button 
             onClick={() => handleExportReport('excel')}
             className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2"
           >
             <Download className="h-4 w-4" />
-            <span>Export Excel</span>
+            <span>{t('reports.exportExcel', 'Export Excel')}</span>
           </button>
         </div>
       </div>
@@ -463,7 +465,7 @@ export function ReportsPage() {
         <CardHeader>
           <CardTitle className="flex items-center">
             <FileText className="h-5 w-5 mr-2" />
-            Select Report Type
+            {t('reports.selectReportType', 'Choose a report')}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -505,18 +507,18 @@ export function ReportsPage() {
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2">
               <Calendar className="h-4 w-4 text-gray-400" />
-              <span className="text-sm font-medium text-gray-700">Date Range:</span>
+              <span className="text-sm font-medium text-gray-700">{t('reports.dateRange', 'Date range')}</span>
             </div>
             <select
               value={dateRange}
               onChange={(e) => setDateRange(e.target.value)}
               className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
-              <option value="current">Current Month</option>
-              <option value="last3">Last 3 Months</option>
-              <option value="last6">Last 6 Months</option>
-              <option value="year">Current Year</option>
-              <option value="custom">Custom Range</option>
+              <option value="current">{t('reports.currentMonth', 'Current Month')}</option>
+              <option value="last3">{t('reports.last3Months', 'Last 3 Months')}</option>
+              <option value="last6">{t('reports.last6Months', 'Last 6 Months')}</option>
+              <option value="year">{t('reports.currentYear', 'Current Year')}</option>
+              <option value="custom">{t('reports.customRange', 'Custom Range')}</option>
             </select>
             <div className="flex items-center space-x-2 ml-auto">
               <button className="p-2 text-gray-400 hover:text-gray-600 transition-colors">

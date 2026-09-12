@@ -10,6 +10,7 @@ import { useToast } from '../../contexts/ToastContext';
 import type { User } from '../../types';
 import { Mail, Phone, Calendar, Shield, Edit, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
+import { useTranslation } from '../../hooks/useTranslation';
 
 interface UserDetailsDialogProps {
   user: User;
@@ -23,6 +24,7 @@ interface UserDetailsDialogProps {
  * Displays comprehensive user information and allows role management
  */
 export function UserDetailsDialog({ user, open, onOpenChange, onEdit }: UserDetailsDialogProps) {
+  const { t } = useTranslation();
   const toast = useToast();
   const { data: availableRoles } = useRoles();
   const assignRolesMutation = useAssignRoles();
@@ -76,13 +78,13 @@ export function UserDetailsDialog({ user, open, onOpenChange, onEdit }: UserDeta
           {/* Basic Information */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">Basic Information</CardTitle>
+              <CardTitle className="text-lg">{t('users.basicInformation', 'Basic Information')}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="flex items-center gap-3">
                 <Mail className="h-4 w-4 text-muted-foreground" />
                 <div>
-                  <div className="text-sm text-muted-foreground">Email</div>
+                  <div className="text-sm text-muted-foreground">{t('auth.email', 'Email Address')}</div>
                   <div className="font-medium">{user.email}</div>
                 </div>
               </div>
@@ -90,7 +92,7 @@ export function UserDetailsDialog({ user, open, onOpenChange, onEdit }: UserDeta
                 <div className="flex items-center gap-3">
                   <Phone className="h-4 w-4 text-muted-foreground" />
                   <div>
-                    <div className="text-sm text-muted-foreground">Phone</div>
+                    <div className="text-sm text-muted-foreground">{t('auth.phoneNumber', 'Phone number')}</div>
                     <div className="font-medium">{user.phoneNumber}</div>
                   </div>
                 </div>
@@ -98,7 +100,7 @@ export function UserDetailsDialog({ user, open, onOpenChange, onEdit }: UserDeta
               <div className="flex items-center gap-3">
                 <Calendar className="h-4 w-4 text-muted-foreground" />
                 <div>
-                  <div className="text-sm text-muted-foreground">Member Since</div>
+                  <div className="text-sm text-muted-foreground">{t('users.memberSince', 'Member since')}</div>
                   <div className="font-medium">
                     {format(new Date(user.createdAt), 'MMMM d, yyyy')}
                   </div>
@@ -113,7 +115,7 @@ export function UserDetailsDialog({ user, open, onOpenChange, onEdit }: UserDeta
               <div className="flex items-center justify-between">
                 <CardTitle className="text-lg flex items-center gap-2">
                   <Shield className="h-5 w-5" />
-                  Roles & Permissions
+                  {t('users.rolesAndPermissions', 'Roles and permissions')}
                 </CardTitle>
                 {!isEditingRoles && (
                   <Button
@@ -125,7 +127,7 @@ export function UserDetailsDialog({ user, open, onOpenChange, onEdit }: UserDeta
                     }}
                   >
                     <Edit className="h-4 w-4 mr-2" />
-                    Edit Roles
+                    {t('users.editRoles', 'Edit roles')}
                   </Button>
                 )}
               </div>
@@ -175,7 +177,7 @@ export function UserDetailsDialog({ user, open, onOpenChange, onEdit }: UserDeta
                       size="sm"
                     >
                       {isSavingRoles && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                      Save Changes
+                      {t('common.save', 'Save')}
                     </Button>
                     <Button
                       variant="outline"
@@ -186,7 +188,7 @@ export function UserDetailsDialog({ user, open, onOpenChange, onEdit }: UserDeta
                       disabled={isSavingRoles}
                       size="sm"
                     >
-                      Cancel
+                      {t('common.cancel', 'Cancel')}
                     </Button>
                   </div>
                 </div>
@@ -207,11 +209,11 @@ export function UserDetailsDialog({ user, open, onOpenChange, onEdit }: UserDeta
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Close
+            {t('common.close', 'Close')}
           </Button>
           <Button onClick={onEdit}>
             <Edit className="mr-2 h-4 w-4" />
-            Edit User
+            {t('users.editUser', 'Edit User')}
           </Button>
         </DialogFooter>
       </DialogContent>

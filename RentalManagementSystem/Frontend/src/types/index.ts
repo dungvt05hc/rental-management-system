@@ -52,13 +52,78 @@ export interface ResetPasswordRequest {
   newPassword: string;
 }
 
-export interface RegisterRequest {
-  userName: string;
-  email: string;
-  password: string;
+// POST /auth/register — khớp SelfRegisterDto
+// Không có trường role: role do mã mời quy định, và DTO phía backend cũng không
+// có chỗ nào để nhận role từ request.
+export interface SelfRegisterRequest {
   firstName: string;
   lastName: string;
+  email: string;
+  phoneNumber: string;
+  password: string;
+  confirmPassword: string;
+  invitationCode: string;
+}
+
+// Kết quả đăng ký — cố tình không có token: tài khoản mới còn phải xác nhận email.
+export interface SelfRegisterResult {
+  email: string;
+  requiresEmailConfirmation: boolean;
+}
+
+// GET /auth/check-email — khớp CheckEmailResultDto
+export interface CheckEmailResult {
+  available: boolean;
+}
+
+// POST /auth/confirm-email — khớp ConfirmEmailDto
+export interface ConfirmEmailRequest {
+  email: string;
+  token: string;
+}
+
+// POST /auth/resend-confirmation — khớp ResendConfirmationDto
+export interface ResendConfirmationRequest {
+  email: string;
+}
+
+// Invitation Types — khớp InvitationDtos.cs
+
+// Khớp enum InvitationStatus phía backend. ASP.NET serialize enum thành số theo
+// mặc định, nên các giá trị dưới đây phải giữ đúng thứ tự khai báo của C#.
+export enum InvitationStatus {
+  Pending = 0,
+  Redeemed = 1,
+  Revoked = 2,
+  Expired = 3
+}
+
+export interface Invitation {
+  id: string;
+  codePrefix: string;
+  role: string;
+  email?: string | null;
+  note?: string | null;
+  status: InvitationStatus;
+  expiresAt: string;
+  createdAt: string;
+  createdByEmail?: string | null;
+  redeemedAt?: string | null;
+  redeemedByEmail?: string | null;
+  revokedAt?: string | null;
+}
+
+export interface CreateInvitationRequest {
   role: UserRole;
+  email?: string;
+  expiresInDays: number;
+  note?: string;
+}
+
+// Mã gốc chỉ có trong response tạo mã — backend chỉ lưu bản băm.
+export interface CreatedInvitation {
+  invitation: Invitation;
+  code: string;
 }
 
 // Room Types
@@ -78,8 +143,8 @@ export interface Room {
   isFurnished: boolean;
   createdAt: string;
   updatedAt: string;
-  tenant?: Tenant;
-  currentTenant?: Tenant;
+  customer?: Customer;
+  currentCustomer?: Customer;
 }
 
 export enum RoomStatus {
@@ -129,8 +194,8 @@ export type RoomSearchRequest = {
   pageSize?: number;
 }
 
-// Tenant Types
-export interface Tenant {
+// Customer Types
+export interface Customer {
   id: string;
   firstName: string;
   lastName: string;
@@ -148,13 +213,16 @@ export interface Tenant {
   emergencyContactPhone?: string;
   checkInDate?: string;
   checkOutDate?: string;
+  // Các trường dưới đây suy ra từ hợp đồng đang hoạt động của khách,
+  // backend tính sẵn trong CustomerDto — không lưu trên bản ghi Customer.
+  activeContractId?: number;
   contractStartDate?: string;
   contractEndDate?: string;
   securityDeposit: number;
   monthlyRent?: number;
-  status: TenantStatus;
   isActive?: boolean;
   hasActiveContract?: boolean;
+  contractCount?: number;
   notes?: string;
   createdAt: string;
   updatedAt: string;
@@ -167,13 +235,7 @@ export interface Tenant {
   };
 }
 
-export enum TenantStatus {
-  Active = 'Active',
-  Inactive = 'Inactive',
-  Terminated = 'Terminated'
-}
-
-export interface CreateTenantRequest {
+export interface CreateCustomerRequest {
   firstName: string;
   lastName: string;
   email: string;
@@ -182,12 +244,10 @@ export interface CreateTenantRequest {
   identificationNumber?: string;
   emergencyContactName?: string;
   emergencyContactPhone?: string;
-  securityDeposit: number;
-  monthlyRent: number;
   notes?: string;
 }
 
-export interface UpdateTenantRequest extends Partial<CreateTenantRequest> {
+export interface UpdateCustomerRequest extends Partial<CreateCustomerRequest> {
   isActive?: boolean;
 }
 
@@ -196,12 +256,77 @@ export interface AssignRoomRequest {
   contractStartDate: string;
   contractEndDate: string;
   monthlyRent: number;
+  securityDeposit: number;
 }
 
-export type TenantSearchRequest = {
+// Rental Contract Types
+export enum RentalContractStatus {
+  Draft = 1,
+  Active = 2,
+  Ended = 3,
+  Cancelled = 4,
+}
+
+export interface RentalContract {
+  id: number;
+  customerId: number;
+  customerName: string;
+  roomId: number;
+  room?: {
+    id: number;
+    roomNumber: string;
+    typeName?: string;
+    monthlyRent: number;
+    floor: number;
+  };
+  startDate: string;
+  endDate?: string;
+  monthlyRent: number;
+  securityDeposit: number;
+  status: RentalContractStatus;
+  statusName: string;
+  isCurrentlyActive: boolean;
+  invoiceCount: number;
+  notes: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateRentalContractRequest {
+  customerId: number;
+  roomId: number;
+  startDate: string;
+  endDate?: string;
+  monthlyRent?: number;
+  securityDeposit: number;
+  status?: RentalContractStatus;
+  notes?: string;
+}
+
+export interface UpdateRentalContractRequest {
+  startDate?: string;
+  endDate?: string;
+  monthlyRent?: number;
+  securityDeposit?: number;
+  notes?: string;
+}
+
+export interface EndRentalContractRequest {
+  endDate?: string;
+  notes?: string;
+}
+
+export type RentalContractSearchRequest = {
+  customerId?: number;
+  roomId?: number;
+  status?: RentalContractStatus;
+  page?: number;
+  pageSize?: number;
+}
+
+export type CustomerSearchRequest = {
   search?: string;
   searchTerm?: string;
-  status?: TenantStatus;
   roomId?: string;
   hasRoom?: boolean;
   isActive?: boolean;
@@ -213,7 +338,7 @@ export type TenantSearchRequest = {
 // Invoice Types
 export interface Invoice {
   id: string;
-  tenantId: string;
+  customerId: string;
   roomId: string;
   invoiceNumber: string;
   amount: number;
@@ -237,7 +362,7 @@ export interface Invoice {
   isPartiallyPaid?: boolean;
   createdAt: string;
   updatedAt: string;
-  tenant?: Tenant;
+  customer?: Customer;
   room?: Room;
   payments?: Payment[];
   invoiceItems?: InvoiceItem[];
@@ -254,7 +379,7 @@ export enum InvoiceStatus {
 }
 
 export interface CreateInvoiceRequest {
-  tenantId: number;
+  customerId: number;
   roomId: number;
   billingPeriod: string;
   additionalCharges?: number;
@@ -281,7 +406,7 @@ export type InvoiceSearchRequest = {
   search?: string;
   searchTerm?: string;
   status?: InvoiceStatus;
-  tenantId?: string;
+  customerId?: string;
   roomId?: string;
   billingPeriod?: string;
   dueDateFrom?: string;
@@ -384,7 +509,7 @@ export type ItemSearchRequest = {
 export interface InvoiceSummary {
   id: string;
   invoiceNumber: string;
-  tenantName: string;
+  customerName: string;
   roomNumber: string;
   totalAmount: number;
   remainingBalance: number;
@@ -475,8 +600,8 @@ export interface MonthlyReport {
   collectedRevenue: number;
   pendingRevenue: number;
   overdueRevenue: number;
-  newTenants: number;
-  departedTenants: number;
+  newCustomers: number;
+  departedCustomers: number;
 }
 
 // Các báo cáo dưới đây được backend trả về dưới dạng anonymous object
@@ -493,7 +618,7 @@ export interface ReportPeriod {
 // GET /reports/outstanding-payments
 export interface OutstandingInvoiceRow {
   invoiceId: string;
-  tenantName: string;
+  customerName: string;
   amount: number;
   dueDate: string;
   status: string;
@@ -557,22 +682,22 @@ export interface FinancialSummaryReport {
   };
 }
 
-// GET /reports/tenant-statistics
-export interface TenantStatisticsReport {
+// GET /reports/customer-statistics
+export interface CustomerStatisticsReport {
   generatedAt: string;
   overview: {
-    totalTenants: number;
-    activeTenants: number;
-    inactiveTenants: number;
-    assignedTenants: number;
-    unassignedTenants: number;
+    totalCustomers: number;
+    activeCustomers: number;
+    inactiveCustomers: number;
+    assignedCustomers: number;
+    unassignedCustomers: number;
   };
   contractStatus: {
     expiringIn30Days: number;
     expiringIn90Days: number;
   };
   recentActivity: {
-    newTenantsLast30Days: number;
+    newCustomersLast30Days: number;
   };
   demographics: {
     ageGroups: Record<string, number>;
@@ -597,7 +722,7 @@ export interface RoomUtilizationDetail {
   floor: number;
   status: string;
   monthlyRent: number;
-  currentTenant: {
+  currentCustomer: {
     id: string;
     name: string;
     contractStart?: string;
@@ -674,7 +799,7 @@ export interface PaymentStatistics {
 
 // GET /reports/dashboard-summary
 export interface ExpiringContractRow {
-  tenantName: string;
+  customerName: string;
   roomNumber: string;
   expiryDate?: string;
 }
@@ -687,7 +812,7 @@ export interface DashboardSummaryReport {
     vacantRooms: number;
     occupancyRate: number;
   };
-  tenants: {
+  customers: {
     totalActive: number;
     newThisMonth: number;
   };

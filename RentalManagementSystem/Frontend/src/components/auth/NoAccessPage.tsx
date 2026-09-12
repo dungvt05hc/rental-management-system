@@ -2,8 +2,10 @@ import { Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { Button, Card, CardContent, CardHeader, CardTitle } from '../ui';
 import { getDefaultRoute } from '../../utils/accessControl';
+import { useTranslation } from '../../hooks/useTranslation';
 
 export function NoAccessPage() {
+  const { t } = useTranslation();
   const { user, isAuthenticated, isLoading } = useAuth();
   const navigate = useNavigate();
   const fallbackRoute = getDefaultRoute(user);
@@ -24,15 +26,15 @@ export function NoAccessPage() {
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
       <Card className="max-w-md w-full">
         <CardHeader>
-          <CardTitle>Access denied</CardTitle>
+          <CardTitle>{t('auth.accessDenied', 'Access denied')}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-sm text-gray-600">
-            You do not have permission to view this page. If you believe this is a mistake,
+            {t('auth.accessDeniedBody', 'This account does not have permission to open this page. If that looks wrong,')}
             contact an administrator.
           </p>
           <div className="flex justify-end">
-            <Button onClick={() => navigate(fallbackRoute)}>Go back</Button>
+            <Button onClick={() => navigate(fallbackRoute)}>{t('common.back', 'Back')}</Button>
           </div>
         </CardContent>
       </Card>

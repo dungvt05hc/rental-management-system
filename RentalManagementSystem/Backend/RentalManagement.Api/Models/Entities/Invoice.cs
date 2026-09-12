@@ -22,16 +22,28 @@ public class Invoice
     public string InvoiceNumber { get; set; } = string.Empty;
 
     /// <summary>
-    /// ID of the tenant this invoice belongs to
+    /// ID of the customer this invoice belongs to
     /// </summary>
     [Required]
-    [ForeignKey(nameof(Tenant))]
-    public int TenantId { get; set; }
+    [ForeignKey(nameof(Customer))]
+    public int CustomerId { get; set; }
 
     /// <summary>
-    /// The tenant this invoice belongs to
+    /// The customer this invoice belongs to
     /// </summary>
-    public virtual Tenant Tenant { get; set; } = null!;
+    public virtual Customer Customer { get; set; } = null!;
+
+    /// <summary>
+    /// ID of the rental contract this invoice was issued under.
+    /// Null for invoices that predate contracts, or whose customer had no room assigned.
+    /// </summary>
+    [ForeignKey(nameof(RentalContract))]
+    public int? RentalContractId { get; set; }
+
+    /// <summary>
+    /// The rental contract this invoice was issued under
+    /// </summary>
+    public virtual RentalContract? RentalContract { get; set; }
 
     /// <summary>
     /// ID of the room this invoice is for

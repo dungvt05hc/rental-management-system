@@ -31,6 +31,8 @@ interface UserTableProps {
  * User Table Component
  * Displays users in a table with pagination and actions
  */
+import { useTranslation } from '../../hooks/useTranslation';
+
 export function UserTable({
   users,
   totalCount,
@@ -49,6 +51,7 @@ export function UserTable({
   onToggleActivation,
   onResetPassword,
 }: UserTableProps) {
+  const { t } = useTranslation();
   const allSelected = users.length > 0 && users.every((user) => selectedUserIds.includes(user.id));
   const someSelected = users.some((user) => selectedUserIds.includes(user.id)) && !allSelected;
 
@@ -62,15 +65,15 @@ export function UserTable({
                 <Checkbox
                   checked={allSelected}
                   onCheckedChange={onSelectAll}
-                  aria-label="Select all"
+                  aria-label={t('users.selectAll', 'Select all')}
                   className={someSelected ? 'data-[state=checked]:bg-primary' : ''}
                 />
               </TableHead>
-              <TableHead>User</TableHead>
-              <TableHead>Email</TableHead>
-              <TableHead>Roles</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Created</TableHead>
+              <TableHead>{t('users.user', 'User')}</TableHead>
+              <TableHead>{t('auth.email', 'Email Address')}</TableHead>
+              <TableHead>{t('users.roleAssignment', 'Roles')}</TableHead>
+              <TableHead>{t('rooms.status', 'Status')}</TableHead>
+              <TableHead>{t('users.created', 'Created')}</TableHead>
               <TableHead className="w-12"></TableHead>
             </TableRow>
           </TableHeader>
@@ -78,7 +81,7 @@ export function UserTable({
             {users.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                  No users found
+                  {t('users.noUsersFound', 'No users found')}
                 </TableCell>
               </TableRow>
             ) : (
@@ -111,7 +114,7 @@ export function UserTable({
                   </TableCell>
                   <TableCell>
                     <Badge variant={user.isActive ? 'default' : 'secondary'}>
-                      {user.isActive ? 'Active' : 'Inactive'}
+                      {user.isActive ? t('customers.active', 'Active') : t('customers.inactive', 'Inactive')}
                     </Badge>
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">
@@ -127,20 +130,20 @@ export function UserTable({
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem onClick={() => onView(user)}>
                           <Eye className="mr-2 h-4 w-4" />
-                          View Details
+                          {t('invoices.viewDetails', 'View Details')}
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => onEdit(user)}>
                           <Edit className="mr-2 h-4 w-4" />
-                          Edit User
+                          {t('users.editUser', 'Edit User')}
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem onClick={() => onToggleActivation(user)}>
                           <Power className="mr-2 h-4 w-4" />
-                          {user.isActive ? 'Deactivate' : 'Activate'}
+                          {user.isActive ? t('users.deactivate', 'Deactivate') : t('users.activate', 'Activate')}
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => onResetPassword(user)}>
                           <Key className="mr-2 h-4 w-4" />
-                          Reset Password
+                          {t('auth.resetPassword', 'Reset password')}
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
@@ -148,7 +151,7 @@ export function UserTable({
                           className="text-red-600"
                         >
                           <Trash2 className="mr-2 h-4 w-4" />
-                          Delete User
+                          {t('users.deleteUser', 'Delete User')}
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
@@ -164,8 +167,11 @@ export function UserTable({
       {totalPages > 1 && (
         <div className="flex items-center justify-between">
           <div className="text-sm text-muted-foreground">
-            Showing {(page - 1) * pageSize + 1} to {Math.min(page * pageSize, totalCount)} of{' '}
-            {totalCount} users
+            {t('users.showingRange', 'Showing {from} to {to} of {total} users', {
+              from: (page - 1) * pageSize + 1,
+              to: Math.min(page * pageSize, totalCount),
+              total: totalCount,
+            })}
           </div>
           <div className="flex gap-2">
             <Button
@@ -174,7 +180,7 @@ export function UserTable({
               onClick={() => onPageChange(page - 1)}
               disabled={!hasPrevious}
             >
-              Previous
+              {t('common.previous', 'Previous')}
             </Button>
             <div className="flex items-center gap-1">
               {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
@@ -207,7 +213,7 @@ export function UserTable({
               onClick={() => onPageChange(page + 1)}
               disabled={!hasNext}
             >
-              Next
+              {t('common.next', 'Next')}
             </Button>
           </div>
         </div>

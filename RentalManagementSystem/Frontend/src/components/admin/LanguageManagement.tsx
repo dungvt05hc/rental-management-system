@@ -190,21 +190,21 @@ export const LanguageManagement: React.FC = () => {
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-gray-800">Language Management</h1>
+        <h1 className="text-3xl font-bold text-gray-800">{t('languages.title', 'Languages')}</h1>
         <div className="flex gap-2">
           <button
             onClick={loadLanguages}
             className="flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition"
           >
             <RefreshCw className="h-4 w-4" />
-            Refresh
+            {t('common.refresh', 'Refresh')}
           </button>
           <button
             onClick={handleOpenCreateModal}
             className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
           >
             <Plus className="h-4 w-4" />
-            Add Language
+            {t('languages.addLanguage', 'Add language')}
           </button>
         </div>
       </div>
@@ -223,22 +223,22 @@ export const LanguageManagement: React.FC = () => {
           <thead className="bg-gray-50">
             <tr>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Code
+                {t('languages.code', 'Code')}
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Name
+                {t('languages.name', 'Name')}
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Native Name
+                {t('languages.nativeName', 'Native name')}
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Status
+                {t('rooms.status', 'Status')}
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Default
+                {t('languages.default', 'Default')}
               </th>
               <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Actions
+                {t('common.actions', 'Actions')}
               </th>
             </tr>
           </thead>
@@ -262,20 +262,20 @@ export const LanguageManagement: React.FC = () => {
                         : 'bg-gray-100 text-gray-800'
                     }`}
                   >
-                    {language.isActive ? 'Active' : 'Inactive'}
+                    {language.isActive ? t('customers.active', 'Active') : t('customers.inactive', 'Inactive')}
                   </span>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   {language.isDefault ? (
                     <span className="flex items-center gap-1 text-yellow-600">
                       <Star className="h-4 w-4 fill-yellow-600" />
-                      Default
+                      {t('languages.default', 'Default')}
                     </span>
                   ) : (
                     <button
                       onClick={() => handleSetDefault(language.code)}
                       className="text-gray-400 hover:text-yellow-600 transition"
-                      title="Set as default"
+                      title={t('languages.setAsDefault', 'Set as default')}
                     >
                       <Star className="h-4 w-4" />
                     </button>
@@ -286,14 +286,14 @@ export const LanguageManagement: React.FC = () => {
                     <button
                       onClick={() => handleOpenEditModal(language)}
                       className="text-blue-600 hover:text-blue-900 transition"
-                      title="Edit"
+                      title={t('common.edit', 'Edit')}
                     >
                       <Edit className="h-4 w-4" />
                     </button>
                     <button
                       onClick={() => handleDeleteLanguage(language.code, language.name)}
                       className="text-red-600 hover:text-red-900 transition disabled:opacity-50 disabled:cursor-not-allowed"
-                      title="Delete"
+                      title={t('common.delete', 'Delete')}
                       disabled={language.isDefault}
                     >
                       <Trash2 className="h-4 w-4" />
@@ -307,7 +307,7 @@ export const LanguageManagement: React.FC = () => {
 
         {languages.length === 0 && (
           <div className="text-center py-12">
-            <p className="text-gray-500 text-lg">No languages found. Add your first language to get started.</p>
+            <p className="text-gray-500 text-lg">{t('languages.emptyState', 'No languages yet. Add the first one to get started.')}</p>
           </div>
         )}
       </div>
@@ -317,14 +317,14 @@ export const LanguageManagement: React.FC = () => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
             <h2 className="text-2xl font-bold mb-4 text-gray-800">
-              {editingLanguage ? 'Edit Language' : 'Add New Language'}
+              {editingLanguage ? t('languages.editLanguage', 'Edit language') : t('languages.addLanguage', 'Add language')}
             </h2>
 
             <form onSubmit={editingLanguage ? handleUpdate : handleCreate}>
               {!editingLanguage && (
                 <div className="mb-4">
                   <label htmlFor="code" className="block text-sm font-medium text-gray-700 mb-1">
-                    Language Code *
+                    {t('languages.code', 'Code')} *
                   </label>
                   <input
                     type="text"
@@ -334,16 +334,16 @@ export const LanguageManagement: React.FC = () => {
                     onChange={handleInputChange}
                     required
                     maxLength={10}
-                    placeholder="e.g., en, vi, fr"
+                    placeholder={t('languages.codePlaceholder', 'e.g. en, vi, fr')}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
-                  <p className="text-xs text-gray-500 mt-1">ISO 639-1 language code</p>
+                  <p className="text-xs text-gray-500 mt-1">{t('languages.codeHint', 'ISO 639-1 language code')}</p>
                 </div>
               )}
 
               <div className="mb-4">
                 <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
-                  Language Name *
+                  {t('languages.name', 'Name')} *
                 </label>
                 <input
                   type="text"
@@ -352,14 +352,14 @@ export const LanguageManagement: React.FC = () => {
                   value={formData.name}
                   onChange={handleInputChange}
                   required
-                  placeholder="e.g., English"
+                  placeholder={t('languages.namePlaceholder', 'e.g. English')}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
 
               <div className="mb-4">
                 <label htmlFor="nativeName" className="block text-sm font-medium text-gray-700 mb-1">
-                  Native Name *
+                  {t('languages.nativeName', 'Native name')} *
                 </label>
                 <input
                   type="text"
@@ -368,7 +368,7 @@ export const LanguageManagement: React.FC = () => {
                   value={formData.nativeName}
                   onChange={handleInputChange}
                   required
-                  placeholder="e.g., English, Tiếng Việt"
+                  placeholder={t('languages.nativeNamePlaceholder', 'e.g. English, Tiếng Việt')}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
@@ -383,7 +383,7 @@ export const LanguageManagement: React.FC = () => {
                       onChange={handleInputChange}
                       className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 h-4 w-4"
                     />
-                    <span className="ml-2 text-sm text-gray-700">Active</span>
+                    <span className="ml-2 text-sm text-gray-700">{t('customers.active', 'Active')}</span>
                   </label>
                 </div>
               )}
@@ -397,7 +397,7 @@ export const LanguageManagement: React.FC = () => {
                     onChange={handleInputChange}
                     className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 h-4 w-4"
                   />
-                  <span className="ml-2 text-sm text-gray-700">Set as Default Language</span>
+                  <span className="ml-2 text-sm text-gray-700">{t('languages.setAsDefault', 'Set as default')}</span>
                 </label>
               </div>
 
@@ -407,14 +407,14 @@ export const LanguageManagement: React.FC = () => {
                   onClick={handleCloseModal}
                   className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition"
                 >
-                  Cancel
+                  {t('common.cancel', 'Cancel')}
                 </button>
                 <button
                   type="submit"
                   className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
                 >
                   <Check className="h-4 w-4" />
-                  {editingLanguage ? 'Update' : 'Create'}
+                  {editingLanguage ? t('common.update', 'Update') : t('common.create', 'Create')}
                 </button>
               </div>
             </form>
@@ -431,7 +431,8 @@ export const LanguageManagement: React.FC = () => {
         title={t('languages.deleteTitle', 'Delete Language')}
         description={t(
           'languages.deleteMessage',
-          `Are you sure you want to delete the language "${confirmDialog.languageName}" (${confirmDialog.languageCode})? This will also delete all associated translations.`
+          'Deleting the language "{name}" ({code}) also deletes every translation belonging to it. This cannot be undone.',
+          { name: confirmDialog.languageName, code: confirmDialog.languageCode }
         )}
         confirmText={t('common.delete', 'Delete')}
         cancelText={t('common.cancel', 'Cancel')}

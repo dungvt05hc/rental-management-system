@@ -1,6 +1,7 @@
 import * as React from 'react';
 import { AlertCircle, CheckCircle, Info, XCircle, X } from 'lucide-react';
 import * as AlertDialogPrimitive from '@radix-ui/react-alert-dialog';
+import { useTranslation } from '../../hooks/useTranslation';
 
 export type AlertType = 'default' | 'destructive' | 'warning' | 'success' | 'info';
 
@@ -20,11 +21,12 @@ export function AlertDialog({
   onOpenChange,
   title,
   description,
-  confirmText = 'OK',
-  cancelText = 'Cancel',
+  confirmText,
+  cancelText,
   onConfirm,
   variant = 'default',
 }: AlertDialogProps) {
+  const { t } = useTranslation();
   const [isLoading, setIsLoading] = React.useState(false);
 
   if (!open) return null;
@@ -107,7 +109,7 @@ export function AlertDialog({
               disabled={isLoading}
               className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {cancelText}
+              {cancelText ?? t('common.cancel', 'Cancel')}
             </button>
             <button
               onClick={handleConfirm}
@@ -136,10 +138,10 @@ export function AlertDialog({
                       d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                     />
                   </svg>
-                  Loading...
+                  {t('common.loading', 'Loading...')}
                 </span>
               ) : (
-                confirmText
+                confirmText ?? t('common.confirm', 'OK')
               )}
             </button>
           </div>

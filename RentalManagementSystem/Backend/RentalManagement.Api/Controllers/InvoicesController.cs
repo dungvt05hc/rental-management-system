@@ -111,7 +111,7 @@ public class InvoicesController : ControllerBase
     }
 
     /// <summary>
-    /// Generates monthly invoices for all active tenants
+    /// Generates monthly invoices for all active customers
     /// </summary>
     /// <param name="billingPeriod">Billing period (year and month)</param>
     /// <returns>Number of invoices generated</returns>
@@ -130,14 +130,14 @@ public class InvoicesController : ControllerBase
     }
 
     /// <summary>
-    /// Gets invoices by tenant ID
+    /// Gets invoices by customer ID
     /// </summary>
-    /// <param name="tenantId">Tenant ID</param>
-    /// <returns>List of invoices for the tenant</returns>
-    [HttpGet("tenant/{tenantId}")]
-    public async Task<ActionResult<ApiResponse<IEnumerable<InvoiceDto>>>> GetInvoicesByTenant(int tenantId)
+    /// <param name="customerId">Customer ID</param>
+    /// <returns>List of invoices for the customer</returns>
+    [HttpGet("customer/{customerId}")]
+    public async Task<ActionResult<ApiResponse<IEnumerable<InvoiceDto>>>> GetInvoicesByCustomer(int customerId)
     {
-        var result = await _invoiceService.GetInvoicesByTenantAsync(tenantId);
+        var result = await _invoiceService.GetInvoicesByCustomerAsync(customerId);
         return Ok(result);
     }
 

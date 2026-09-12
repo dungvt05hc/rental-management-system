@@ -22,11 +22,11 @@ A comprehensive full-stack rental property management application built with .NE
 - Pricing and description management
 - Advanced filtering and search capabilities
 
-### 👥 Tenant Management
-- Complete tenant profiles with contact information
+### 👥 Customer Management
+- Complete customer profiles with contact information
 - Identity document management
 - Room assignment tracking
-- Tenant status monitoring
+- Customer status monitoring
 
 ### 📄 Invoice Management
 - Automated invoice generation
@@ -114,8 +114,8 @@ and are committed — the API applies them automatically at startup.
 - Room details and pricing information
 - Availability tracking
 
-### Tenant Management
-- Detailed tenant profiles
+### Customer Management
+- Detailed customer profiles
 - Contact information management
 - Room assignment tracking
 - Identity document records
@@ -141,12 +141,12 @@ and are committed — the API applies them automatically at startup.
 - `PUT /api/rooms/{id}` - Update room
 - `DELETE /api/rooms/{id}` - Delete room
 
-### Tenants
-- `GET /api/tenants` - Get all tenants
-- `GET /api/tenants/{id}` - Get tenant by ID
-- `POST /api/tenants` - Create new tenant
-- `PUT /api/tenants/{id}` - Update tenant
-- `DELETE /api/tenants/{id}` - Delete tenant
+### Customers
+- `GET /api/customers` - Get all customers
+- `GET /api/customers/{id}` - Get customer by ID
+- `POST /api/customers` - Create new customer
+- `PUT /api/customers/{id}` - Update customer
+- `DELETE /api/customers/{id}` - Delete customer
 
 ### Invoices
 - `GET /api/invoices` - Get all invoices
@@ -172,7 +172,7 @@ The application uses Entity Framework Core with the following main entities:
 
 - **Users** - Authentication and user management
 - **Rooms** - Property inventory
-- **Tenants** - Tenant information and profiles
+- **Customers** - Customer information and profiles
 - **Invoices** - Billing and invoice management
 - **Payments** - Payment tracking and processing
 

@@ -3,26 +3,27 @@ using System.ComponentModel.DataAnnotations;
 namespace RentalManagement.Api.Models.DTOs;
 
 /// <summary>
-/// DTO for creating a new tenant
+/// DTO for creating a new customer.
+/// Rent and deposit are not captured here — they belong to a rental contract.
 /// </summary>
-public class CreateTenantDto
+public class CreateCustomerDto
 {
     /// <summary>
-    /// Tenant's first name
+    /// Customer's first name
     /// </summary>
     [Required]
     [StringLength(100)]
     public string FirstName { get; set; } = string.Empty;
 
     /// <summary>
-    /// Tenant's last name
+    /// Customer's last name
     /// </summary>
     [Required]
     [StringLength(100)]
     public string LastName { get; set; } = string.Empty;
 
     /// <summary>
-    /// Tenant's email address
+    /// Customer's email address
     /// </summary>
     [Required]
     [EmailAddress]
@@ -30,7 +31,7 @@ public class CreateTenantDto
     public string Email { get; set; } = string.Empty;
 
     /// <summary>
-    /// Tenant's phone number
+    /// Customer's phone number
     /// </summary>
     [Required]
     [Phone]
@@ -38,12 +39,12 @@ public class CreateTenantDto
     public string PhoneNumber { get; set; } = string.Empty;
 
     /// <summary>
-    /// Tenant's date of birth
+    /// Customer's date of birth
     /// </summary>
     public DateTime? DateOfBirth { get; set; }
 
     /// <summary>
-    /// Tenant's national ID or identification number
+    /// Customer's national ID or identification number
     /// </summary>
     [StringLength(50)]
     public string IdentificationNumber { get; set; } = string.Empty;
@@ -61,62 +62,50 @@ public class CreateTenantDto
     public string EmergencyContactPhone { get; set; } = string.Empty;
 
     /// <summary>
-    /// Security deposit amount
-    /// </summary>
-    [Range(0, double.MaxValue)]
-    public decimal SecurityDeposit { get; set; }
-
-    /// <summary>
-    /// Monthly rent amount
-    /// </summary>
-    [Range(0, double.MaxValue)]
-    public decimal MonthlyRent { get; set; }
-
-    /// <summary>
-    /// Additional notes about the tenant
+    /// Additional notes about the customer
     /// </summary>
     [StringLength(1000)]
     public string Notes { get; set; } = string.Empty;
 }
 
 /// <summary>
-/// DTO for updating an existing tenant
+/// DTO for updating an existing customer
 /// </summary>
-public class UpdateTenantDto
+public class UpdateCustomerDto
 {
     /// <summary>
-    /// Tenant's first name
+    /// Customer's first name
     /// </summary>
     [StringLength(100)]
     public string? FirstName { get; set; }
 
     /// <summary>
-    /// Tenant's last name
+    /// Customer's last name
     /// </summary>
     [StringLength(100)]
     public string? LastName { get; set; }
 
     /// <summary>
-    /// Tenant's email address
+    /// Customer's email address
     /// </summary>
     [EmailAddress]
     [StringLength(255)]
     public string? Email { get; set; }
 
     /// <summary>
-    /// Tenant's phone number
+    /// Customer's phone number
     /// </summary>
     [Phone]
     [StringLength(20)]
     public string? PhoneNumber { get; set; }
 
     /// <summary>
-    /// Tenant's date of birth
+    /// Customer's date of birth
     /// </summary>
     public DateTime? DateOfBirth { get; set; }
 
     /// <summary>
-    /// Tenant's national ID or identification number
+    /// Customer's national ID or identification number
     /// </summary>
     [StringLength(50)]
     public string? IdentificationNumber { get; set; }
@@ -134,33 +123,21 @@ public class UpdateTenantDto
     public string? EmergencyContactPhone { get; set; }
 
     /// <summary>
-    /// Security deposit amount
-    /// </summary>
-    [Range(0, double.MaxValue)]
-    public decimal? SecurityDeposit { get; set; }
-
-    /// <summary>
-    /// Monthly rent amount
-    /// </summary>
-    [Range(0, double.MaxValue)]
-    public decimal? MonthlyRent { get; set; }
-
-    /// <summary>
-    /// Whether the tenant is active
+    /// Whether the customer is active
     /// </summary>
     public bool? IsActive { get; set; }
 
     /// <summary>
-    /// Additional notes about the tenant
+    /// Additional notes about the customer
     /// </summary>
     [StringLength(1000)]
     public string? Notes { get; set; }
 }
 
 /// <summary>
-/// DTO for assigning a tenant to a room
+/// DTO for assigning a customer to a room. Creates an active rental contract.
 /// </summary>
-public class AssignTenantToRoomDto
+public class AssignCustomerToRoomDto
 {
     /// <summary>
     /// ID of the room to assign
@@ -184,55 +161,62 @@ public class AssignTenantToRoomDto
     /// Monthly rent for this assignment (optional, defaults to room rent)
     /// </summary>
     public decimal? MonthlyRent { get; set; }
+
+    /// <summary>
+    /// Security deposit for this assignment
+    /// </summary>
+    [Range(0, double.MaxValue)]
+    public decimal SecurityDeposit { get; set; }
 }
 
 /// <summary>
-/// DTO for tenant information response
+/// DTO for customer information response.
+/// Rental fields are derived from the customer's currently active contract.
 /// </summary>
-public class TenantDto
+public class CustomerDto
 {
     /// <summary>
-    /// Unique identifier for the tenant
+    /// Unique identifier for the customer
     /// </summary>
     public int Id { get; set; }
 
     /// <summary>
-    /// Tenant's first name
+    /// Customer's first name
     /// </summary>
     public string FirstName { get; set; } = string.Empty;
 
     /// <summary>
-    /// Tenant's last name
+    /// Customer's last name
     /// </summary>
     public string LastName { get; set; } = string.Empty;
 
     /// <summary>
-    /// Tenant's full name
+    /// Customer's full name
     /// </summary>
     public string FullName { get; set; } = string.Empty;
 
     /// <summary>
-    /// Tenant's email address
+    /// Customer's email address
     /// </summary>
     public string Email { get; set; } = string.Empty;
 
     /// <summary>
-    /// Tenant's phone number
+    /// Customer's phone number
     /// </summary>
     public string PhoneNumber { get; set; } = string.Empty;
 
     /// <summary>
-    /// Tenant's date of birth
+    /// Customer's date of birth
     /// </summary>
     public DateTime? DateOfBirth { get; set; }
 
     /// <summary>
-    /// Tenant's age (calculated from date of birth)
+    /// Customer's age (calculated from date of birth)
     /// </summary>
     public int? Age { get; set; }
 
     /// <summary>
-    /// Tenant's national ID or identification number
+    /// Customer's national ID or identification number
     /// </summary>
     public string IdentificationNumber { get; set; } = string.Empty;
 
@@ -247,132 +231,111 @@ public class TenantDto
     public string EmergencyContactPhone { get; set; } = string.Empty;
 
     /// <summary>
-    /// Information about the assigned room
+    /// ID of the currently active contract, if any
+    /// </summary>
+    public int? ActiveContractId { get; set; }
+
+    /// <summary>
+    /// Room under the currently active contract, if any
     /// </summary>
     public RoomSummaryDto? Room { get; set; }
 
     /// <summary>
-    /// When the rental contract started
+    /// Start date of the currently active contract
     /// </summary>
     public DateTime? ContractStartDate { get; set; }
 
     /// <summary>
-    /// When the rental contract ends
+    /// End date of the currently active contract
     /// </summary>
     public DateTime? ContractEndDate { get; set; }
 
     /// <summary>
-    /// Security deposit amount
+    /// Security deposit held under the currently active contract
     /// </summary>
     public decimal SecurityDeposit { get; set; }
 
     /// <summary>
-    /// Monthly rent amount
+    /// Monthly rent under the currently active contract
     /// </summary>
     public decimal MonthlyRent { get; set; }
 
     /// <summary>
-    /// Whether the tenant is active
+    /// Whether the customer is active
     /// </summary>
     public bool IsActive { get; set; }
 
     /// <summary>
-    /// Whether the tenant has an active contract
+    /// Whether the customer has a currently active contract
     /// </summary>
     public bool HasActiveContract { get; set; }
 
     /// <summary>
-    /// Additional notes about the tenant
+    /// Total number of contracts this customer has held
+    /// </summary>
+    public int ContractCount { get; set; }
+
+    /// <summary>
+    /// Additional notes about the customer
     /// </summary>
     public string Notes { get; set; } = string.Empty;
 
     /// <summary>
-    /// When the tenant was created
+    /// When the customer was created
     /// </summary>
     public DateTime CreatedAt { get; set; }
 
     /// <summary>
-    /// When the tenant was last updated
+    /// When the customer was last updated
     /// </summary>
     public DateTime UpdatedAt { get; set; }
 }
 
 /// <summary>
-/// DTO for tenant summary information
+/// DTO for customer summary information
 /// </summary>
-public class TenantSummaryDto
+public class CustomerSummaryDto
 {
     /// <summary>
-    /// Unique identifier for the tenant
+    /// Unique identifier for the customer
     /// </summary>
     public int Id { get; set; }
 
     /// <summary>
-    /// Tenant's full name
+    /// Customer's full name
     /// </summary>
     public string FullName { get; set; } = string.Empty;
 
     /// <summary>
-    /// Tenant's email address
+    /// Customer's email address
     /// </summary>
     public string Email { get; set; } = string.Empty;
 
     /// <summary>
-    /// Tenant's phone number
+    /// Customer's phone number
     /// </summary>
     public string PhoneNumber { get; set; } = string.Empty;
 
     /// <summary>
-    /// When the rental contract started
+    /// Start date of the currently active contract
     /// </summary>
     public DateTime? ContractStartDate { get; set; }
 
     /// <summary>
-    /// When the rental contract ends
+    /// End date of the currently active contract
     /// </summary>
     public DateTime? ContractEndDate { get; set; }
 
     /// <summary>
-    /// Whether the tenant has an active contract
+    /// Whether the customer has a currently active contract
     /// </summary>
     public bool HasActiveContract { get; set; }
 }
 
 /// <summary>
-/// DTO for room summary information
+/// DTO for customer search and filter parameters
 /// </summary>
-public class RoomSummaryDto
-{
-    /// <summary>
-    /// Unique identifier for the room
-    /// </summary>
-    public int Id { get; set; }
-
-    /// <summary>
-    /// Room number for identification
-    /// </summary>
-    public string RoomNumber { get; set; } = string.Empty;
-
-    /// <summary>
-    /// Type of room as string
-    /// </summary>
-    public string TypeName { get; set; } = string.Empty;
-
-    /// <summary>
-    /// Monthly rent price for the room
-    /// </summary>
-    public decimal MonthlyRent { get; set; }
-
-    /// <summary>
-    /// Floor number where the room is located
-    /// </summary>
-    public int Floor { get; set; }
-}
-
-/// <summary>
-/// DTO for tenant search and filter parameters
-/// </summary>
-public class TenantSearchDto
+public class CustomerSearchDto
 {
     /// <summary>
     /// Search term for name, email, or phone

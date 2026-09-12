@@ -44,18 +44,18 @@ public interface IInvoiceService
     Task<ApiResponse<bool>> DeleteInvoiceAsync(int id);
 
     /// <summary>
-    /// Generates monthly invoices for all active tenants
+    /// Generates monthly invoices for all active customers
     /// </summary>
     /// <param name="billingPeriod">Month and year to generate invoices for</param>
     /// <returns>Number of invoices generated</returns>
     Task<ApiResponse<int>> GenerateMonthlyInvoicesAsync(DateTime billingPeriod);
 
     /// <summary>
-    /// Gets invoices by tenant ID
+    /// Gets invoices by customer ID
     /// </summary>
-    /// <param name="tenantId">Tenant ID</param>
-    /// <returns>List of invoices for the tenant</returns>
-    Task<ApiResponse<IEnumerable<InvoiceDto>>> GetInvoicesByTenantAsync(int tenantId);
+    /// <param name="customerId">Customer ID</param>
+    /// <returns>List of invoices for the customer</returns>
+    Task<ApiResponse<IEnumerable<InvoiceDto>>> GetInvoicesByCustomerAsync(int customerId);
 
     /// <summary>
     /// Gets overdue invoices

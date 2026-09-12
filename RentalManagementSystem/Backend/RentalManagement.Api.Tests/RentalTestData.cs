@@ -10,15 +10,15 @@ namespace RentalManagement.Api.Tests;
 public static class RentalTestData
 {
     /// <summary>
-    /// Empties every table these tests write to and seeds one tenant living in one
-    /// room, so each test starts from a known, empty ledger.
+    /// Empties every table these tests write to and seeds one customer holding an
+    /// active contract on one room, so each test starts from a known, empty ledger.
     /// </summary>
-    public static async Task<(int TenantId, int RoomId)> ResetAndSeedTenantAsync(
+    public static async Task<(int CustomerId, int RoomId, int ContractId)> ResetAndSeedCustomerAsync(
         RentalManagementContext context,
         decimal monthlyRent = 1_000m)
     {
         await context.Database.ExecuteSqlRawAsync("""
-            TRUNCATE "Payments", "InvoiceItems", "Invoices", "Tenants", "Rooms", "InvoiceNumberCounters"
+            TRUNCATE "Payments", "InvoiceItems", "Invoices", "RentalContracts", "Customers", "Rooms", "InvoiceNumberCounters"
             RESTART IDENTITY CASCADE;
             """);
 
@@ -31,19 +31,28 @@ public static class RentalTestData
         context.Rooms.Add(room);
         await context.SaveChangesAsync();
 
-        var tenant = new Tenant
+        var customer = new Customer
         {
             FirstName = "Test",
-            LastName = "Tenant",
+            LastName = "Customer",
             Email = $"{Guid.NewGuid():N}@example.test",
             IdentificationNumber = Guid.NewGuid().ToString("N"),
-            RoomId = room.Id,
-            MonthlyRent = monthlyRent,
             IsActive = true
         };
-        context.Tenants.Add(tenant);
+        context.Customers.Add(customer);
         await context.SaveChangesAsync();
 
-        return (tenant.Id, room.Id);
+        var contract = new RentalContract
+        {
+            CustomerId = customer.Id,
+            RoomId = room.Id,
+            StartDate = DateTime.UtcNow.AddMonths(-1),
+            MonthlyRent = monthlyRent,
+            Status = RentalContractStatus.Active
+        };
+        context.RentalContracts.Add(contract);
+        await context.SaveChangesAsync();
+
+        return (customer.Id, room.Id, contract.Id);
     }
 }

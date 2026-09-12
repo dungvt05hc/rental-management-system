@@ -15,6 +15,7 @@ import {
   Package,
   Settings,
   UserCog,
+  MailPlus,
   Globe
 } from 'lucide-react';
 import { useState } from 'react';
@@ -41,13 +42,14 @@ export function Layout({ children }: LayoutProps) {
   const navigation = [
     { name: t('dashboard.title', 'Dashboard'), href: '/', icon: Home, feature: 'dashboard' as const },
     { name: t('rooms.title', 'Rooms'), href: '/rooms', icon: Building, feature: 'rooms' as const },
-    { name: t('tenants.title', 'Tenants'), href: '/tenants', icon: Users, feature: 'tenants' as const },
+    { name: t('customers.title', 'Customers'), href: '/customers', icon: Users, feature: 'customers' as const },
     { name: t('invoices.title', 'Invoices'), href: '/invoices', icon: FileText, feature: 'invoices' as const },
     { name: t('items.title', 'Items'), href: '/items', icon: Package, feature: 'items' as const },
     { name: t('payments.title', 'Payments'), href: '/payments', icon: CreditCard, feature: 'payments' as const },
     { name: t('reports.title', 'Reports'), href: '/reports', icon: BarChart3, feature: 'reports' as const },
     { name: t('languages.title', 'Languages'), href: '/admin/languages', icon: Globe, feature: 'languages' as const },
     { name: t('users.title', 'User Management'), href: '/users', icon: UserCog, feature: 'users' as const },
+    { name: t('invitations.title', 'Invitations'), href: '/invitations', icon: MailPlus, feature: 'invitations' as const },
     { name: t('system.title', 'System'), href: '/system', icon: Settings, feature: 'system' as const },
   ];
 

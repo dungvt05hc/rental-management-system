@@ -30,8 +30,8 @@ export interface SystemInfo {
   totalLanguages: number;
   totalUsers: number;
   totalRooms: number;
-  totalTenants: number;
-  activeTenants: number;
+  totalCustomers: number;
+  activeCustomers: number;
   databaseInfo: Record<string, string>;
 }
 

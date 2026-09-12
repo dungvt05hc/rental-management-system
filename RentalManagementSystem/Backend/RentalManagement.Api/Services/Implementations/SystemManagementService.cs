@@ -194,9 +194,9 @@ public class SystemManagementService : ISystemManagementService
         var totalLanguages = await _context.Languages.CountAsync();
         var totalUsers = await _context.Users.CountAsync();
         var totalRooms = await _context.Rooms.CountAsync();
-        var totalTenants = await _context.Tenants.CountAsync();
-        var activeTenants = await _context.Tenants
-            .Where(t => t.IsActive && t.RoomId != null)
+        var totalCustomers = await _context.Customers.CountAsync();
+        var activeCustomers = await _context.Customers
+            .Where(t => t.IsActive && t.RentalContracts.Any(c => c.Status == RentalContractStatus.Active))
             .CountAsync();
 
         var databaseInfo = new Dictionary<string, string>
@@ -215,8 +215,8 @@ public class SystemManagementService : ISystemManagementService
             TotalLanguages = totalLanguages,
             TotalUsers = totalUsers,
             TotalRooms = totalRooms,
-            TotalTenants = totalTenants,
-            ActiveTenants = activeTenants,
+            TotalCustomers = totalCustomers,
+            ActiveCustomers = activeCustomers,
             DatabaseInfo = databaseInfo
         };
     }

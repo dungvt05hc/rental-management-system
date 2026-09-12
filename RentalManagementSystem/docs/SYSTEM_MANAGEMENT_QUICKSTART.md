@@ -107,7 +107,7 @@ Or use the "Seed Defaults" button in the UI after logging in.
 
 1. Go to System Info tab
 2. View real-time data:
-   - User/room/tenant counts
+   - User/room/customer counts
    - Server time
    - Database status
    - Environment info

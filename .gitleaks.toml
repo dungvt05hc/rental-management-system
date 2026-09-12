@@ -15,24 +15,29 @@ id = "connstring-password"
 description = "Password= trong connection string (ADO.NET / Npgsql)"
 regex = '''(?i)\bPassword\s*=\s*(?!["']?(\{\{|\$\{|\$\(|%|<|__|YOUR|CHANGE|PLACEHOLDER|REPLACE|xxx|\*\*\*|ENV|SECRET_|TODO))["']?([^\s;"'`,)]{8,})'''
 tags = ["password", "database"]
+# Một rule chỉ được có ĐÚNG MỘT bảng [rules.allowlist] — khai báo thêm
+# [[rules.allowlist]] làm file TOML không parse được và gitleaks bỏ luôn config.
+# Vì vậy gộp hết vào một allowlist duy nhất, soi cả dòng (regexTarget = "line").
 [rules.allowlist]
-regexTarget = "match"
+regexTarget = "line"
 regexes = [
   '''(?i)Password\s*=\s*["']?(\$\{[^}]+\}|\$\([^)]+\)|\{\{[^}]+\}\}|%[A-Z_]+%|<[^>]+>|__[A-Z_]+__)''',
   '''(?i)Password\s*=\s*["']?(your[-_ ]?password|changeme|change[-_ ]?me|placeholder|replace[-_ ]?me|example|sample|dummy|test1234|postgres|password)\b''',
   '''\*\*\*REMOVED''',
-]
-
-# Khai báo biến C# nhận giá trị từ biểu thức (member access, gọi hàm, ??) chứ
-# không phải literal — ví dụ:
-#   var password = createDto.Password ?? GenerateRandomPassword();
-#   var seedPassword = Environment.GetEnvironmentVariable("SEED_ADMIN_PASSWORD");
-# Soi cả dòng (regexTarget = "line") để bắt buộc có ngữ cảnh khai báo biến, và
-# yêu cầu giá trị không mở đầu bằng dấu nháy — `var password = "literal";` vẫn bị bắt.
-[[rules.allowlist]]
-regexTarget = "line"
-regexes = [
+  # Khai báo biến C# nhận giá trị từ biểu thức (member access, gọi hàm, ??) chứ
+  # không phải literal — ví dụ:
+  #   var password = createDto.Password ?? GenerateRandomPassword();
+  #   var seedPassword = Environment.GetEnvironmentVariable("SEED_ADMIN_PASSWORD");
+  # Bắt buộc có ngữ cảnh khai báo biến và giá trị không mở đầu bằng dấu nháy —
+  # nên `var password = "literal";` vẫn bị bắt.
   '''^\s*(?:#|//)?\s*(?:var|string\??|const\s+string|(?:static\s+)?readonly\s+string)\s+[A-Za-z0-9_]*(?i:password)[A-Za-z0-9_]*\s*=\s*[^"'\s](?:[^"']|"[A-Z0-9_]+")*$''',
+  # Hằng chứa tên định danh dạng slug (route, policy, cache key…) — ví dụ:
+  #   public const string ForgotPassword = "forgot-password";
+  #   export const FORGOT_PASSWORD = 'forgot-password';
+  # Literal kebab/snake toàn chữ thường có dấu phân cách, nằm trong khai báo
+  # const/readonly — mật khẩu thật không có hình dạng này. Cho phép tiền tố
+  # comment (#, //) để ví dụ trong tài liệu / script không bị chặn.
+  '''^\s*(?:#|//)?\s*(?:export\s+)?(?:public|private|internal|protected)?\s*(?:static\s+)?(?:const|readonly)(?:\s+string)?\s+[A-Za-z0-9_]+\s*=\s*["'][a-z][a-z0-9]*(?:[-_./][a-z0-9]+)+["']\s*;?\s*$''',
 ]
 
 [[rules]]

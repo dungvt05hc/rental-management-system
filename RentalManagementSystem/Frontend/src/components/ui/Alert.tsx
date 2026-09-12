@@ -1,5 +1,6 @@
 import { ReactNode } from 'react';
 import * as React from 'react';
+import { useTranslation } from '../../hooks/useTranslation';
 
 export type AlertVariant = 'success' | 'error' | 'warning' | 'info';
 
@@ -58,6 +59,7 @@ const icons: Record<AlertVariant, ReactNode> = {
 };
 
 export function Alert({ variant = 'info', title, children, onClose, className = '' }: AlertProps) {
+  const { t } = useTranslation();
   const styles = variantStyles[variant];
 
   return (
@@ -86,9 +88,9 @@ export function Alert({ variant = 'info', title, children, onClose, className = 
                 type="button"
                 onClick={onClose}
                 className={`inline-flex rounded-md p-1.5 focus:outline-none focus:ring-2 focus:ring-offset-2 ${styles.closeButton}`}
-                aria-label="Close"
+                aria-label={t('common.close', 'Close')}
               >
-                <span className="sr-only">Dismiss</span>
+                <span className="sr-only">{t('common.close', 'Close')}</span>
                 <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                   <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
                 </svg>

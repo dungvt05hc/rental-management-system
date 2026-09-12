@@ -2,6 +2,9 @@ import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose, Button, Input } from '../ui';
 import { roomService } from '../../services';
 import type { Room, CreateRoomRequest, UpdateRoomRequest, RoomType, RoomStatus } from '../../types';
+import { parseDecimalInput } from '../../utils';
+import { defineMessage } from '../../utils/i18n';
+import { useTranslation } from '../../hooks/useTranslation';
 
 interface RoomDialogProps {
   open: boolean;
@@ -11,22 +14,23 @@ interface RoomDialogProps {
 }
 
 const roomTypeOptions = [
-  { value: 1, label: 'Single' },
-  { value: 2, label: 'Double' },
-  { value: 3, label: 'Triple' },
-  { value: 4, label: 'Suite' },
-  { value: 5, label: 'Studio' },
-  { value: 6, label: 'Apartment' },
+  { value: 1, message: defineMessage('rooms.typeSingle', 'Single') },
+  { value: 2, message: defineMessage('rooms.typeDouble', 'Double') },
+  { value: 3, message: defineMessage('rooms.typeTriple', 'Triple') },
+  { value: 4, message: defineMessage('rooms.typeSuite', 'Suite') },
+  { value: 5, message: defineMessage('rooms.typeStudio', 'Studio') },
+  { value: 6, message: defineMessage('rooms.typeApartment', 'Apartment') },
 ];
 
 const roomStatusOptions = [
-  { value: 1, label: 'Vacant' },
-  { value: 2, label: 'Rented' },
-  { value: 3, label: 'Maintenance' },
-  { value: 4, label: 'Reserved' },
+  { value: 1, message: defineMessage('rooms.available', 'Available') },
+  { value: 2, message: defineMessage('rooms.occupied', 'Occupied') },
+  { value: 3, message: defineMessage('rooms.statusMaintenance', 'Maintenance') },
+  { value: 4, message: defineMessage('rooms.statusReserved', 'Reserved') },
 ];
 
 export function RoomDialog({ open, onOpenChange, room, onSuccess }: RoomDialogProps) {
+  const { t } = useTranslation();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
@@ -88,9 +92,9 @@ export function RoomDialog({ open, onOpenChange, room, onSuccess }: RoomDialogPr
         roomNumber: formData.roomNumber,
         type: formData.type,
         status: validStatus,
-        monthlyRent: parseFloat(formData.monthlyRent),
-        floor: parseInt(formData.floor),
-        area: formData.area ? parseFloat(formData.area) : undefined,
+        monthlyRent: parseDecimalInput(formData.monthlyRent) ?? 0,
+        floor: parseDecimalInput(formData.floor) ?? 0,
+        area: formData.area ? parseDecimalInput(formData.area) ?? undefined : undefined,
         description: formData.description,
         hasAirConditioning: formData.hasAirConditioning,
         hasPrivateBathroom: formData.hasPrivateBathroom,
@@ -125,7 +129,7 @@ export function RoomDialog({ open, onOpenChange, room, onSuccess }: RoomDialogPr
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>{room ? 'Edit Room' : 'Add New Room'}</DialogTitle>
+          <DialogTitle>{room ? t('rooms.editRoom', 'Edit Room') : t('rooms.addRoom', 'Add Room')}</DialogTitle>
           <DialogClose onClose={() => onOpenChange(false)} />
         </DialogHeader>
 
@@ -140,19 +144,19 @@ export function RoomDialog({ open, onOpenChange, room, onSuccess }: RoomDialogPr
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Room Number <span className="text-red-500">*</span>
+                  {t('rooms.roomNumber', 'Room Number')} <span className="text-red-500">*</span>
                 </label>
                 <Input
                   value={formData.roomNumber}
                   onChange={(e) => handleChange('roomNumber', e.target.value)}
-                  placeholder="e.g., 101"
+                  placeholder={t('rooms.roomNumberPlaceholder', 'e.g. 101')}
                   required
                 />
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Room Type <span className="text-red-500">*</span>
+                  {t('rooms.roomType', 'Type')} <span className="text-red-500">*</span>
                 </label>
                 <select
                   value={formData.type}
@@ -162,7 +166,7 @@ export function RoomDialog({ open, onOpenChange, room, onSuccess }: RoomDialogPr
                 >
                   {roomTypeOptions.map(option => (
                     <option key={option.value} value={option.value}>
-                      {option.label}
+                      {t(option.message.key, option.message.defaultValue)}
                     </option>
                   ))}
                 </select>
@@ -172,21 +176,21 @@ export function RoomDialog({ open, onOpenChange, room, onSuccess }: RoomDialogPr
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Monthly Rent <span className="text-red-500">*</span>
+                  {t('rooms.price', 'Monthly Rent')} <span className="text-red-500">*</span>
                 </label>
                 <Input
-                  type="number"
-                  step="0.01"
+                  type="text"
+                  inputMode="decimal"
                   value={formData.monthlyRent}
                   onChange={(e) => handleChange('monthlyRent', e.target.value)}
-                  placeholder="e.g., 1200.00"
+                  placeholder="vd: 3.500.000"
                   required
                 />
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Status <span className="text-red-500">*</span>
+                  {t('rooms.status', 'Status')} <span className="text-red-500">*</span>
                 </label>
                 <select
                   value={formData.status}
@@ -196,7 +200,7 @@ export function RoomDialog({ open, onOpenChange, room, onSuccess }: RoomDialogPr
                 >
                   {roomStatusOptions.map(option => (
                     <option key={option.value} value={option.value}>
-                      {option.label}
+                      {t(option.message.key, option.message.defaultValue)}
                     </option>
                   ))}
                 </select>
@@ -206,39 +210,40 @@ export function RoomDialog({ open, onOpenChange, room, onSuccess }: RoomDialogPr
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Floor <span className="text-red-500">*</span>
+                  {t('rooms.floor', 'Floor')} <span className="text-red-500">*</span>
                 </label>
                 <Input
-                  type="number"
+                  type="text"
+                  inputMode="numeric"
                   value={formData.floor}
                   onChange={(e) => handleChange('floor', e.target.value)}
-                  placeholder="e.g., 1"
+                  placeholder="vd: 1"
                   required
                 />
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Area (sq.m)
+                  {t('rooms.area', 'Area (m²)')}
                 </label>
                 <Input
-                  type="number"
-                  step="0.01"
+                  type="text"
+                  inputMode="decimal"
                   value={formData.area}
                   onChange={(e) => handleChange('area', e.target.value)}
-                  placeholder="e.g., 35.50"
+                  placeholder="vd: 35,5"
                 />
               </div>
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Description
+                {t('items.description', 'Description')}
               </label>
               <textarea
                 value={formData.description}
                 onChange={(e) => handleChange('description', e.target.value)}
-                placeholder="Room description..."
+                placeholder={t('rooms.descriptionPlaceholder', 'Notes about this room...')}
                 rows={3}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
@@ -246,7 +251,7 @@ export function RoomDialog({ open, onOpenChange, room, onSuccess }: RoomDialogPr
 
             <div className="space-y-2">
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Amenities
+                {t('rooms.amenities', 'Amenities')}
               </label>
               <div className="space-y-2">
                 <label className="flex items-center">
@@ -256,7 +261,7 @@ export function RoomDialog({ open, onOpenChange, room, onSuccess }: RoomDialogPr
                     onChange={(e) => handleChange('hasAirConditioning', e.target.checked)}
                     className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                   />
-                  <span className="ml-2 text-sm text-gray-700">Air Conditioning</span>
+                  <span className="ml-2 text-sm text-gray-700">{t('rooms.airConditioning', 'Air conditioning')}</span>
                 </label>
                 <label className="flex items-center">
                   <input
@@ -265,7 +270,7 @@ export function RoomDialog({ open, onOpenChange, room, onSuccess }: RoomDialogPr
                     onChange={(e) => handleChange('hasPrivateBathroom', e.target.checked)}
                     className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                   />
-                  <span className="ml-2 text-sm text-gray-700">Private Bathroom</span>
+                  <span className="ml-2 text-sm text-gray-700">{t('rooms.privateBathroom', 'Private bathroom')}</span>
                 </label>
                 <label className="flex items-center">
                   <input
@@ -274,7 +279,7 @@ export function RoomDialog({ open, onOpenChange, room, onSuccess }: RoomDialogPr
                     onChange={(e) => handleChange('isFurnished', e.target.checked)}
                     className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                   />
-                  <span className="ml-2 text-sm text-gray-700">Furnished</span>
+                  <span className="ml-2 text-sm text-gray-700">{t('rooms.furnished', 'Furnished')}</span>
                 </label>
               </div>
             </div>
@@ -287,10 +292,14 @@ export function RoomDialog({ open, onOpenChange, room, onSuccess }: RoomDialogPr
               onClick={() => onOpenChange(false)}
               disabled={isSubmitting}
             >
-              Cancel
+              {t('common.cancel', 'Cancel')}
             </Button>
             <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? 'Saving...' : room ? 'Update Room' : 'Create Room'}
+              {isSubmitting
+                ? t('common.saving', 'Saving...')
+                : room
+                  ? t('common.update', 'Update')
+                  : t('common.create', 'Create')}
             </Button>
           </DialogFooter>
         </form>

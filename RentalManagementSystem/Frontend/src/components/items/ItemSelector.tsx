@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Plus } from 'lucide-react';
 import { itemService } from '../../services';
+import { NumericInput } from '../ui';
+import { formatCurrency } from '../../utils';
+import { useTranslation } from '../../hooks/useTranslation';
 import type { Item, InvoiceItem } from '../../types';
 
 interface ItemSelectorProps {
@@ -8,6 +11,7 @@ interface ItemSelectorProps {
 }
 
 export const ItemSelector: React.FC<ItemSelectorProps> = ({ onItemSelect }) => {
+  const { t } = useTranslation();
   const [items, setItems] = useState<Item[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
@@ -90,20 +94,20 @@ export const ItemSelector: React.FC<ItemSelectorProps> = ({ onItemSelect }) => {
         className="px-4 py-2 border border-blue-600 text-blue-600 rounded-lg hover:bg-blue-50 flex items-center gap-2"
       >
         <Plus size={18} />
-        Add Item from Catalog
+        {t('items.addFromCatalog', 'Add item from catalog')}
       </button>
 
       {showDialog && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6">
-              <h2 className="text-2xl font-bold mb-4">Select Item</h2>
+              <h2 className="text-2xl font-bold mb-4">{t('invoices.selectItem', 'Select an item')}</h2>
 
               <div className="relative mb-4">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
                 <input
                   type="text"
-                  placeholder="Search items..."
+                  placeholder={t('items.searchShortPlaceholder', 'Search items...')}
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
@@ -113,13 +117,13 @@ export const ItemSelector: React.FC<ItemSelectorProps> = ({ onItemSelect }) => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Items List */}
                 <div className="border border-gray-300 rounded-lg p-4 h-96 overflow-y-auto">
-                  <h3 className="font-semibold mb-3">Available Items</h3>
+                  <h3 className="font-semibold mb-3">{t('items.availableItems', 'Available items')}</h3>
                   {loading ? (
                     <div className="flex justify-center items-center h-32">
                       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                     </div>
                   ) : filteredItems.length === 0 ? (
-                    <div className="text-center text-gray-500 py-8">No items found</div>
+                    <div className="text-center text-gray-500 py-8">{t('items.noItemsFound', 'No items found')}</div>
                   ) : (
                     <div className="space-y-2">
                       {filteredItems.map((item) => (
@@ -135,11 +139,11 @@ export const ItemSelector: React.FC<ItemSelectorProps> = ({ onItemSelect }) => {
                           <div className="font-medium text-sm">{item.itemName}</div>
                           <div className="text-xs text-gray-500">{item.itemCode}</div>
                           <div className="text-sm font-semibold text-gray-900 mt-1">
-                            ${item.unitPrice.toFixed(2)} / {item.unitOfMeasure}
+                            {formatCurrency(item.unitPrice)} / {item.unitOfMeasure}
                           </div>
                           {item.category && (
                             <div className="text-xs text-gray-500 mt-1">
-                              Category: {item.category}
+                              {t('items.category', 'Category')}: {item.category}
                             </div>
                           )}
                         </div>
@@ -150,7 +154,7 @@ export const ItemSelector: React.FC<ItemSelectorProps> = ({ onItemSelect }) => {
 
                 {/* Item Details */}
                 <div className="border border-gray-300 rounded-lg p-4">
-                  <h3 className="font-semibold mb-3">Item Details</h3>
+                  <h3 className="font-semibold mb-3">{t('items.itemDetails', 'Item details')}</h3>
                   {selectedItem ? (
                     <div className="space-y-4">
                       <div>
@@ -163,20 +167,20 @@ export const ItemSelector: React.FC<ItemSelectorProps> = ({ onItemSelect }) => {
 
                       <div className="grid grid-cols-2 gap-2 text-sm">
                         <div>
-                          <span className="text-gray-500">Unit Price:</span>
-                          <div className="font-semibold">${selectedItem.unitPrice.toFixed(2)}</div>
+                          <span className="text-gray-500">{t('items.unitPrice', 'Unit Price')}</span>
+                          <div className="font-semibold">{formatCurrency(selectedItem.unitPrice)}</div>
                         </div>
                         <div>
                           <span className="text-gray-500">UOM:</span>
                           <div className="font-semibold">{selectedItem.unitOfMeasure}</div>
                         </div>
                         <div>
-                          <span className="text-gray-500">Tax:</span>
+                          <span className="text-gray-500">{t('invoices.tax', 'Tax')}</span>
                           <div className="font-semibold">{selectedItem.taxPercent}%</div>
                         </div>
                         {selectedItem.category && (
                           <div>
-                            <span className="text-gray-500">Category:</span>
+                            <span className="text-gray-500">{t('items.category', 'Category')}</span>
                             <div className="font-semibold">{selectedItem.category}</div>
                           </div>
                         )}
@@ -185,73 +189,64 @@ export const ItemSelector: React.FC<ItemSelectorProps> = ({ onItemSelect }) => {
                       <div className="border-t pt-4 space-y-3">
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Quantity *
+                            {t('invoices.quantity', 'Quantity')} *
                           </label>
-                          <input
-                            type="number"
-                            min="0.001"
-                            step="0.001"
+                          <NumericInput
                             value={quantity}
-                            onChange={(e) => setQuantity(parseFloat(e.target.value) || 0)}
+                            onValueChange={(value) => setQuantity(value ?? 0)}
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                           />
                         </div>
 
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Discount %
+                            {t('invoices.discountPercentShort', 'Disc %')}
                           </label>
-                          <input
-                            type="number"
-                            min="0"
-                            max="100"
-                            step="0.01"
+                          <NumericInput
                             value={discountPercent}
-                            onChange={(e) => setDiscountPercent(parseFloat(e.target.value) || 0)}
+                            onValueChange={(value) => setDiscountPercent(value ?? 0)}
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                           />
                         </div>
 
                         <div className="bg-gray-50 p-3 rounded-lg space-y-1 text-sm">
                           <div className="flex justify-between">
-                            <span>Subtotal:</span>
+                            <span>{t('invoices.subtotal', 'Subtotal')}</span>
                             <span className="font-semibold">
-                              ${(quantity * selectedItem.unitPrice).toFixed(2)}
+                              {formatCurrency((quantity * selectedItem.unitPrice))}
                             </span>
                           </div>
                           {discountPercent > 0 && (
                             <div className="flex justify-between text-red-600">
                               <span>Discount ({discountPercent}%):</span>
                               <span>
-                                -$
-                                {((quantity * selectedItem.unitPrice * discountPercent) / 100).toFixed(2)}
+                                -
+                                {formatCurrency((quantity * selectedItem.unitPrice * discountPercent) / 100)}
                               </span>
                             </div>
                           )}
                           <div className="flex justify-between">
                             <span>Tax ({selectedItem.taxPercent}%):</span>
                             <span>
-                              $
-                              {(
-                                ((quantity * selectedItem.unitPrice -
-                                  (quantity * selectedItem.unitPrice * discountPercent) / 100) *
-                                  selectedItem.taxPercent) /
-                                100
-                              ).toFixed(2)}
-                            </span>
-                          </div>
-                          <div className="flex justify-between font-bold text-base pt-2 border-t">
-                            <span>Total:</span>
-                            <span>
-                              $
-                              {(
-                                quantity * selectedItem.unitPrice -
-                                (quantity * selectedItem.unitPrice * discountPercent) / 100 +
+                              {formatCurrency(
                                 ((quantity * selectedItem.unitPrice -
                                   (quantity * selectedItem.unitPrice * discountPercent) / 100) *
                                   selectedItem.taxPercent) /
                                   100
-                              ).toFixed(2)}
+                              )}
+                            </span>
+                          </div>
+                          <div className="flex justify-between font-bold text-base pt-2 border-t">
+                            <span>{t('invoices.total', 'Total')}</span>
+                            <span>
+                              {formatCurrency(
+                                quantity * selectedItem.unitPrice -
+                                  (quantity * selectedItem.unitPrice * discountPercent) / 100 +
+                                  ((quantity * selectedItem.unitPrice -
+                                    (quantity * selectedItem.unitPrice * discountPercent) / 100) *
+                                    selectedItem.taxPercent) /
+                                    100
+                              )}
                             </span>
                           </div>
                         </div>
@@ -259,7 +254,7 @@ export const ItemSelector: React.FC<ItemSelectorProps> = ({ onItemSelect }) => {
                     </div>
                   ) : (
                     <div className="text-center text-gray-500 py-8">
-                      Select an item from the list to see details
+                      {t('items.selectToSeeDetails', 'Pick an item from the list to see its details')}
                     </div>
                   )}
                 </div>
@@ -276,7 +271,7 @@ export const ItemSelector: React.FC<ItemSelectorProps> = ({ onItemSelect }) => {
                   }}
                   className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
                 >
-                  Cancel
+                  {t('common.cancel', 'Cancel')}
                 </button>
                 <button
                   type="button"
@@ -284,7 +279,7 @@ export const ItemSelector: React.FC<ItemSelectorProps> = ({ onItemSelect }) => {
                   disabled={!selectedItem || quantity <= 0}
                   className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Add to Invoice
+                  {t('items.addToInvoice', 'Add to invoice')}
                 </button>
               </div>
             </div>

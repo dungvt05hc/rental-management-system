@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Save, Plus, Trash2, X } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle, Button, Input, AlertDialog } from '../ui';
-import { invoiceService, tenantService, roomService, itemService } from '../../services';
-import type { CreateInvoiceRequest, UpdateInvoiceRequest, Tenant, Room, InvoiceItem, Item, InvoiceStatus } from '../../types';
+import { Card, CardContent, CardHeader, CardTitle, Button, Input, NumericInput, AlertDialog } from '../ui';
+import { invoiceService, customerService, roomService, itemService } from '../../services';
+import type { CreateInvoiceRequest, UpdateInvoiceRequest, Customer, Room, InvoiceItem, Item, InvoiceStatus } from '../../types';
 import { useTranslation } from '../../hooks/useTranslation';
 import { useToast } from '../../contexts/ToastContext';
 import {
@@ -11,15 +11,17 @@ import {
   calculateInvoiceItemsTotals,
   roundToCents,
 } from './invoiceItemCalculations';
+import { formatCurrency, parseDecimalInput } from '../../utils';
+import { defineMessage } from '../../utils/i18n';
 
 const statusOptions = [
-  { value: 1, label: 'Draft', color: 'gray' },
-  { value: 2, label: 'Issued', color: 'blue' },
-  { value: 3, label: 'Unpaid', color: 'yellow' },
-  { value: 4, label: 'Partially Paid', color: 'orange' },
-  { value: 5, label: 'Paid', color: 'green' },
-  { value: 6, label: 'Overdue', color: 'red' },
-  { value: 7, label: 'Cancelled', color: 'gray' },
+  { value: 1, message: defineMessage('invoices.statusDraft', 'Draft'), color: 'gray' },
+  { value: 2, message: defineMessage('invoices.statusIssued', 'Issued'), color: 'blue' },
+  { value: 3, message: defineMessage('invoices.unpaid', 'Pending'), color: 'yellow' },
+  { value: 4, message: defineMessage('invoices.partiallyPaid', 'Partially Paid'), color: 'orange' },
+  { value: 5, message: defineMessage('invoices.paid', 'Paid'), color: 'green' },
+  { value: 6, message: defineMessage('invoices.overdue', 'Overdue'), color: 'red' },
+  { value: 7, message: defineMessage('invoices.cancelled', 'Cancelled'), color: 'gray' },
 ];
 
 const defaultItem: InvoiceItem = {
@@ -50,12 +52,12 @@ export function InvoiceFormPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [tenants, setTenants] = useState<Tenant[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
   const [rooms, setRooms] = useState<Room[]>([]);
   const [items, setItems] = useState<Item[]>([]);
   const [invoiceItems, setInvoiceItems] = useState<InvoiceItem[]>([]);
   const [formData, setFormData] = useState({
-    tenantId: '',
+    customerId: '',
     roomId: '',
     billingPeriod: '',
     additionalCharges: '0',
@@ -77,7 +79,7 @@ export function InvoiceFormPage() {
   });
 
   useEffect(() => {
-    loadTenants();
+    loadCustomers();
     loadRooms();
     loadItems();
 
@@ -104,7 +106,7 @@ export function InvoiceFormPage() {
       if (response.success && response.data) {
         const invoiceData = response.data;
         setFormData({
-          tenantId: String(invoiceData.tenant?.id || invoiceData.tenantId || ''),
+          customerId: String(invoiceData.customer?.id || invoiceData.customerId || ''),
           roomId: String(invoiceData.room?.id || invoiceData.roomId || ''),
           billingPeriod: invoiceData.billingPeriod ? invoiceData.billingPeriod.split('T')[0] : '',
           additionalCharges: String(invoiceData.additionalCharges || 0),
@@ -124,14 +126,14 @@ export function InvoiceFormPage() {
     }
   };
 
-  const loadTenants = async () => {
+  const loadCustomers = async () => {
     try {
-      const response = await tenantService.getTenants({ pageSize: 1000 });
+      const response = await customerService.getCustomers({ pageSize: 1000 });
       if (response.success && response.data) {
-        setTenants(response.data.items || []);
+        setCustomers(response.data.items || []);
       }
     } catch (err) {
-      console.error('Failed to load tenants:', err);
+      console.error('Failed to load customers:', err);
     }
   };
 
@@ -157,17 +159,17 @@ export function InvoiceFormPage() {
     }
   };
 
-  const handleTenantChange = (tenantId: string) => {
-    const tenant = tenants.find(t => String(t.id) === tenantId);
+  const handleCustomerChange = (customerId: string) => {
+    const customer = customers.find(t => String(t.id) === customerId);
 
-    if (tenant) {
+    if (customer) {
       setFormData(prev => ({
         ...prev,
-        tenantId,
-        roomId: tenant.room?.id ? String(tenant.room.id) : prev.roomId,
+        customerId,
+        roomId: customer.room?.id ? String(customer.room.id) : prev.roomId,
       }));
     } else {
-      setFormData(prev => ({ ...prev, tenantId }));
+      setFormData(prev => ({ ...prev, customerId }));
     }
   };
 
@@ -245,8 +247,8 @@ export function InvoiceFormPage() {
 
       if (isEditMode && id) {
         const updateData: UpdateInvoiceRequest = {
-          additionalCharges: parseFloat(formData.additionalCharges),
-          discount: parseFloat(formData.discount),
+          additionalCharges: (parseDecimalInput(formData.additionalCharges) ?? 0),
+          discount: (parseDecimalInput(formData.discount) ?? 0),
           status: parseInt(formData.status) as InvoiceStatus,
           dueDate: formData.dueDate,
           additionalChargesDescription: formData.additionalChargesDescription,
@@ -264,11 +266,11 @@ export function InvoiceFormPage() {
         }
       } else {
         const createData: CreateInvoiceRequest = {
-          tenantId: parseInt(formData.tenantId),
+          customerId: parseInt(formData.customerId),
           roomId: parseInt(formData.roomId),
           billingPeriod: formData.billingPeriod,
-          additionalCharges: parseFloat(formData.additionalCharges),
-          discount: parseFloat(formData.discount),
+          additionalCharges: (parseDecimalInput(formData.additionalCharges) ?? 0),
+          discount: (parseDecimalInput(formData.discount) ?? 0),
           dueDate: formData.dueDate,
           additionalChargesDescription: formData.additionalChargesDescription,
           notes: formData.notes,
@@ -303,8 +305,8 @@ export function InvoiceFormPage() {
   // Same expression the backend applies when it recalculates the invoice, so the
   // figure previewed here is the one that gets stored.
   const calculateTotal = () => {
-    const additional = parseFloat(formData.additionalCharges) || 0;
-    const discount = parseFloat(formData.discount) || 0;
+    const additional = parseDecimalInput(formData.additionalCharges) ?? 0;
+    const discount = parseDecimalInput(formData.discount) ?? 0;
 
     return roundToCents(itemsTotals.total + additional - discount);
   };
@@ -314,7 +316,7 @@ export function InvoiceFormPage() {
       <div className="flex items-center justify-center h-screen">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-4 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-sm text-gray-600">Loading invoice...</p>
+          <p className="mt-4 text-sm text-gray-600">{t('invoices.loadingOne', 'Loading invoice...')}</p>
         </div>
       </div>
     );
@@ -330,14 +332,16 @@ export function InvoiceFormPage() {
             className="flex items-center space-x-2"
           >
             <ArrowLeft className="h-4 w-4" />
-            <span>Back to Invoices</span>
+            <span>{t('invoices.backToList', 'Back to invoices')}</span>
           </Button>
           <div>
             <h1 className="text-3xl font-bold text-gray-900">
-              {isEditMode ? 'Edit Invoice' : 'Create New Invoice'}
+              {isEditMode ? t('invoices.editInvoice', 'Edit Invoice') : t('invoices.createInvoice', 'Create Invoice')}
             </h1>
             <p className="text-sm text-gray-500 mt-1">
-              {isEditMode ? 'Update invoice details and line items' : 'Fill in the details below to create a new invoice'}
+              {isEditMode
+                ? t('invoices.editSubtitle', 'Change the invoice details and its line items')
+                : t('invoices.createSubtitle', 'Fill in the details below to raise a new invoice')}
             </p>
           </div>
         </div>
@@ -354,27 +358,27 @@ export function InvoiceFormPage() {
           <CardHeader className="bg-gradient-to-r from-blue-50 to-blue-100 border-b">
             <CardTitle className="flex items-center text-lg">
               <span className="bg-blue-600 text-white rounded-full w-8 h-8 flex items-center justify-center text-sm mr-3">1</span>
-              Billing Information
+              {t('invoices.billingInformation', 'Billing Information')}
             </CardTitle>
           </CardHeader>
           <CardContent className="p-6">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Tenant <span className="text-red-500">*</span>
+                  {t('invoices.customer', 'Customer')} <span className="text-red-500">*</span>
                 </label>
                 <select
-                  value={formData.tenantId}
-                  onChange={(e) => handleTenantChange(e.target.value)}
+                  value={formData.customerId}
+                  onChange={(e) => handleCustomerChange(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   required
                   disabled={isEditMode}
                 >
-                  <option value="">Select Tenant</option>
-                  {tenants.map(tenant => (
-                    <option key={tenant.id} value={tenant.id}>
-                      {tenant.fullName || `${tenant.firstName} ${tenant.lastName}`}
-                      {tenant.room && ` - Room ${tenant.room.roomNumber}`}
+                  <option value="">{t('invoices.selectCustomer', 'Select a customer')}</option>
+                  {customers.map(customer => (
+                    <option key={customer.id} value={customer.id}>
+                      {customer.fullName || `${customer.firstName} ${customer.lastName}`}
+                      {customer.room && ` - ${t('rooms.roomLabel', 'Room {number}', { number: customer.room.roomNumber })}`}
                     </option>
                   ))}
                 </select>
@@ -382,7 +386,7 @@ export function InvoiceFormPage() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Room <span className="text-red-500">*</span>
+                  {t('contracts.room', 'Room')} <span className="text-red-500">*</span>
                 </label>
                 <select
                   value={formData.roomId}
@@ -391,10 +395,10 @@ export function InvoiceFormPage() {
                   required
                   disabled={isEditMode}
                 >
-                  <option value="">Select Room</option>
+                  <option value="">{t('contracts.selectRoom', 'Select a room')}</option>
                   {rooms.map(room => (
                     <option key={room.id} value={room.id}>
-                      Room {room.roomNumber} - ${room.monthlyRent}/mo
+                      {t('rooms.roomLabel', 'Room {number}', { number: room.roomNumber })} — {t('rooms.perMonth', '{amount}/month', { amount: formatCurrency(room.monthlyRent) })}
                     </option>
                   ))}
                 </select>
@@ -402,7 +406,7 @@ export function InvoiceFormPage() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Billing Period <span className="text-red-500">*</span>
+                  {t('invoices.billingPeriod', 'Billing Period')} <span className="text-red-500">*</span>
                 </label>
                 <Input
                   type="date"
@@ -415,7 +419,7 @@ export function InvoiceFormPage() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Due Date <span className="text-red-500">*</span>
+                  {t('invoices.dueDate', 'Due Date')} <span className="text-red-500">*</span>
                 </label>
                 <Input
                   type="date"
@@ -428,7 +432,7 @@ export function InvoiceFormPage() {
               {isEditMode && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Status
+                    {t('rooms.status', 'Status')}
                   </label>
                   <select
                     value={formData.status}
@@ -437,7 +441,7 @@ export function InvoiceFormPage() {
                   >
                     {statusOptions.map(option => (
                       <option key={option.value} value={option.value}>
-                        {option.label}
+                        {t(option.message.key, option.message.defaultValue)}
                       </option>
                     ))}
                   </select>
@@ -452,7 +456,7 @@ export function InvoiceFormPage() {
             <div className="flex items-center justify-between">
               <CardTitle className="flex items-center text-lg">
                 <span className="bg-blue-600 text-white rounded-full w-8 h-8 flex items-center justify-center text-sm mr-3">2</span>
-                Invoice Line Items
+                {t('invoices.lineItems', 'Invoice Line Items')}
               </CardTitle>
               <Button
                 type="button"
@@ -462,7 +466,7 @@ export function InvoiceFormPage() {
                 className="flex items-center space-x-2 bg-gradient-to-r from-green-50 to-green-100 hover:from-green-100 hover:to-green-200 border-green-300 text-green-700"
               >
                 <Plus className="h-4 w-4" />
-                <span>Add Item</span>
+                <span>{t('invoices.addItem', 'Add Item')}</span>
               </Button>
             </div>
           </CardHeader>
@@ -472,16 +476,16 @@ export function InvoiceFormPage() {
                 <thead className="bg-gray-50 border-b-2 border-gray-200">
                   <tr>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 w-12">#</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 min-w-[200px]">Item</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 min-w-[180px]">Item Name</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 min-w-[150px]">Description</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 w-24">Qty</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 w-20">UoM</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 w-28">Unit Price</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 w-24">Disc %</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 w-24">Tax %</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 w-32">Line Total</th>
-                    <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 w-16">Action</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 min-w-[200px]">{t('items.itemCode', 'Item Code')}</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 min-w-[180px]">{t('items.itemName', 'Item Name')}</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 min-w-[150px]">{t('items.description', 'Description')}</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 w-24">{t('invoices.quantityShort', 'Qty')}</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 w-20">{t('invoices.unitShort', 'Unit')}</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 w-28">{t('items.unitPrice', 'Unit Price')}</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 w-24">{t('invoices.discountPercentShort', 'Disc %')}</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 w-24">{t('items.taxPercent', 'Tax %')}</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 w-32">{t('invoices.lineTotal', 'Line Total')}</th>
+                    <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 w-16">{t('common.actions', 'Actions')}</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
@@ -489,8 +493,8 @@ export function InvoiceFormPage() {
                     <tr>
                       <td colSpan={11} className="px-4 py-12 text-center">
                         <div className="text-gray-500">
-                          <p className="text-base font-medium mb-2">No items added yet</p>
-                          <p className="text-sm">Click "Add Item" to add line items to this invoice</p>
+                          <p className="text-base font-medium mb-2">{t('invoices.noItemsYet', 'No line items yet')}</p>
+                          <p className="text-sm">{t('invoices.noItemsHint', 'Use the Add Item button to put lines on this invoice')}</p>
                         </div>
                       </td>
                     </tr>
@@ -504,7 +508,7 @@ export function InvoiceFormPage() {
                             onChange={(e) => handleItemSelect(index, e.target.value)}
                             className="w-full h-9 text-sm border border-gray-300 rounded px-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                           >
-                            <option value="">Select Item</option>
+                            <option value="">{t('invoices.selectItem', 'Select an item')}</option>
                             {items.map(i => (
                               <option key={i.id} value={i.id}>
                                 {i.itemCode} - {i.itemName}
@@ -517,7 +521,7 @@ export function InvoiceFormPage() {
                             value={item.itemName}
                             onChange={(e) => handleEditItem(index, 'itemName', e.target.value)}
                             className="h-9 text-sm"
-                            placeholder="Item name"
+                            placeholder={t('items.itemName', 'Item Name')}
                           />
                         </td>
                         <td className="px-4 py-3">
@@ -525,15 +529,13 @@ export function InvoiceFormPage() {
                             value={item.description || ''}
                             onChange={(e) => handleEditItem(index, 'description', e.target.value)}
                             className="h-9 text-sm"
-                            placeholder="Description"
+                            placeholder={t('items.description', 'Description')}
                           />
                         </td>
                         <td className="px-4 py-3">
-                          <Input
-                            type="number"
-                            step="0.001"
+                          <NumericInput
                             value={item.quantity}
-                            onChange={(e) => handleEditItem(index, 'quantity', parseFloat(e.target.value) || 0)}
+                            onValueChange={(value) => handleEditItem(index, 'quantity', value ?? 0)}
                             className="h-9 text-sm text-right"
                           />
                         </td>
@@ -544,7 +546,7 @@ export function InvoiceFormPage() {
                             value={item.unitOfMeasure}
                             onChange={(e) => handleEditItem(index, 'unitOfMeasure', e.target.value)}
                             className="h-9 text-sm border border-gray-300 rounded px-2 w-full focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            placeholder="UoM"
+                            placeholder={t('invoices.unitShort', 'Unit')}
                           />
                           <datalist id="uom-options-form">
                             <option value="pcs">pcs</option>
@@ -576,38 +578,28 @@ export function InvoiceFormPage() {
                           </datalist>
                         </td>
                         <td className="px-4 py-3">
-                          <Input
-                            type="number"
-                            step="0.01"
+                          <NumericInput
                             value={item.unitPrice}
-                            onChange={(e) => handleEditItem(index, 'unitPrice', parseFloat(e.target.value) || 0)}
+                            onValueChange={(value) => handleEditItem(index, 'unitPrice', value ?? 0)}
                             className="h-9 text-sm text-right"
                           />
                         </td>
                         <td className="px-4 py-3">
-                          <Input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            max="100"
+                          <NumericInput
                             value={item.discountPercent}
-                            onChange={(e) => handleEditItem(index, 'discountPercent', parseFloat(e.target.value) || 0)}
+                            onValueChange={(value) => handleEditItem(index, 'discountPercent', value ?? 0)}
                             className="h-9 text-sm text-right"
                           />
                         </td>
                         <td className="px-4 py-3">
-                          <Input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            max="100"
+                          <NumericInput
                             value={item.taxPercent}
-                            onChange={(e) => handleEditItem(index, 'taxPercent', parseFloat(e.target.value) || 0)}
+                            onValueChange={(value) => handleEditItem(index, 'taxPercent', value ?? 0)}
                             className="h-9 text-sm text-right"
                           />
                         </td>
                         <td className="px-4 py-3 text-right font-semibold text-gray-900">
-                          ${item.lineTotalWithTax.toFixed(2)}
+                          {formatCurrency(item.lineTotalWithTax)}
                         </td>
                         <td className="px-4 py-3 text-center">
                           <Button
@@ -617,7 +609,7 @@ export function InvoiceFormPage() {
                             onClick={() => handleDeleteItem(index, item.itemName)}
                             disabled={isSubmitting}
                             className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
-                            title="Delete"
+                            title={t('common.delete', 'Delete')}
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
@@ -630,28 +622,28 @@ export function InvoiceFormPage() {
                   <tfoot className="bg-gray-50 border-t-2 border-gray-300">
                     <tr>
                       <td colSpan={9} className="px-4 py-3 text-right font-semibold text-gray-700">
-                        Subtotal:
+                        {t('invoices.subtotal', 'Subtotal')}
                       </td>
                       <td className="px-4 py-3 text-right font-bold text-gray-900">
-                        ${itemsTotals.afterDiscount.toFixed(2)}
+                        {formatCurrency(itemsTotals.afterDiscount)}
                       </td>
                       <td></td>
                     </tr>
                     <tr>
                       <td colSpan={9} className="px-4 py-2 text-right font-semibold text-gray-700">
-                        Total Tax:
+                        {t('invoices.totalTax', 'Total tax')}
                       </td>
                       <td className="px-4 py-2 text-right font-bold text-gray-900">
-                        ${itemsTotals.tax.toFixed(2)}
+                        {formatCurrency(itemsTotals.tax)}
                       </td>
                       <td></td>
                     </tr>
                     <tr className="bg-blue-50">
                       <td colSpan={9} className="px-4 py-3 text-right font-bold text-gray-900 text-base">
-                        Items Total:
+                        {t('invoices.itemsTotal', 'Line items total')}
                       </td>
                       <td className="px-4 py-3 text-right font-bold text-blue-600 text-base">
-                        ${itemsTotals.total.toFixed(2)}
+                        {formatCurrency(itemsTotals.total)}
                       </td>
                       <td></td>
                     </tr>
@@ -666,47 +658,47 @@ export function InvoiceFormPage() {
           <CardHeader className="bg-gradient-to-r from-blue-50 to-blue-100 border-b">
             <CardTitle className="flex items-center text-lg">
               <span className="bg-blue-600 text-white rounded-full w-8 h-8 flex items-center justify-center text-sm mr-3">3</span>
-              Additional Charges & Discounts
+              {t('invoices.chargesAndDiscounts', 'Additional charges and discounts')}
             </CardTitle>
           </CardHeader>
           <CardContent className="p-6 space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Additional Charges ($)
+                  {t('invoices.additionalCharges', 'Additional Charges')}
                 </label>
                 <Input
-                  type="number"
-                  step="0.01"
+                  type="text"
+                  inputMode="decimal"
                   value={formData.additionalCharges}
                   onChange={(e) => handleChange('additionalCharges', e.target.value)}
-                  placeholder="0.00"
+                  placeholder="0"
                 />
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Discount ($)
+                  {t('invoices.discount', 'Discount')}
                 </label>
                 <Input
-                  type="number"
-                  step="0.01"
+                  type="text"
+                  inputMode="decimal"
                   value={formData.discount}
                   onChange={(e) => handleChange('discount', e.target.value)}
-                  placeholder="0.00"
+                  placeholder="0"
                 />
               </div>
             </div>
 
-            {parseFloat(formData.additionalCharges) > 0 && (
+            {(parseDecimalInput(formData.additionalCharges) ?? 0) > 0 && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Additional Charges Description
+                  {t('invoices.additionalChargesDescription', 'What the additional charges are for')}
                 </label>
                 <textarea
                   value={formData.additionalChargesDescription}
                   onChange={(e) => handleChange('additionalChargesDescription', e.target.value)}
-                  placeholder="e.g., Utilities, Maintenance, Late fees..."
+                  placeholder={t('invoices.additionalChargesPlaceholder', 'e.g. utilities, repairs, late fee...')}
                   rows={3}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
@@ -716,25 +708,25 @@ export function InvoiceFormPage() {
             <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl p-6 shadow-lg">
               <div className="space-y-3">
                 <div className="flex justify-between text-sm opacity-90">
-                  <span>Invoice Items Total:</span>
-                  <span className="font-medium">${itemsTotals.total.toFixed(2)}</span>
+                  <span>{t('invoices.itemsTotal', 'Line items total')}</span>
+                  <span className="font-medium">{formatCurrency(itemsTotals.total)}</span>
                 </div>
-                {parseFloat(formData.additionalCharges) > 0 && (
+                {(parseDecimalInput(formData.additionalCharges) ?? 0) > 0 && (
                   <div className="flex justify-between text-sm opacity-90">
-                    <span>Additional Charges:</span>
-                    <span className="font-medium">+${parseFloat(formData.additionalCharges).toFixed(2)}</span>
+                    <span>{t('invoices.additionalCharges', 'Additional Charges')}</span>
+                    <span className="font-medium">+{formatCurrency((parseDecimalInput(formData.additionalCharges) ?? 0))}</span>
                   </div>
                 )}
-                {parseFloat(formData.discount) > 0 && (
+                {(parseDecimalInput(formData.discount) ?? 0) > 0 && (
                   <div className="flex justify-between text-sm text-yellow-200">
-                    <span>Discount:</span>
-                    <span className="font-medium">-${parseFloat(formData.discount).toFixed(2)}</span>
+                    <span>{t('invoices.discount', 'Discount')}</span>
+                    <span className="font-medium">-{formatCurrency((parseDecimalInput(formData.discount) ?? 0))}</span>
                   </div>
                 )}
                 <div className="border-t-2 border-white border-opacity-30 pt-3 mt-3 flex justify-between items-center">
-                  <span className="text-xl font-bold">Invoice Grand Total:</span>
+                  <span className="text-xl font-bold">{t('invoices.grandTotal', 'Invoice grand total')}</span>
                   <span className="text-3xl font-bold">
-                    ${calculateTotal().toFixed(2)}
+                    {formatCurrency(calculateTotal())}
                   </span>
                 </div>
               </div>
@@ -746,14 +738,14 @@ export function InvoiceFormPage() {
           <CardHeader className="bg-gradient-to-r from-blue-50 to-blue-100 border-b">
             <CardTitle className="flex items-center text-lg">
               <span className="bg-blue-600 text-white rounded-full w-8 h-8 flex items-center justify-center text-sm mr-3">4</span>
-              Notes
+              {t('common.notes', 'Notes')}
             </CardTitle>
           </CardHeader>
           <CardContent className="p-6">
             <textarea
               value={formData.notes}
               onChange={(e) => handleChange('notes', e.target.value)}
-              placeholder="Additional notes about this invoice..."
+              placeholder={t('invoices.notesPlaceholder', 'Notes about this invoice...')}
               rows={4}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
@@ -771,7 +763,7 @@ export function InvoiceFormPage() {
                 className="flex items-center space-x-2"
               >
                 <X className="h-4 w-4" />
-                <span>Cancel</span>
+                <span>{t('common.cancel', 'Cancel')}</span>
               </Button>
               <Button
                 type="submit"
@@ -779,7 +771,13 @@ export function InvoiceFormPage() {
                 className="flex items-center space-x-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-8"
               >
                 <Save className="h-4 w-4" />
-                <span>{isSubmitting ? 'Saving...' : isEditMode ? 'Update Invoice' : 'Create Invoice'}</span>
+                <span>
+                  {isSubmitting
+                    ? t('common.saving', 'Saving...')
+                    : isEditMode
+                      ? t('invoices.updateInvoice', 'Update Invoice')
+                      : t('invoices.createInvoice', 'Create Invoice')}
+                </span>
               </Button>
             </div>
           </div>
@@ -794,7 +792,8 @@ export function InvoiceFormPage() {
         title={t('invoices.deleteItemTitle', 'Delete Item')}
         description={t(
           'invoices.deleteItemMessage',
-          `Are you sure you want to remove "${confirmDialog.itemName}" from this invoice?`
+          'Remove "{name}" from this invoice?',
+          { name: confirmDialog.itemName }
         )}
         confirmText={t('common.delete', 'Delete')}
         cancelText={t('common.cancel', 'Cancel')}

@@ -1,6 +1,7 @@
 export { authService, tokenStorage } from './auth';
 export { roomService } from './rooms';
-export { tenantService } from './tenants';
+export { customerService } from './customers';
+export { rentalContractService } from './rentalContracts';
 export { invoiceService } from './invoices';
 export { paymentService } from './payments';
 export { reportService } from './reports';

@@ -31,7 +31,7 @@ RentalManagementSystem/
 │   ├── Data/          → DbContext, cấu hình entity
 │   └── Models/        → Entities + DTOs
 └── Frontend/src/
-    ├── components/    → theo domain (invoices, rooms, tenants, …)
+    ├── components/    → theo domain (invoices, rooms, customers, …)
     ├── services/      → gọi API, một file một domain
     ├── contexts/      → Auth, Localization, Toast, Notification
     └── types/         → type dùng chung, phải khớp DTO backend

@@ -14,7 +14,7 @@ The System Management module provides administrators with comprehensive control 
 
 Displays real-time system statistics:
 - Application version and environment
-- Total users, rooms, tenants (active/total)
+- Total users, rooms, customers (active/total)
 - Server time and default language
 - Database connection status and provider information
 

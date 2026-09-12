@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -42,15 +44,29 @@ public class AuthController : ControllerBase
     }
 
     /// <summary>
-    /// User registration
+    /// Registers an account from an invitation code
     /// </summary>
-    /// <param name="registerDto">Registration information</param>
-    /// <returns>Registration result</returns>
+    /// <remarks>
+    /// Ẩn danh: người được mời chưa có tài khoản nên không thể tự xác thực.
+    /// Role KHÔNG lấy từ request — <see cref="SelfRegisterDto"/> không có trường
+    /// role, nên một body có "role" chỉ đơn giản không được bind vào đâu cả.
+    /// Role thật do mã mời quy định.
+    ///
+    /// Trả về 200 mà không kèm JWT: tài khoản mới còn phải xác nhận email trước
+    /// khi đăng nhập được.
+    /// </remarks>
+    /// <param name="registerDto">Registration information plus the invitation code</param>
     [HttpPost("register")]
-    [Authorize(Roles = "Admin")]
-    public async Task<ActionResult<ApiResponse<AuthResponseDto>>> Register([FromBody] RegisterDto registerDto)
+    [AllowAnonymous]
+    [EnableRateLimiting(RateLimitPolicies.Register)]
+    [ProducesResponseType(typeof(ApiResponse<SelfRegisterResultDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<SelfRegisterResultDto>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
+    public async Task<ActionResult<ApiResponse<SelfRegisterResultDto>>> Register(
+        [FromBody] SelfRegisterDto registerDto,
+        CancellationToken ct)
     {
-        var result = await _authService.RegisterAsync(registerDto);
+        var result = await _authService.RegisterAsync(registerDto, ct);
 
         if (!result.Success)
         {
@@ -58,6 +74,79 @@ public class AuthController : ControllerBase
         }
 
         return Ok(result);
+    }
+
+    /// <summary>
+    /// Tells the registration form whether an email address is still free
+    /// </summary>
+    /// <remarks>
+    /// Endpoint này trả lời đúng câu hỏi "địa chỉ này đã có tài khoản chưa", nên
+    /// nó là một kênh user enumeration có chủ ý, đánh đổi lấy việc form báo trùng
+    /// email ngay khi rời ô nhập. Rate limit theo IP là thứ giữ cho nó không
+    /// thành công cụ quét danh sách địa chỉ.
+    /// </remarks>
+    /// <param name="email">Address to check</param>
+    [HttpGet("check-email")]
+    [AllowAnonymous]
+    [EnableRateLimiting(RateLimitPolicies.CheckEmail)]
+    [ProducesResponseType(typeof(ApiResponse<CheckEmailResultDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
+    public async Task<ActionResult<ApiResponse<CheckEmailResultDto>>> CheckEmail(
+        [FromQuery, Required, EmailAddress] string email,
+        CancellationToken ct)
+    {
+        var available = await _authService.IsEmailAvailableAsync(email, ct);
+
+        return Ok(ApiResponse<CheckEmailResultDto>.SuccessResponse(
+            new CheckEmailResultDto { Available = available }));
+    }
+
+    /// <summary>
+    /// Confirms an email address with the token from the emailed link
+    /// </summary>
+    /// <param name="confirmEmailDto">Email and confirmation token</param>
+    [HttpPost("confirm-email")]
+    [AllowAnonymous]
+    [ProducesResponseType(typeof(ApiResponse<bool>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<bool>), StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<ApiResponse<bool>>> ConfirmEmail(
+        [FromBody] ConfirmEmailDto confirmEmailDto)
+    {
+        var result = await _authService.ConfirmEmailAsync(confirmEmailDto);
+
+        if (!result.Success)
+        {
+            return BadRequest(result);
+        }
+
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Requests another email confirmation link
+    /// </summary>
+    /// <remarks>
+    /// Như <c>forgot-password</c>: luôn trả 200 với cùng một thông điệp, dù địa
+    /// chỉ có tài khoản chờ xác nhận hay không.
+    /// </remarks>
+    /// <param name="resendDto">The address to send the link to</param>
+    [HttpPost("resend-confirmation")]
+    [AllowAnonymous]
+    [EnableRateLimiting(RateLimitPolicies.ResendConfirmation)]
+    [ProducesResponseType(typeof(ApiResponse<bool>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
+    public async Task<ActionResult<ApiResponse<bool>>> ResendConfirmation(
+        [FromBody] ResendConfirmationDto resendDto,
+        CancellationToken ct)
+    {
+        await _authService.ResendEmailConfirmationAsync(resendDto, ct);
+
+        return Ok(ApiResponse<bool>.SuccessResponse(
+            true,
+            "If that address belongs to an account waiting for confirmation, "
+            + "we have sent a new link to it"));
     }
 
     /// <summary>

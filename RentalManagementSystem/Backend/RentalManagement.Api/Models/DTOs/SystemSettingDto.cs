@@ -79,7 +79,7 @@ public class SystemInfoDto
     public int TotalLanguages { get; set; }
     public int TotalUsers { get; set; }
     public int TotalRooms { get; set; }
-    public int TotalTenants { get; set; }
-    public int ActiveTenants { get; set; }
+    public int TotalCustomers { get; set; }
+    public int ActiveCustomers { get; set; }
     public required Dictionary<string, string> DatabaseInfo { get; set; }
 }

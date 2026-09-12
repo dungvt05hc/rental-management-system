@@ -1,7 +1,8 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { Check, X } from 'lucide-react';
 import { Button, Input, Card, CardHeader, CardTitle, CardContent } from '../ui';
+import { PasswordRuleList } from './PasswordRuleList';
+import { meetsPasswordPolicy } from './passwordPolicy';
 import { authService } from '../../services/auth';
 import { useToast } from '../../contexts/ToastContext';
 import { isValidEmail } from '../../utils';
@@ -12,38 +13,6 @@ import { useTranslation } from '../../hooks/useTranslation';
 // bẻ dòng — những trường hợp đó báo lỗi ngay tại chỗ tốt hơn là để người dùng
 // gõ xong mật khẩu rồi mới nhận lỗi từ server.
 const TOKEN_FORMAT = /^[A-Za-z0-9+/=_-]{20,}$/;
-
-// Khớp với Identity password policy cấu hình ở Program.cs:
-// RequiredLength = 10, RequireUppercase, RequireLowercase, RequireDigit.
-// RequireNonAlphanumeric đang tắt nên không liệt kê ở đây.
-interface PasswordRule {
-  key: string;
-  label: string;
-  isMet: (password: string) => boolean;
-}
-
-const PASSWORD_RULES: PasswordRule[] = [
-  {
-    key: 'auth.passwordRuleLength',
-    label: 'At least 10 characters',
-    isMet: (password) => password.length >= 10
-  },
-  {
-    key: 'auth.passwordRuleUppercase',
-    label: 'One uppercase letter',
-    isMet: (password) => /[A-Z]/.test(password)
-  },
-  {
-    key: 'auth.passwordRuleLowercase',
-    label: 'One lowercase letter',
-    isMet: (password) => /[a-z]/.test(password)
-  },
-  {
-    key: 'auth.passwordRuleDigit',
-    label: 'One number',
-    isMet: (password) => /[0-9]/.test(password)
-  }
-];
 
 export function ResetPasswordPage() {
   const { t } = useTranslation();
@@ -63,12 +32,7 @@ export function ResetPasswordPage() {
 
   const isLinkUsable = isValidEmail(email) && TOKEN_FORMAT.test(token);
 
-  const ruleResults = useMemo(
-    () => PASSWORD_RULES.map((rule) => ({ ...rule, met: rule.isMet(password) })),
-    [password]
-  );
-
-  const meetsPolicy = ruleResults.every((rule) => rule.met);
+  const meetsPolicy = meetsPasswordPolicy(password);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -140,23 +104,7 @@ export function ResetPasswordPage() {
                     required
                   />
 
-                  <ul className="mt-2 space-y-1">
-                    {ruleResults.map((rule) => (
-                      <li
-                        key={rule.key}
-                        className={`flex items-center gap-2 text-sm ${
-                          rule.met ? 'text-green-700' : 'text-gray-500'
-                        }`}
-                      >
-                        {rule.met ? (
-                          <Check className="h-4 w-4 shrink-0 text-green-600" aria-hidden="true" />
-                        ) : (
-                          <X className="h-4 w-4 shrink-0 text-gray-400" aria-hidden="true" />
-                        )}
-                        {t(rule.key, rule.label)}
-                      </li>
-                    ))}
-                  </ul>
+                  <PasswordRuleList password={password} />
                 </div>
 
                 <Input

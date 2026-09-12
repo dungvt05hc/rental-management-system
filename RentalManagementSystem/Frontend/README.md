@@ -9,14 +9,14 @@ Currently, two official plugins are available:
 
 # Rental Management System - Frontend
 
-A modern React application built with TypeScript, Vite, and Tailwind CSS for managing rental properties, tenants, invoices, and payments.
+A modern React application built with TypeScript, Vite, and Tailwind CSS for managing rental properties, customers, invoices, and payments.
 
 ## Features
 
 - **Authentication & Authorization**: JWT-based authentication with role-based access control
 - **Dashboard**: Overview of occupancy rates, revenue, and key metrics
 - **Room Management**: CRUD operations for rental rooms
-- **Tenant Management**: Complete tenant lifecycle management
+- **Customer Management**: Complete customer lifecycle management
 - **Invoice Management**: Automated invoice generation and tracking
 - **Payment Management**: Payment processing and tracking
 - **Reports**: Comprehensive reporting and analytics
@@ -116,14 +116,14 @@ The application uses JWT tokens for authentication. Demo credentials:
 ### Room Management
 - Add, edit, and delete rooms
 - Track room status (Available, Occupied, Maintenance)
-- Room assignment to tenants
+- Room assignment to customers
 - Rent amount management
 
-### Tenant Management
-- Complete tenant profiles
+### Customer Management
+- Complete customer profiles
 - Check-in/check-out tracking
 - Emergency contact information
-- Tenant status management
+- Customer status management
 
 ### Invoice Management
 - Automatic monthly invoice generation

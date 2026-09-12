@@ -306,8 +306,8 @@ export const TranslationManagement: React.FC = () => {
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-bold text-gray-800">Translation Management</h2>
-          <p className="text-gray-600 mt-1">Manage translations for each language</p>
+          <h2 className="text-2xl font-bold text-gray-800">{t('translations.title', 'Translations')}</h2>
+          <p className="text-gray-600 mt-1">{t('translations.subtitle', 'Manage the wording shown in each language')}</p>
         </div>
         <div className="flex gap-2">
           <button
@@ -316,7 +316,7 @@ export const TranslationManagement: React.FC = () => {
             className="flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <RefreshCw className="h-4 w-4" />
-            Refresh
+            {t('common.refresh', 'Refresh')}
           </button>
           <button
             onClick={handleExportTranslations}
@@ -324,11 +324,11 @@ export const TranslationManagement: React.FC = () => {
             className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Download className="h-4 w-4" />
-            Export
+            {t('system.export', 'Export')}
           </button>
           <label className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition cursor-pointer disabled:opacity-50">
             <Upload className="h-4 w-4" />
-            Import
+            {t('translations.import', 'Import')}
             <input
               type="file"
               accept=".json"
@@ -343,7 +343,7 @@ export const TranslationManagement: React.FC = () => {
             className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Plus className="h-4 w-4" />
-            Add Translation
+            {t('translations.addTranslation', 'Add translation')}
           </button>
         </div>
       </div>
@@ -351,7 +351,7 @@ export const TranslationManagement: React.FC = () => {
       {/* Language Selector */}
       <div className="bg-white rounded-lg shadow p-4">
         <label className="block text-sm font-medium text-gray-700 mb-2">
-          Select Language
+          {t('translations.selectLanguage', 'Language')}
         </label>
         <select
           value={selectedLanguage}
@@ -386,7 +386,7 @@ export const TranslationManagement: React.FC = () => {
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
                   <input
                     type="text"
-                    placeholder="Search by key, value, or description..."
+                    placeholder={t('translations.searchPlaceholder', 'Search by key, text or description...')}
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -425,19 +425,19 @@ export const TranslationManagement: React.FC = () => {
                   <thead className="bg-gray-50">
                     <tr>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Key
+                        {t('translations.key', 'Key')}
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Value
+                        {t('translations.value', 'Text')}
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Category
+                        {t('items.category', 'Category')}
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Description
+                        {t('items.description', 'Description')}
                       </th>
                       <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Actions
+                        {t('common.actions', 'Actions')}
                       </th>
                     </tr>
                   </thead>
@@ -463,14 +463,14 @@ export const TranslationManagement: React.FC = () => {
                             <button
                               onClick={() => handleOpenEditModal(translation)}
                               className="text-blue-600 hover:text-blue-900 transition"
-                              title="Edit"
+                              title={t('common.edit', 'Edit')}
                             >
                               <Edit className="h-4 w-4" />
                             </button>
                             <button
                               onClick={() => handleDeleteTranslation(translation.key)}
                               className="text-red-600 hover:text-red-900 transition"
-                              title="Delete"
+                              title={t('common.delete', 'Delete')}
                             >
                               <Trash2 className="h-4 w-4" />
                             </button>
@@ -486,15 +486,15 @@ export const TranslationManagement: React.FC = () => {
                     <FileJson className="mx-auto h-12 w-12 text-gray-400" />
                     <p className="text-gray-500 text-lg mt-4">
                       {searchTerm || selectedCategory !== 'all'
-                        ? 'No translations match your filters'
-                        : 'No translations found for this language'}
+                        ? t('translations.noneMatchFilters', 'No translation matches the current filters')
+                        : t('translations.noneForLanguage', 'This language has no translations yet')}
                     </p>
                     {(!searchTerm && selectedCategory === 'all') && (
                       <button
                         onClick={handleOpenCreateModal}
                         className="mt-4 text-blue-600 hover:text-blue-800 font-medium"
                       >
-                        Add your first translation
+                        {t('translations.addFirst', 'Add the first translation')}
                       </button>
                     )}
                   </div>
@@ -510,13 +510,13 @@ export const TranslationManagement: React.FC = () => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full p-6">
             <h2 className="text-2xl font-bold mb-4 text-gray-800">
-              {editingTranslation ? 'Edit Translation' : 'Add New Translation'}
+              {editingTranslation ? t('translations.editTranslation', 'Edit translation') : t('translations.addTranslation', 'Add translation')}
             </h2>
 
             <form onSubmit={handleSubmit}>
               <div className="mb-4">
                 <label htmlFor="key" className="block text-sm font-medium text-gray-700 mb-1">
-                  Translation Key *
+                  {t('translations.key', 'Key')} *
                 </label>
                 <input
                   type="text"
@@ -526,15 +526,15 @@ export const TranslationManagement: React.FC = () => {
                   onChange={handleInputChange}
                   required
                   disabled={!!editingTranslation}
-                  placeholder="e.g., common.save, auth.login"
+                  placeholder={t('translations.keyPlaceholder', 'e.g. common.save, auth.login')}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed font-mono"
                 />
-                <p className="text-xs text-gray-500 mt-1">Use dot notation for namespacing (e.g., category.subcategory.key)</p>
+                <p className="text-xs text-gray-500 mt-1">{t('translations.keyHint', 'Use dots to group keys, e.g. category.name')}</p>
               </div>
 
               <div className="mb-4">
                 <label htmlFor="value" className="block text-sm font-medium text-gray-700 mb-1">
-                  Translation Value *
+                  {t('translations.value', 'Text')} *
                 </label>
                 <textarea
                   id="value"
@@ -543,14 +543,14 @@ export const TranslationManagement: React.FC = () => {
                   onChange={handleInputChange}
                   required
                   rows={3}
-                  placeholder="Enter the translated text..."
+                  placeholder={t('translations.valuePlaceholder', 'The translated text...')}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
 
               <div className="mb-4">
                 <label htmlFor="category" className="block text-sm font-medium text-gray-700 mb-1">
-                  Category *
+                  {t('items.category', 'Category')} *
                 </label>
                 <input
                   type="text"
@@ -559,15 +559,15 @@ export const TranslationManagement: React.FC = () => {
                   value={formData.category}
                   onChange={handleInputChange}
                   required
-                  placeholder="e.g., common, auth, rooms"
+                  placeholder={t('translations.categoryPlaceholder', 'e.g. common, auth, rooms')}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
-                <p className="text-xs text-gray-500 mt-1">Group related translations together</p>
+                <p className="text-xs text-gray-500 mt-1">{t('translations.categoryHint', 'Groups related translations together')}</p>
               </div>
 
               <div className="mb-6">
                 <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-1">
-                  Description (Optional)
+                  {t('translations.descriptionOptional', 'Description (optional)')}
                 </label>
                 <textarea
                   id="description"
@@ -575,7 +575,7 @@ export const TranslationManagement: React.FC = () => {
                   value={formData.description}
                   onChange={handleInputChange}
                   rows={2}
-                  placeholder="Add context or notes for translators..."
+                  placeholder={t('translations.descriptionPlaceholder', 'Context or notes for whoever translates this...')}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
@@ -586,14 +586,14 @@ export const TranslationManagement: React.FC = () => {
                   onClick={handleCloseModal}
                   className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition"
                 >
-                  Cancel
+                  {t('common.cancel', 'Cancel')}
                 </button>
                 <button
                   type="submit"
                   className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
                 >
                   <Check className="h-4 w-4" />
-                  {editingTranslation ? 'Update' : 'Create'}
+                  {editingTranslation ? t('common.update', 'Update') : t('common.create', 'Create')}
                 </button>
               </div>
             </form>
@@ -610,7 +610,8 @@ export const TranslationManagement: React.FC = () => {
         title={t('translations.deleteTitle', 'Delete Translation')}
         description={t(
           'translations.deleteMessage',
-          `Are you sure you want to delete the translation "${confirmDialog.translationKey}"?`
+          'Delete the translation for key "{key}"?',
+          { key: confirmDialog.translationKey }
         )}
         confirmText={t('common.delete', 'Delete')}
         cancelText={t('common.cancel', 'Cancel')}

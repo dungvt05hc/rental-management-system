@@ -31,24 +31,32 @@ public class InvoiceService : IInvoiceService
     /// </summary>
     public async Task<ApiResponse<InvoiceDto>> CreateInvoiceAsync(CreateInvoiceDto createInvoiceDto)
     {
-        // Validate tenant exists
-        var tenant = await _context.Tenants
-            .Include(t => t.Room)
-            .FirstOrDefaultAsync(t => t.Id == createInvoiceDto.TenantId);
+        // Validate customer exists
+        var customer = await _context.Customers
+            .Include(t => t.RentalContracts)
+                .ThenInclude(c => c.Room)
+            .FirstOrDefaultAsync(t => t.Id == createInvoiceDto.CustomerId);
 
-        if (tenant == null)
+        if (customer == null)
         {
-            return ApiResponse<InvoiceDto>.ErrorResponse("Tenant not found");
+            return ApiResponse<InvoiceDto>.ErrorResponse("Customer not found");
         }
 
-        if (tenant.Room == null)
+        // An invoice is always issued under a contract, which is what ties it to a room.
+        var contract = customer.RentalContracts
+            .Where(c => c.Status == RentalContractStatus.Active)
+            .OrderByDescending(c => c.StartDate)
+            .FirstOrDefault();
+
+        if (contract == null)
         {
-            return ApiResponse<InvoiceDto>.ErrorResponse("Tenant must be assigned to a room");
+            return ApiResponse<InvoiceDto>.ErrorResponse("Customer must be assigned to a room");
         }
 
-        // Get monthly rent from the room
-        var monthlyRent = tenant.Room.MonthlyRent;
-        var tenantId = tenant.Id;
+        // Rent comes from the contract, which may differ from the room's base rent
+        var monthlyRent = contract.MonthlyRent;
+        var contractId = contract.Id;
+        var customerId = customer.Id;
 
         // The three writes below must land together: a failure between them would
         // otherwise leave an invoice with no line items, or a total that does not
@@ -68,7 +76,8 @@ public class InvoiceService : IInvoiceService
 
             var invoice = new Invoice
             {
-                TenantId = createInvoiceDto.TenantId,
+                CustomerId = createInvoiceDto.CustomerId,
+                RentalContractId = contractId,
                 RoomId = createInvoiceDto.RoomId,
                 InvoiceNumber = await GenerateInvoiceNumberAsync(),
                 MonthlyRent = monthlyRent,
@@ -124,8 +133,8 @@ public class InvoiceService : IInvoiceService
 
             var invoiceDto = _mapper.Map<InvoiceDto>(invoice);
 
-            _logger.LogInformation("Created invoice {InvoiceNumber} for tenant {TenantId} with total amount {TotalAmount}",
-                invoice.InvoiceNumber, tenantId, invoice.TotalAmount);
+            _logger.LogInformation("Created invoice {InvoiceNumber} for customer {CustomerId} with total amount {TotalAmount}",
+                invoice.InvoiceNumber, customerId, invoice.TotalAmount);
 
             return ApiResponse<InvoiceDto>.SuccessResponse(invoiceDto, "Invoice created successfully");
         });
@@ -137,7 +146,7 @@ public class InvoiceService : IInvoiceService
     public async Task<ApiResponse<InvoiceDto>> GetInvoiceByIdAsync(int id)
     {
         var invoice = await _context.Invoices
-            .Include(i => i.Tenant)
+            .Include(i => i.Customer)
             .Include(i => i.Room)
             .Include(i => i.Payments)
             .Include(i => i.InvoiceItems)
@@ -158,16 +167,16 @@ public class InvoiceService : IInvoiceService
     public async Task<ApiResponse<PagedResponse<InvoiceDto>>> GetInvoicesAsync(InvoiceSearchDto searchDto)
     {
         var query = _context.Invoices
-            .Include(i => i.Tenant)
+            .Include(i => i.Customer)
             .Include(i => i.Room)
             .Include(i => i.Payments)
             .Include(i => i.InvoiceItems)
             .AsQueryable();
 
         // Apply filters
-        if (searchDto.TenantId.HasValue)
+        if (searchDto.CustomerId.HasValue)
         {
-            query = query.Where(i => i.TenantId == searchDto.TenantId.Value);
+            query = query.Where(i => i.CustomerId == searchDto.CustomerId.Value);
         }
 
         if (searchDto.Status.HasValue)
@@ -199,7 +208,7 @@ public class InvoiceService : IInvoiceService
         if (!string.IsNullOrEmpty(searchDto.SearchTerm))
         {
             query = query.Where(i => i.InvoiceNumber.Contains(searchDto.SearchTerm) ||
-                                   i.Tenant.FullName.Contains(searchDto.SearchTerm) ||
+                                   i.Customer.FullName.Contains(searchDto.SearchTerm) ||
                                    i.Room.RoomNumber.Contains(searchDto.SearchTerm));
         }
 
@@ -328,7 +337,7 @@ public class InvoiceService : IInvoiceService
         await _context.SaveChangesAsync();
 
         // Reload the invoice with all related data for the response
-        await _context.Entry(invoice).Reference(i => i.Tenant).LoadAsync();
+        await _context.Entry(invoice).Reference(i => i.Customer).LoadAsync();
         await _context.Entry(invoice).Reference(i => i.Room).LoadAsync();
         await _context.Entry(invoice).Collection(i => i.Payments).LoadAsync();
         await _context.Entry(invoice).Collection(i => i.InvoiceItems).LoadAsync();
@@ -367,13 +376,13 @@ public class InvoiceService : IInvoiceService
     }
 
     /// <summary>
-    /// Generates monthly invoices for all active tenants
+    /// Generates monthly invoices for all active customers
     /// </summary>
     public async Task<ApiResponse<int>> GenerateMonthlyInvoicesAsync(DateTime billingPeriod)
     {
-        var activeTenantsWithRooms = await _context.Tenants
-            .Include(t => t.Room)
-            .Where(t => t.IsActive && t.RoomId.HasValue)
+        var activeContracts = await _context.RentalContracts
+            .Include(c => c.Room)
+            .Where(c => c.Status == RentalContractStatus.Active && c.Customer.IsActive)
             .ToListAsync();
 
         var billingMonth = NormalizeToUtc(new DateTime(billingPeriod.Year, billingPeriod.Month, 1));
@@ -390,27 +399,28 @@ public class InvoiceService : IInvoiceService
 
             var count = 0;
 
-            foreach (var tenant in activeTenantsWithRooms)
+            foreach (var contract in activeContracts)
             {
                 // Check if invoice already exists for this billing period
                 var existingInvoice = await _context.Invoices
-                    .AnyAsync(i => i.TenantId == tenant.Id &&
+                    .AnyAsync(i => i.CustomerId == contract.CustomerId &&
                                   i.BillingPeriod.Year == billingMonth.Year &&
                                   i.BillingPeriod.Month == billingMonth.Month);
 
-                if (!existingInvoice && tenant.Room != null)
+                if (!existingInvoice)
                 {
                     var invoice = new Invoice
                     {
-                        TenantId = tenant.Id,
-                        RoomId = tenant.RoomId!.Value,
+                        CustomerId = contract.CustomerId,
+                        RentalContractId = contract.Id,
+                        RoomId = contract.RoomId,
                         // Drawn per invoice: every row in the batch gets its own number.
                         InvoiceNumber = await GenerateInvoiceNumberAsync(),
-                        MonthlyRent = tenant.Room.MonthlyRent,
+                        MonthlyRent = contract.MonthlyRent,
                         AdditionalCharges = 0,
                         Discount = 0,
-                        TotalAmount = tenant.Room.MonthlyRent,
-                        RemainingBalance = tenant.Room.MonthlyRent,
+                        TotalAmount = contract.MonthlyRent,
+                        RemainingBalance = contract.MonthlyRent,
                         BillingPeriod = billingMonth,
                         IssueDate = DateTime.UtcNow,
                         DueDate = DateTime.UtcNow.AddDays(15),
@@ -436,16 +446,16 @@ public class InvoiceService : IInvoiceService
     }
 
     /// <summary>
-    /// Gets invoices by tenant ID
+    /// Gets invoices by customer ID
     /// </summary>
-    public async Task<ApiResponse<IEnumerable<InvoiceDto>>> GetInvoicesByTenantAsync(int tenantId)
+    public async Task<ApiResponse<IEnumerable<InvoiceDto>>> GetInvoicesByCustomerAsync(int customerId)
     {
         var invoices = await _context.Invoices
-            .Include(i => i.Tenant)
+            .Include(i => i.Customer)
             .Include(i => i.Room)
             .Include(i => i.Payments)
             .Include(i => i.InvoiceItems)
-            .Where(i => i.TenantId == tenantId)
+            .Where(i => i.CustomerId == customerId)
             .OrderByDescending(i => i.IssueDate)
             .ToListAsync();
 
@@ -459,7 +469,7 @@ public class InvoiceService : IInvoiceService
     public async Task<ApiResponse<IEnumerable<InvoiceDto>>> GetOverdueInvoicesAsync()
     {
         var overdueInvoices = await _context.Invoices
-            .Include(i => i.Tenant)
+            .Include(i => i.Customer)
             .Include(i => i.Room)
             .Include(i => i.Payments)
             .Include(i => i.InvoiceItems)
@@ -530,7 +540,7 @@ public class InvoiceService : IInvoiceService
         // Get invoices due in the next 3 days or overdue
         var reminderDate = DateTime.UtcNow.AddDays(3);
         var invoicesNeedingReminders = await _context.Invoices
-            .Include(i => i.Tenant)
+            .Include(i => i.Customer)
             .Where(i => i.Status != InvoiceStatus.Paid && i.DueDate <= reminderDate)
             .ToListAsync();
 
@@ -540,8 +550,8 @@ public class InvoiceService : IInvoiceService
         {
             // TODO: Implement email sending logic here
             // For now, just log the reminder
-            _logger.LogInformation("Reminder needed for invoice {InvoiceNumber} for tenant {TenantEmail}", 
-                invoice.InvoiceNumber, invoice.Tenant.Email);
+            _logger.LogInformation("Reminder needed for invoice {InvoiceNumber} for customer {CustomerEmail}", 
+                invoice.InvoiceNumber, invoice.Customer.Email);
 
             remindersSent++;
         }

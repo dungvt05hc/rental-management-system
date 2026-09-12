@@ -18,7 +18,10 @@ import { Plus, Loader2 } from 'lucide-react';
  * Provides comprehensive user management functionality including CRUD operations,
  * role management, filtering, pagination, and bulk operations
  */
+import { useTranslation } from '../../hooks/useTranslation';
+
 export function UserManagementPage() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const toast = useToast();
   
@@ -164,7 +167,7 @@ export function UserManagementPage() {
     return (
       <div className="flex items-center justify-center h-96">
         <div className="text-center">
-          <h2 className="text-2xl font-bold text-red-600 mb-2">Error Loading Users</h2>
+          <h2 className="text-2xl font-bold text-red-600 mb-2">{t('users.loadError', 'Could not load the user list')}</h2>
           <p className="text-gray-600">{usersError.message}</p>
         </div>
       </div>
@@ -176,14 +179,14 @@ export function UserManagementPage() {
       {/* Page Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">User Management</h1>
+          <h1 className="text-3xl font-bold tracking-tight">{t('users.title', 'User Management')}</h1>
           <p className="text-muted-foreground mt-1">
-            Manage system users, roles, and permissions
+            {t('users.subtitle', 'Manage the people who use the system and what they may do')}
           </p>
         </div>
         <Button onClick={() => navigate('/users/new')} size="lg">
           <Plus className="mr-2 h-4 w-4" />
-          Create User
+          {t('users.createUser', 'Create User')}
         </Button>
       </div>
 
@@ -233,7 +236,7 @@ export function UserManagementPage() {
         />
       ) : (
         <div className="text-center py-12">
-          <p className="text-muted-foreground">No users found</p>
+          <p className="text-muted-foreground">{t('users.noUsersFound', 'No users found')}</p>
         </div>
       )}
 

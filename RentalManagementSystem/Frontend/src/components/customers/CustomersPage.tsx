@@ -1,23 +1,25 @@
 import { useState, useEffect } from 'react';
-import { Plus, Search, Edit, Trash2, User, Phone, Mail, Calendar } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Plus, Search, Edit, Trash2, User, Phone, Mail, Calendar, FileText } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, Button, Input, Badge, AlertDialog } from '../ui';
-import { TenantDialog } from './TenantDialog';
-import { tenantService } from '../../services';
+import { CustomerDialog } from './CustomerDialog';
+import { customerService } from '../../services';
 import { formatDate } from '../../utils';
-import type { Tenant, TenantSearchRequest } from '../../types';
+import type { Customer, CustomerSearchRequest } from '../../types';
 import { useTranslation } from '../../hooks/useTranslation';
 import { useToast } from '../../contexts/ToastContext';
 
-export function TenantsPage() {
+export function CustomersPage() {
   const { t } = useTranslation();
   const { showSuccess, showError } = useToast();
-  const [tenants, setTenants] = useState<Tenant[]>([]);
+  const navigate = useNavigate();
+  const [customers, setCustomers] = useState<Customer[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [selectedTenant, setSelectedTenant] = useState<Tenant | null>(null);
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [pagination, setPagination] = useState({
     page: 1,
     pageSize: 10,
@@ -26,24 +28,24 @@ export function TenantsPage() {
   });
   const [confirmDialog, setConfirmDialog] = useState<{
     open: boolean;
-    tenantId: string | null;
-    tenantName: string;
+    customerId: string | null;
+    customerName: string;
   }>({
     open: false,
-    tenantId: null,
-    tenantName: '',
+    customerId: null,
+    customerName: '',
   });
 
   useEffect(() => {
-    loadTenants();
+    loadCustomers();
   }, [searchQuery, statusFilter, pagination.page]);
 
-  const loadTenants = async () => {
+  const loadCustomers = async () => {
     try {
       setIsLoading(true);
       setError(null);
 
-      const searchParams: TenantSearchRequest = {
+      const searchParams: CustomerSearchRequest = {
         page: pagination.page,
         pageSize: pagination.pageSize,
         search: searchQuery || undefined,
@@ -53,11 +55,11 @@ export function TenantsPage() {
         searchParams.isActive = statusFilter === 'Active' ? true : statusFilter === 'Inactive' ? false : undefined;
       }
 
-      const response = await tenantService.getTenants(searchParams);
+      const response = await customerService.getCustomers(searchParams);
 
       if (response.success && response.data) {
         const paginatedData = response.data;
-        setTenants(paginatedData.items || []);
+        setCustomers(paginatedData.items || []);
         setPagination({
           page: paginatedData.page || 1,
           pageSize: paginatedData.pageSize || 10,
@@ -65,7 +67,7 @@ export function TenantsPage() {
           totalPages: paginatedData.totalPages || 1,
         });
       } else {
-        throw new Error(response.message || 'Failed to load tenants');
+        throw new Error(response.message || 'Failed to load customers');
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
@@ -74,34 +76,34 @@ export function TenantsPage() {
     }
   };
 
-  const handleCreateTenant = () => {
-    setSelectedTenant(null);
+  const handleCreateCustomer = () => {
+    setSelectedCustomer(null);
     setDialogOpen(true);
   };
 
-  const handleEditTenant = (tenant: Tenant) => {
-    setSelectedTenant(tenant);
+  const handleEditCustomer = (customer: Customer) => {
+    setSelectedCustomer(customer);
     setDialogOpen(true);
   };
 
-  const handleDeleteTenant = (tenantId: string, tenantName: string) => {
+  const handleDeleteCustomer = (customerId: string, customerName: string) => {
     setConfirmDialog({
       open: true,
-      tenantId,
-      tenantName,
+      customerId,
+      customerName,
     });
   };
 
-  const confirmDeleteTenant = async () => {
-    if (!confirmDialog.tenantId) return;
+  const confirmDeleteCustomer = async () => {
+    if (!confirmDialog.customerId) return;
 
     try {
-      const response = await tenantService.deleteTenant(confirmDialog.tenantId);
+      const response = await customerService.deleteCustomer(confirmDialog.customerId);
       if (response.success) {
-        showSuccess(t('common.success', 'Success'), t('tenants.deleteSuccess', 'Tenant deleted successfully'));
-        await loadTenants();
+        showSuccess(t('common.success', 'Success'), t('customers.deleteSuccess', 'Customer deleted successfully'));
+        await loadCustomers();
       } else {
-        showError(t('common.error', 'Error'), response.message || t('tenants.deleteError', 'Failed to delete tenant'));
+        showError(t('common.error', 'Error'), response.message || t('customers.deleteError', 'Failed to delete customer'));
       }
     } catch (err) {
       showError(
@@ -112,15 +114,15 @@ export function TenantsPage() {
   };
 
   const handleDialogSuccess = () => {
-    loadTenants();
+    loadCustomers();
   };
 
   const getStatusBadgeColor = (isActive: boolean) => {
     return isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800';
   };
 
-  const getTenantStatus = (tenant: Tenant) => {
-    return tenant.isActive ? t('tenants.active', 'Active') : t('tenants.inactive', 'Inactive');
+  const getCustomerStatus = (customer: Customer) => {
+    return customer.isActive ? t('customers.active', 'Active') : t('customers.inactive', 'Inactive');
   };
 
   const handlePageChange = (page: number) => {
@@ -130,10 +132,10 @@ export function TenantsPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">{t('tenants.title', 'Tenants Management')}</h1>
-        <Button onClick={handleCreateTenant} className="flex items-center space-x-2">
+        <h1 className="text-2xl font-bold text-gray-900">{t('customers.pageTitle', 'Customers Management')}</h1>
+        <Button onClick={handleCreateCustomer} className="flex items-center space-x-2">
           <Plus className="h-4 w-4" />
-          <span>{t('common.add', 'Add Tenant')}</span>
+          <span>{t('customers.addCustomer', 'Add Customer')}</span>
         </Button>
       </div>
 
@@ -145,7 +147,7 @@ export function TenantsPage() {
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                 <Input
-                  placeholder={t('common.search', 'Search tenants...')}
+                  placeholder={t('customers.searchPlaceholder', 'Search customers...')}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-10"
@@ -159,8 +161,8 @@ export function TenantsPage() {
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="">{t('common.filter', 'All Status')}</option>
-                <option value="Active">{t('tenants.active', 'Active')}</option>
-                <option value="Inactive">{t('tenants.inactive', 'Inactive')}</option>
+                <option value="Active">{t('customers.active', 'Active')}</option>
+                <option value="Inactive">{t('customers.inactive', 'Inactive')}</option>
               </select>
             </div>
           </div>
@@ -173,7 +175,7 @@ export function TenantsPage() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">{t('tenants.totalTenants', 'Total Tenants')}</p>
+                <p className="text-sm font-medium text-gray-600">{t('customers.totalCustomers', 'Total Customers')}</p>
                 <p className="text-2xl font-bold text-gray-900">{pagination.totalCount}</p>
               </div>
               <div className="p-3 rounded-lg bg-blue-100">
@@ -186,9 +188,9 @@ export function TenantsPage() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">{t('tenants.active', 'Active')}</p>
+                <p className="text-sm font-medium text-gray-600">{t('customers.active', 'Active')}</p>
                 <p className="text-2xl font-bold text-green-600">
-                  {tenants?.filter(t => t.isActive === true).length || 0}
+                  {customers?.filter(t => t.isActive === true).length || 0}
                 </p>
               </div>
               <div className="p-3 rounded-lg bg-green-100">
@@ -201,9 +203,9 @@ export function TenantsPage() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">{t('tenants.inactive', 'Inactive')}</p>
+                <p className="text-sm font-medium text-gray-600">{t('customers.inactive', 'Inactive')}</p>
                 <p className="text-2xl font-bold text-yellow-600">
-                  {tenants?.filter(t => t.isActive === false).length || 0}
+                  {customers?.filter(t => t.isActive === false).length || 0}
                 </p>
               </div>
               <div className="p-3 rounded-lg bg-yellow-100">
@@ -216,9 +218,9 @@ export function TenantsPage() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">{t('tenants.withRooms', 'With Rooms')}</p>
+                <p className="text-sm font-medium text-gray-600">{t('customers.withRooms', 'With Rooms')}</p>
                 <p className="text-2xl font-bold text-purple-600">
-                  {tenants?.filter(tenant => tenant.room).length || 0}
+                  {customers?.filter(customer => customer.room).length || 0}
                 </p>
               </div>
               <div className="p-3 rounded-lg bg-purple-100">
@@ -229,10 +231,10 @@ export function TenantsPage() {
         </Card>
       </div>
 
-      {/* Tenants Table */}
+      {/* Customers Table */}
       <Card>
         <CardHeader>
-          <CardTitle>{t('tenants.title', 'Tenants')}</CardTitle>
+          <CardTitle>{t('customers.title', 'Customers')}</CardTitle>
         </CardHeader>
         <CardContent>
           {isLoading ? (
@@ -242,15 +244,15 @@ export function TenantsPage() {
           ) : error ? (
             <div className="text-center py-8">
               <p className="text-red-600">{error}</p>
-              <Button onClick={loadTenants} className="mt-4">
-                {t('common.refresh', 'Try Again')}
+              <Button onClick={loadCustomers} className="mt-4">
+                {t('common.tryAgain', 'Try Again')}
               </Button>
             </div>
-          ) : tenants.length === 0 ? (
+          ) : customers.length === 0 ? (
             <div className="text-center py-8">
-              <p className="text-gray-500">{t('tenants.noTenantsFound', 'No tenants found')}</p>
-              <Button onClick={handleCreateTenant} className="mt-4">
-                {t('tenants.addFirstTenant', 'Add Your First Tenant')}
+              <p className="text-gray-500">{t('customers.noCustomersFound', 'No customers found')}</p>
+              <Button onClick={handleCreateCustomer} className="mt-4">
+                {t('customers.addFirstCustomer', 'Add Your First Customer')}
               </Button>
             </div>
           ) : (
@@ -260,28 +262,28 @@ export function TenantsPage() {
                   <thead className="bg-gray-50">
                     <tr>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        {t('tenants.name', 'Name')}
+                        {t('customers.name', 'Name')}
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        {t('tenants.contact', 'Contact')}
+                        {t('customers.contact', 'Contact')}
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        {t('tenants.room', 'Room')}
+                        {t('customers.room', 'Room')}
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         {t('rooms.status', 'Status')}
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        {t('tenants.contractPeriod', 'Contract Period')}
+                        {t('customers.contractPeriod', 'Contract Period')}
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        {t('common.edit', 'Actions')}
+                        {t('common.actions', 'Actions')}
                       </th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {tenants?.map((tenant) => (
-                      <tr key={tenant.id} className="hover:bg-gray-50">
+                    {customers?.map((customer) => (
+                      <tr key={customer.id} className="hover:bg-gray-50">
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex items-center">
                             <div className="flex-shrink-0 h-10 w-10">
@@ -291,10 +293,10 @@ export function TenantsPage() {
                             </div>
                             <div className="ml-4">
                               <div className="text-sm font-medium text-gray-900">
-                                {tenant.fullName || `${tenant.firstName} ${tenant.lastName}`}
+                                {customer.fullName || `${customer.firstName} ${customer.lastName}`}
                               </div>
                               <div className="text-sm text-gray-500">
-                                ID: {tenant.identificationNumber || tenant.identityNumber || 'N/A'}
+                                ID: {customer.identificationNumber || customer.identityNumber || 'N/A'}
                               </div>
                             </div>
                           </div>
@@ -303,42 +305,42 @@ export function TenantsPage() {
                           <div className="space-y-1">
                             <div className="flex items-center text-sm text-gray-900">
                               <Mail className="h-4 w-4 mr-2 text-gray-400" />
-                              {tenant.email}
+                              {customer.email}
                             </div>
                             <div className="flex items-center text-sm text-gray-900">
                               <Phone className="h-4 w-4 mr-2 text-gray-400" />
-                              {tenant.phoneNumber}
+                              {customer.phoneNumber}
                             </div>
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          {tenant.room ? (
+                          {customer.room ? (
                             <div className="text-sm font-medium text-gray-900">
-                              {t('tenants.roomNumber', 'Room')} {tenant.room.roomNumber}
+                              {t('rooms.roomLabel', 'Room {number}', { number: customer.room.roomNumber })}
                             </div>
                           ) : (
-                            <div className="text-sm text-gray-500">{t('tenants.noRoomAssigned', 'No room assigned')}</div>
+                            <div className="text-sm text-gray-500">{t('customers.noRoomAssigned', 'No room assigned')}</div>
                           )}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <Badge className={getStatusBadgeColor(tenant.isActive)}>
-                            {getTenantStatus(tenant)}
+                          <Badge className={getStatusBadgeColor(customer.isActive)}>
+                            {getCustomerStatus(customer)}
                           </Badge>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm text-gray-900">
-                            {tenant.contractStartDate || tenant.checkInDate ? (
+                            {customer.contractStartDate || customer.checkInDate ? (
                               <div className="flex items-center">
                                 <Calendar className="h-4 w-4 mr-2 text-gray-400" />
-                                {formatDate(tenant.contractStartDate || tenant.checkInDate!)}
-                                {(tenant.contractEndDate || tenant.checkOutDate) && (
+                                {formatDate(customer.contractStartDate || customer.checkInDate!)}
+                                {(customer.contractEndDate || customer.checkOutDate) && (
                                   <span className="mx-1">→</span>
                                 )}
-                                {(tenant.contractEndDate || tenant.checkOutDate) && 
-                                  formatDate(tenant.contractEndDate || tenant.checkOutDate!)}
+                                {(customer.contractEndDate || customer.checkOutDate) && 
+                                  formatDate(customer.contractEndDate || customer.checkOutDate!)}
                               </div>
                             ) : (
-                              <span className="text-gray-500">{t('tenants.notSet', 'Not set')}</span>
+                              <span className="text-gray-500">{t('customers.notSet', 'Not set')}</span>
                             )}
                           </div>
                         </td>
@@ -347,18 +349,27 @@ export function TenantsPage() {
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => handleEditTenant(tenant)}
+                              onClick={() => navigate(`/customers/${customer.id}/contracts`)}
                               className="h-8 w-8 p-0"
-                              title={t('common.edit', 'Edit Tenant')}
+                              title={t('contracts.title', 'Rental Contracts')}
+                            >
+                              <FileText className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleEditCustomer(customer)}
+                              className="h-8 w-8 p-0"
+                              title={t('customers.editCustomer', 'Edit Customer')}
                             >
                               <Edit className="h-4 w-4" />
                             </Button>
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => handleDeleteTenant(String(tenant.id), tenant.fullName || `${tenant.firstName} ${tenant.lastName}`)}
+                              onClick={() => handleDeleteCustomer(String(customer.id), customer.fullName || `${customer.firstName} ${customer.lastName}`)}
                               className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
-                              title={t('common.delete', 'Delete Tenant')}
+                              title={t('customers.deleteCustomer', 'Delete Customer')}
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>
@@ -383,7 +394,7 @@ export function TenantsPage() {
                       onClick={() => handlePageChange(pagination.page - 1)}
                       disabled={pagination.page <= 1}
                     >
-                      Previous
+                      {t('common.previous', 'Previous')}
                     </Button>
                     {Array.from({ length: Math.min(pagination.totalPages, 5) }, (_, i) => {
                       const startPage = Math.max(1, pagination.page - 2);
@@ -406,7 +417,7 @@ export function TenantsPage() {
                       onClick={() => handlePageChange(pagination.page + 1)}
                       disabled={pagination.page >= pagination.totalPages}
                     >
-                      Next
+                      {t('common.next', 'Next')}
                     </Button>
                   </div>
                 </div>
@@ -416,11 +427,11 @@ export function TenantsPage() {
         </CardContent>
       </Card>
 
-      {/* Tenant Dialog */}
-      <TenantDialog
+      {/* Customer Dialog */}
+      <CustomerDialog
         open={dialogOpen}
         onOpenChange={setDialogOpen}
-        tenant={selectedTenant}
+        customer={selectedCustomer}
         onSuccess={handleDialogSuccess}
       />
 
@@ -428,16 +439,17 @@ export function TenantsPage() {
       <AlertDialog
         open={confirmDialog.open}
         onOpenChange={(open) =>
-          setConfirmDialog({ open, tenantId: null, tenantName: '' })
+          setConfirmDialog({ open, customerId: null, customerName: '' })
         }
-        title={t('tenants.deleteConfirmTitle', 'Delete Tenant')}
+        title={t('customers.deleteConfirmTitle', 'Delete Customer')}
         description={t(
-          'tenants.deleteConfirmMessage',
-          `Are you sure you want to delete tenant "${confirmDialog.tenantName}"? This action cannot be undone and will remove all associated data including invoices and payments.`
+          'customers.deleteConfirmMessage',
+          'Deleting customer "{name}" also removes their invoices and payments. This cannot be undone.',
+          { name: confirmDialog.customerName }
         )}
         confirmText={t('common.delete', 'Delete')}
         cancelText={t('common.cancel', 'Cancel')}
-        onConfirm={confirmDeleteTenant}
+        onConfirm={confirmDeleteCustomer}
         variant="destructive"
       />
     </div>

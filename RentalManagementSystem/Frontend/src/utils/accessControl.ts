@@ -4,19 +4,20 @@ import { UserRole } from '../types';
 export type FeatureKey =
   | 'dashboard'
   | 'rooms'
-  | 'tenants'
+  | 'customers'
   | 'invoices'
   | 'items'
   | 'payments'
   | 'reports'
   | 'users'
+  | 'invitations'
   | 'system'
   | 'languages';
 
 const ROLE_FEATURES: Record<UserRole, ReadonlyArray<FeatureKey | '*'>> = {
   [UserRole.Admin]: ['*'],
-  [UserRole.Manager]: ['rooms', 'tenants', 'invoices', 'items', 'payments', 'dashboard', 'reports'],
-  [UserRole.Staff]: ['rooms', 'tenants', 'invoices', 'items', 'payments'],
+  [UserRole.Manager]: ['rooms', 'customers', 'invoices', 'items', 'payments', 'dashboard', 'reports'],
+  [UserRole.Staff]: ['rooms', 'customers', 'invoices', 'items', 'payments'],
 };
 
 const DEFAULT_ROUTE_BY_ROLE: Record<UserRole, string> = {

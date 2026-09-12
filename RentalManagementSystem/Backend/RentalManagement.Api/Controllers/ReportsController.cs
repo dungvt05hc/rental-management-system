@@ -74,13 +74,13 @@ public class ReportsController : ControllerBase
     }
 
     /// <summary>
-    /// Gets tenant statistics report
+    /// Gets customer statistics report
     /// </summary>
-    /// <returns>Tenant statistics</returns>
-    [HttpGet("tenant-statistics")]
-    public async Task<ActionResult<ApiResponse<object>>> GetTenantStatistics()
+    /// <returns>Customer statistics</returns>
+    [HttpGet("customer-statistics")]
+    public async Task<ActionResult<ApiResponse<object>>> GetCustomerStatistics()
     {
-        var result = await _reportingService.GetTenantStatisticsAsync();
+        var result = await _reportingService.GetCustomerStatisticsAsync();
         return Ok(result);
     }
 

@@ -7,8 +7,10 @@ import { formatCurrency, formatDate } from '../../utils';
 import { invoiceService } from '../../services/invoices';
 import { InvoicePrintDialog } from './InvoicePrintDialog';
 import { useState } from 'react';
+import { useTranslation } from '../../hooks/useTranslation';
 
 export function InvoiceDetailPage() {
+  const { t } = useTranslation();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [isPrintDialogOpen, setIsPrintDialogOpen] = useState(false);
@@ -42,9 +44,9 @@ export function InvoiceDetailPage() {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Invoice Not Found</h2>
-          <p className="text-gray-600 mb-4">The invoice you're looking for doesn't exist.</p>
-          <Button onClick={() => navigate('/invoices')}>Back to Invoices</Button>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">{t('invoices.notFoundTitle', 'Invoice not found')}</h2>
+          <p className="text-gray-600 mb-4">{t('invoices.notFoundBody', 'This invoice no longer exists, or the link is wrong.')}</p>
+          <Button onClick={() => navigate('/invoices')}>{t('invoices.backToList', 'Back to invoices')}</Button>
         </div>
       </div>
     );
@@ -52,7 +54,7 @@ export function InvoiceDetailPage() {
 
   const invoiceData = invoice;
   const status = String(invoice.statusName ?? invoice.status);
-  const tenant = invoice.tenant;
+  const customer = invoice.customer;
   const room = invoice.room;
 
   const getStatusColor = (status: string) => {
@@ -98,8 +100,8 @@ export function InvoiceDetailPage() {
         setAlertConfig({
           open: true,
           variant: 'success',
-          title: 'Success',
-          description: 'PDF export initiated successfully! Please check your downloads folder.',
+          title: t('common.success', 'Success'),
+          description: t('invoices.exportStarted', 'The PDF is on its way — check the downloads folder.'),
         });
       }, 500);
     } catch (err) {
@@ -107,9 +109,11 @@ export function InvoiceDetailPage() {
       setAlertConfig({
         open: true,
         variant: 'destructive',
-        title: 'Export Failed',
+        title: t('invoices.exportFailed', 'Export failed'),
         description:
-          err instanceof Error ? err.message : 'An unknown error occurred while exporting the PDF.',
+          err instanceof Error
+            ? err.message
+            : t('invoices.exportError', 'Failed to export invoice'),
       });
     }
   };
@@ -127,10 +131,10 @@ export function InvoiceDetailPage() {
                 className="flex items-center gap-2"
               >
                 <ArrowLeft className="h-4 w-4" />
-                Back to Invoices
+                {t('invoices.backToList', 'Back to invoices')}
               </Button>
               <div className="h-6 w-px bg-gray-300"></div>
-              <h1 className="text-2xl font-bold text-gray-900">Invoice Details</h1>
+              <h1 className="text-2xl font-bold text-gray-900">{t('invoices.invoiceDetails', 'Invoice Details')}</h1>
             </div>
             <div className="flex items-center gap-3">
               <Button
@@ -139,7 +143,7 @@ export function InvoiceDetailPage() {
                 className="flex items-center gap-2"
               >
                 <Edit className="h-4 w-4" />
-                Edit
+                {t('common.edit', 'Edit')}
               </Button>
               <Button
                 variant="outline"
@@ -147,14 +151,14 @@ export function InvoiceDetailPage() {
                 className="flex items-center gap-2"
               >
                 <Printer className="h-4 w-4" />
-                Print
+                {t('invoices.print', 'Print Invoice')}
               </Button>
               <Button
                 onClick={handleExport}
                 className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700"
               >
                 <Download className="h-4 w-4" />
-                Export PDF
+                {t('invoices.exportPdf', 'Export PDF')}
               </Button>
             </div>
           </div>
@@ -173,8 +177,8 @@ export function InvoiceDetailPage() {
                     <FileText className="h-8 w-8 text-white" />
                   </div>
                   <div>
-                    <h2 className="text-3xl font-bold text-gray-900">Invoice</h2>
-                    <p className="text-sm text-gray-600 mt-1">Complete invoice information and breakdown</p>
+                    <h2 className="text-3xl font-bold text-gray-900">{t('invoices.invoice', 'Invoice')}</h2>
+                    <p className="text-sm text-gray-600 mt-1">{t('invoices.detailsSubtitle', 'Full invoice details and how the amount is made up')}</p>
                   </div>
                 </div>
                 <Badge className={`${getStatusColor(status)} border-2 font-semibold px-4 py-2 text-base`}>
@@ -184,19 +188,19 @@ export function InvoiceDetailPage() {
 
               <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
                 <div className="col-span-2 md:col-span-1">
-                  <div className="text-sm text-blue-700 font-semibold mb-2 uppercase tracking-wide">Invoice Number</div>
+                  <div className="text-sm text-blue-700 font-semibold mb-2 uppercase tracking-wide">{t('invoices.invoiceNumber', 'Invoice Number')}</div>
                   <div className="text-3xl font-bold text-blue-900">
                     {invoiceData.invoiceNumber || 'N/A'}
                   </div>
                 </div>
                 <div>
-                  <div className="text-sm text-blue-700 font-semibold mb-2 uppercase tracking-wide">Billing Period</div>
+                  <div className="text-sm text-blue-700 font-semibold mb-2 uppercase tracking-wide">{t('invoices.billingPeriod', 'Billing Period')}</div>
                   <div className="text-xl font-bold text-blue-900">
                     {invoiceData.billingPeriod ? formatDate(invoiceData.billingPeriod) : 'N/A'}
                   </div>
                 </div>
                 <div>
-                  <div className="text-sm text-blue-700 font-semibold mb-2 uppercase tracking-wide">Issue Date</div>
+                  <div className="text-sm text-blue-700 font-semibold mb-2 uppercase tracking-wide">{t('invoices.issueDate', 'Issue Date')}</div>
                   <div className="text-lg font-semibold text-blue-900">
                     {formatDate(invoiceData.issueDate || invoiceData.issuedDate || invoice.createdAt)}
                   </div>
@@ -204,7 +208,7 @@ export function InvoiceDetailPage() {
                 <div>
                   <div className="text-sm text-blue-700 font-semibold mb-2 uppercase tracking-wide flex items-center gap-2">
                     <Calendar className="h-4 w-4" />
-                    Due Date
+                    {t('invoices.dueDate', 'Due Date')}
                   </div>
                   <div className="text-lg font-semibold text-blue-900">
                     {formatDate(invoice.dueDate)}
@@ -215,52 +219,52 @@ export function InvoiceDetailPage() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Tenant Information Card */}
+            {/* Customer Information Card */}
             <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
               <div className="flex items-center gap-3 mb-5 pb-4 border-b border-gray-200">
                 <div className="bg-blue-100 p-2 rounded-lg">
                   <User className="h-6 w-6 text-blue-600" />
                 </div>
-                <h3 className="text-xl font-bold text-gray-900">Tenant Information</h3>
+                <h3 className="text-xl font-bold text-gray-900">{t('invoices.customerInfo', 'Customer Information')}</h3>
               </div>
-              {tenant ? (
+              {customer ? (
                 <div className="space-y-4">
                   <div className="flex items-start gap-3">
                     <div className="bg-gray-100 p-2 rounded-lg">
                       <User className="h-4 w-4 text-gray-600" />
                     </div>
                     <div className="flex-1">
-                      <div className="text-xs text-gray-500 uppercase tracking-wide mb-1">Name</div>
+                      <div className="text-xs text-gray-500 uppercase tracking-wide mb-1">{t('customers.name', 'Name')}</div>
                       <div className="font-bold text-gray-900 text-lg">
-                        {tenant.fullName || `${tenant.firstName} ${tenant.lastName}`}
+                        {customer.fullName || `${customer.firstName} ${customer.lastName}`}
                       </div>
                     </div>
                   </div>
-                  {tenant.email && (
+                  {customer.email && (
                     <div className="flex items-start gap-3">
                       <div className="bg-gray-100 p-2 rounded-lg">
                         <Mail className="h-4 w-4 text-gray-600" />
                       </div>
                       <div className="flex-1">
-                        <div className="text-xs text-gray-500 uppercase tracking-wide mb-1">Email</div>
-                        <div className="font-medium text-gray-900">{tenant.email}</div>
+                        <div className="text-xs text-gray-500 uppercase tracking-wide mb-1">{t('auth.email', 'Email Address')}</div>
+                        <div className="font-medium text-gray-900">{customer.email}</div>
                       </div>
                     </div>
                   )}
-                  {tenant.phoneNumber && (
+                  {customer.phoneNumber && (
                     <div className="flex items-start gap-3">
                       <div className="bg-gray-100 p-2 rounded-lg">
                         <Phone className="h-4 w-4 text-gray-600" />
                       </div>
                       <div className="flex-1">
-                        <div className="text-xs text-gray-500 uppercase tracking-wide mb-1">Phone</div>
-                        <div className="font-medium text-gray-900">{tenant.phoneNumber}</div>
+                        <div className="text-xs text-gray-500 uppercase tracking-wide mb-1">{t('auth.phoneNumber', 'Phone number')}</div>
+                        <div className="font-medium text-gray-900">{customer.phoneNumber}</div>
                       </div>
                     </div>
                   )}
                 </div>
               ) : (
-                <div className="text-sm text-gray-400 italic">No tenant information available</div>
+                <div className="text-sm text-gray-400 italic">{t('invoices.noCustomerInfo', 'No customer info')}</div>
               )}
             </div>
 
@@ -270,7 +274,7 @@ export function InvoiceDetailPage() {
                 <div className="bg-indigo-100 p-2 rounded-lg">
                   <Home className="h-6 w-6 text-indigo-600" />
                 </div>
-                <h3 className="text-xl font-bold text-gray-900">Room Information</h3>
+                <h3 className="text-xl font-bold text-gray-900">{t('invoices.roomInfo', 'Room Information')}</h3>
               </div>
               {room ? (
                 <div className="space-y-4">
@@ -279,7 +283,7 @@ export function InvoiceDetailPage() {
                       <Home className="h-4 w-4 text-gray-600" />
                     </div>
                     <div className="flex-1">
-                      <div className="text-xs text-gray-500 uppercase tracking-wide mb-1">Room Number</div>
+                      <div className="text-xs text-gray-500 uppercase tracking-wide mb-1">{t('rooms.roomNumber', 'Room Number')}</div>
                       <div className="font-bold text-gray-900 text-2xl">{room.roomNumber}</div>
                     </div>
                   </div>
@@ -289,7 +293,7 @@ export function InvoiceDetailPage() {
                         <DollarSign className="h-4 w-4 text-gray-600" />
                       </div>
                       <div className="flex-1">
-                        <div className="text-xs text-gray-500 uppercase tracking-wide mb-1">Monthly Rent</div>
+                        <div className="text-xs text-gray-500 uppercase tracking-wide mb-1">{t('rooms.price', 'Monthly Rent')}</div>
                         <div className="font-bold text-gray-900 text-lg">
                           {formatCurrency(room.monthlyRent)}
                         </div>
@@ -298,7 +302,7 @@ export function InvoiceDetailPage() {
                   )}
                 </div>
               ) : (
-                <div className="text-sm text-gray-400 italic">No room information available</div>
+                <div className="text-sm text-gray-400 italic">{t('invoices.noRoomInfo', 'No room info')}</div>
               )}
             </div>
           </div>
@@ -310,13 +314,13 @@ export function InvoiceDetailPage() {
                 <div className="bg-gray-600 p-2 rounded-lg">
                   <DollarSign className="h-6 w-6 text-white" />
                 </div>
-                <h3 className="text-xl font-bold text-gray-900">Amount Breakdown</h3>
+                <h3 className="text-xl font-bold text-gray-900">{t('invoices.amountBreakdown', 'Amount Breakdown')}</h3>
               </div>
             </div>
             <div className="p-6 space-y-4">
               {/* Monthly Rent Line */}
               <div className="flex justify-between items-center py-3 border-b border-gray-100">
-                <span className="text-base font-medium text-gray-700">Monthly Rent</span>
+                <span className="text-base font-medium text-gray-700">{t('rooms.price', 'Monthly Rent')}</span>
                 <span className="text-lg font-bold text-gray-900">
                   {formatCurrency(room?.monthlyRent || invoiceData.monthlyRent || 0)}
                 </span>
@@ -325,7 +329,7 @@ export function InvoiceDetailPage() {
               {invoiceData.additionalCharges !== undefined && invoiceData.additionalCharges > 0 && (
                 <div className="flex justify-between items-start py-3 border-b border-gray-100">
                   <div className="flex-1">
-                    <span className="text-base font-medium text-gray-700">Additional Charges</span>
+                    <span className="text-base font-medium text-gray-700">{t('invoices.additionalCharges', 'Additional Charges')}</span>
                     {invoiceData.additionalChargesDescription && (
                       <div className="text-sm text-gray-500 mt-1">
                         {invoiceData.additionalChargesDescription}
@@ -340,7 +344,7 @@ export function InvoiceDetailPage() {
 
               {invoiceData.discount !== undefined && invoiceData.discount > 0 && (
                 <div className="flex justify-between items-center py-3 border-b border-gray-100">
-                  <span className="text-base font-medium text-green-600">Discount</span>
+                  <span className="text-base font-medium text-green-600">{t('invoices.discount', 'Discount')}</span>
                   <span className="text-lg font-bold text-green-600">-{formatCurrency(invoiceData.discount)}</span>
                 </div>
               )}
@@ -348,7 +352,7 @@ export function InvoiceDetailPage() {
               {/* Total Amount */}
               <div className="bg-blue-50 rounded-xl p-5 border-2 border-blue-200 mt-6">
                 <div className="flex justify-between items-center">
-                  <span className="text-xl font-bold text-blue-900">Total Amount</span>
+                  <span className="text-xl font-bold text-blue-900">{t('invoices.totalAmount', 'Total Amount')}</span>
                   <span className="text-4xl font-bold text-blue-600">
                     {formatCurrency(invoiceData.totalAmount || invoice.amount)}
                   </span>
@@ -358,7 +362,7 @@ export function InvoiceDetailPage() {
               {/* Payment Status Information */}
               {invoiceData.paidAmount !== undefined && invoiceData.paidAmount > 0 && (
                 <div className="bg-green-50 rounded-xl p-4 border-2 border-green-200 flex justify-between items-center">
-                  <span className="text-base font-semibold text-green-700">Paid Amount</span>
+                  <span className="text-base font-semibold text-green-700">{t('invoices.paidAmount', 'Paid Amount')}</span>
                   <span className="text-2xl font-bold text-green-600">
                     {formatCurrency(invoiceData.paidAmount)}
                   </span>
@@ -367,7 +371,7 @@ export function InvoiceDetailPage() {
 
               {invoiceData.remainingBalance !== undefined && invoiceData.remainingBalance > 0 && (
                 <div className="bg-orange-50 rounded-xl p-4 border-2 border-orange-200 flex justify-between items-center">
-                  <span className="text-base font-semibold text-orange-700">Remaining Balance</span>
+                  <span className="text-base font-semibold text-orange-700">{t('payments.remaining', 'Remaining Balance')}</span>
                   <span className="text-2xl font-bold text-orange-600">
                     {formatCurrency(invoiceData.remainingBalance)}
                   </span>
@@ -384,9 +388,9 @@ export function InvoiceDetailPage() {
                   <div className="bg-indigo-600 p-2 rounded-lg">
                     <Package className="h-6 w-6 text-white" />
                   </div>
-                  <h3 className="text-xl font-bold text-gray-900">Invoice Line Items</h3>
+                  <h3 className="text-xl font-bold text-gray-900">{t('invoices.lineItems', 'Invoice Line Items')}</h3>
                   <Badge className="ml-2 bg-indigo-200 text-indigo-800 border-indigo-300 font-semibold">
-                    {invoiceData.invoiceItems.length} items
+                    {t('invoices.itemCount', '{count} lines', { count: invoiceData.invoiceItems.length })}
                   </Badge>
                 </div>
               </div>
@@ -395,25 +399,25 @@ export function InvoiceDetailPage() {
                   <thead className="bg-gray-50 border-b border-gray-200">
                     <tr>
                       <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                        Item
+                        {t('items.itemName', 'Item Name')}
                       </th>
                       <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                        Description
+                        {t('items.description', 'Description')}
                       </th>
                       <th className="px-6 py-4 text-right text-xs font-bold text-gray-700 uppercase tracking-wider">
-                        Qty
+                        {t('invoices.quantityShort', 'Qty')}
                       </th>
                       <th className="px-6 py-4 text-right text-xs font-bold text-gray-700 uppercase tracking-wider">
-                        Unit Price
+                        {t('items.unitPrice', 'Unit Price')}
                       </th>
                       <th className="px-6 py-4 text-right text-xs font-bold text-gray-700 uppercase tracking-wider">
-                        Discount
+                        {t('invoices.discount', 'Discount')}
                       </th>
                       <th className="px-6 py-4 text-right text-xs font-bold text-gray-700 uppercase tracking-wider">
-                        Tax
+                        {t('invoices.tax', 'Tax')}
                       </th>
                       <th className="px-6 py-4 text-right text-xs font-bold text-gray-700 uppercase tracking-wider">
-                        Total
+                        {t('invoices.total', 'Total')}
                       </th>
                     </tr>
                   </thead>
@@ -458,9 +462,9 @@ export function InvoiceDetailPage() {
                   <div className="bg-green-600 p-2 rounded-lg">
                     <DollarSign className="h-6 w-6 text-white" />
                   </div>
-                  <h3 className="text-xl font-bold text-gray-900">Payment History</h3>
+                  <h3 className="text-xl font-bold text-gray-900">{t('invoices.paymentHistory', 'Payment History')}</h3>
                   <Badge className="ml-2 bg-green-200 text-green-800 border-green-300 font-semibold">
-                    {invoiceData.payments.length} payments
+                    {t('payments.totalCount', '{count} total', { count: invoiceData.payments.length })}
                   </Badge>
                 </div>
               </div>
@@ -476,7 +480,7 @@ export function InvoiceDetailPage() {
                       </div>
                       <div className="text-sm text-gray-600 mt-1">
                         {payment.methodName || payment.method}
-                        {payment.referenceNumber && ` • Ref: ${payment.referenceNumber}`}
+                        {payment.referenceNumber && ` • ${t('payments.reference', 'Reference')}: ${payment.referenceNumber}`}
                       </div>
                     </div>
                     <div className="text-2xl font-bold text-green-600">
@@ -491,7 +495,7 @@ export function InvoiceDetailPage() {
           {/* Notes */}
           {invoiceData.notes && (
             <div className="bg-yellow-50 rounded-xl p-6 border-2 border-yellow-200">
-              <h3 className="font-bold text-gray-900 mb-3 text-lg">Notes</h3>
+              <h3 className="font-bold text-gray-900 mb-3 text-lg">{t('common.notes', 'Notes')}</h3>
               <p className="text-sm text-gray-700 leading-relaxed">{invoiceData.notes}</p>
             </div>
           )}

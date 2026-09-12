@@ -33,13 +33,13 @@ public class ReportingService : IReportingService
         var totalRooms = await _context.Rooms.CountAsync();
 
         // Get occupancy data by month
-        var occupancyData = await _context.Tenants
-            .Where(t => t.IsActive && t.RoomId.HasValue)
-            .Where(t => t.ContractStartDate <= endDate && 
-                       (t.ContractEndDate == null || t.ContractEndDate >= startDate))
-            .GroupBy(t => new { 
-                Year = t.ContractStartDate!.Value.Year, 
-                Month = t.ContractStartDate!.Value.Month 
+        var occupancyData = await _context.RentalContracts
+            .Where(c => c.Status == RentalContractStatus.Active)
+            .Where(c => c.StartDate <= endDate &&
+                       (c.EndDate == null || c.EndDate >= startDate))
+            .GroupBy(c => new {
+                Year = c.StartDate.Year,
+                Month = c.StartDate.Month
             })
             .Select(g => new {
                 Year = g.Key.Year,
@@ -50,8 +50,8 @@ public class ReportingService : IReportingService
             .ThenBy(x => x.Month)
             .ToListAsync();
 
-        var currentOccupancy = await _context.Tenants
-            .CountAsync(t => t.IsActive && t.RoomId.HasValue);
+        var currentOccupancy = await _context.RentalContracts
+            .CountAsync(c => c.Status == RentalContractStatus.Active);
 
         var report = new
         {
@@ -144,11 +144,11 @@ public class ReportingService : IReportingService
 
         // Get overdue invoices
         var overdueInvoices = await _context.Invoices
-            .Include(i => i.Tenant)
+            .Include(i => i.Customer)
             .Where(i => i.Status != InvoiceStatus.Paid && i.DueDate < now)
             .Select(i => new {
                 InvoiceId = i.Id,
-                TenantName = $"{i.Tenant.FirstName} {i.Tenant.LastName}",
+                CustomerName = $"{i.Customer.FirstName} {i.Customer.LastName}",
                 Amount = i.TotalAmount,
                 DueDate = i.DueDate,
                 DaysOverdue = (int)(now - i.DueDate).TotalDays,
@@ -159,13 +159,13 @@ public class ReportingService : IReportingService
 
         // Get upcoming invoices (due in next 30 days)
         var upcomingInvoices = await _context.Invoices
-            .Include(i => i.Tenant)
+            .Include(i => i.Customer)
             .Where(i => i.Status != InvoiceStatus.Paid && 
                        i.DueDate >= now && 
                        i.DueDate <= now.AddDays(30))
             .Select(i => new {
                 InvoiceId = i.Id,
-                TenantName = $"{i.Tenant.FirstName} {i.Tenant.LastName}",
+                CustomerName = $"{i.Customer.FirstName} {i.Customer.LastName}",
                 Amount = i.TotalAmount,
                 DueDate = i.DueDate,
                 DaysUntilDue = (int)(i.DueDate - now).TotalDays,
@@ -223,9 +223,10 @@ public class ReportingService : IReportingService
             .SumAsync(i => i.TotalAmount);
 
         // Security deposits
-        var totalSecurityDeposits = await _context.Tenants
-            .Where(t => t.IsActive && t.ContractStartDate >= fromDate && t.ContractStartDate <= toDate)
-            .SumAsync(t => t.SecurityDeposit);
+        var totalSecurityDeposits = await _context.RentalContracts
+            .Where(c => c.Status == RentalContractStatus.Active &&
+                        c.StartDate >= fromDate && c.StartDate <= toDate)
+            .SumAsync(c => c.SecurityDeposit);
 
         // Monthly breakdown
         var monthlyData = await _context.Invoices
@@ -280,39 +281,40 @@ public class ReportingService : IReportingService
         return ApiResponse<object>.SuccessResponse(report);
     }
 
-    public async Task<ApiResponse<object>> GetTenantStatisticsAsync()
+    public async Task<ApiResponse<object>> GetCustomerStatisticsAsync()
     {
         var now = DateTime.UtcNow;
         var thirtyDaysAgo = now.AddDays(-30);
         var ninetyDaysAgo = now.AddDays(-90);
 
-        var totalTenants = await _context.Tenants.CountAsync();
-        var activeTenants = await _context.Tenants.CountAsync(t => t.IsActive);
-        var inactiveTenants = totalTenants - activeTenants;
+        var totalCustomers = await _context.Customers.CountAsync();
+        var activeCustomers = await _context.Customers.CountAsync(t => t.IsActive);
+        var inactiveCustomers = totalCustomers - activeCustomers;
 
-        var assignedTenants = await _context.Tenants.CountAsync(t => t.IsActive && t.RoomId.HasValue);
-        var unassignedTenants = activeTenants - assignedTenants;
+        var assignedCustomers = await _context.Customers
+            .CountAsync(t => t.IsActive && t.RentalContracts.Any(c => c.Status == RentalContractStatus.Active));
+        var unassignedCustomers = activeCustomers - assignedCustomers;
 
         // Contract expiration analysis
-        var contractsExpiringIn30Days = await _context.Tenants
-            .CountAsync(t => t.IsActive && t.ContractEndDate.HasValue && 
-                           t.ContractEndDate.Value <= now.AddDays(30) && t.ContractEndDate.Value >= now);
+        var contractsExpiringIn30Days = await _context.RentalContracts
+            .CountAsync(c => c.Status == RentalContractStatus.Active && c.EndDate.HasValue &&
+                           c.EndDate.Value <= now.AddDays(30) && c.EndDate.Value >= now);
 
-        var contractsExpiringIn90Days = await _context.Tenants
-            .CountAsync(t => t.IsActive && t.ContractEndDate.HasValue && 
-                           t.ContractEndDate.Value <= now.AddDays(90) && t.ContractEndDate.Value >= now);
+        var contractsExpiringIn90Days = await _context.RentalContracts
+            .CountAsync(c => c.Status == RentalContractStatus.Active && c.EndDate.HasValue &&
+                           c.EndDate.Value <= now.AddDays(90) && c.EndDate.Value >= now);
 
         // Recent activity
-        var newTenantsLast30Days = await _context.Tenants
+        var newCustomersLast30Days = await _context.Customers
             .CountAsync(t => t.CreatedAt >= thirtyDaysAgo);
 
         // Age demographics
-        var tenantAgeGroups = await _context.Tenants
+        var customerAgeGroups = await _context.Customers
             .Where(t => t.IsActive && t.DateOfBirth.HasValue)
             .Select(t => t.DateOfBirth!.Value)
             .ToListAsync();
 
-        var ageAnalysis = tenantAgeGroups
+        var ageAnalysis = customerAgeGroups
             .Select(dob => (int)((now - dob).TotalDays / 365.25))
             .GroupBy(age => age switch {
                 < 25 => "Under 25",
@@ -325,14 +327,14 @@ public class ReportingService : IReportingService
             .ToDictionary(g => g.Key, g => g.Count());
 
         // Financial statistics
-        var financialStats = await _context.Tenants
-            .Where(t => t.IsActive)
-            .GroupBy(t => 1)
+        var financialStats = await _context.RentalContracts
+            .Where(c => c.Status == RentalContractStatus.Active)
+            .GroupBy(c => 1)
             .Select(g => new {
-                TotalMonthlyRent = g.Sum(t => t.MonthlyRent),
-                AverageMonthlyRent = g.Average(t => t.MonthlyRent),
-                TotalSecurityDeposits = g.Sum(t => t.SecurityDeposit),
-                AverageSecurityDeposit = g.Average(t => t.SecurityDeposit)
+                TotalMonthlyRent = g.Sum(c => c.MonthlyRent),
+                AverageMonthlyRent = g.Average(c => c.MonthlyRent),
+                TotalSecurityDeposits = g.Sum(c => c.SecurityDeposit),
+                AverageSecurityDeposit = g.Average(c => c.SecurityDeposit)
             })
             .FirstOrDefaultAsync();
 
@@ -340,22 +342,22 @@ public class ReportingService : IReportingService
         {
             GeneratedAt = now,
             Overview = new {
-                TotalTenants = totalTenants,
-                ActiveTenants = activeTenants,
-                InactiveTenants = inactiveTenants,
-                AssignedTenants = assignedTenants,
-                UnassignedTenants = unassignedTenants
+                TotalCustomers = totalCustomers,
+                ActiveCustomers = activeCustomers,
+                InactiveCustomers = inactiveCustomers,
+                AssignedCustomers = assignedCustomers,
+                UnassignedCustomers = unassignedCustomers
             },
             ContractStatus = new {
                 ExpiringIn30Days = contractsExpiringIn30Days,
                 ExpiringIn90Days = contractsExpiringIn90Days
             },
             RecentActivity = new {
-                NewTenantsLast30Days = newTenantsLast30Days
+                NewCustomersLast30Days = newCustomersLast30Days
             },
             Demographics = new {
                 AgeGroups = ageAnalysis,
-                TotalWithAgeData = tenantAgeGroups.Count
+                TotalWithAgeData = customerAgeGroups.Count
             },
             FinancialSummary = new {
                 TotalMonthlyRent = financialStats?.TotalMonthlyRent ?? 0,
@@ -364,13 +366,13 @@ public class ReportingService : IReportingService
                 AverageSecurityDeposit = Math.Round(financialStats?.AverageSecurityDeposit ?? 0, 2)
             },
             Ratios = new {
-                OccupancyRate = activeTenants > 0 ? Math.Round((double)assignedTenants / activeTenants * 100, 2) : 0,
-                ActivityRate = totalTenants > 0 ? Math.Round((double)activeTenants / totalTenants * 100, 2) : 0
+                OccupancyRate = activeCustomers > 0 ? Math.Round((double)assignedCustomers / activeCustomers * 100, 2) : 0,
+                ActivityRate = totalCustomers > 0 ? Math.Round((double)activeCustomers / totalCustomers * 100, 2) : 0
             }
         };
 
-        _logger.LogInformation("Generated tenant statistics report - {ActiveTenants} active out of {TotalTenants} total tenants", 
-            activeTenants, totalTenants);
+        _logger.LogInformation("Generated customer statistics report - {ActiveCustomers} active out of {TotalCustomers} total customers", 
+            activeCustomers, totalCustomers);
         return ApiResponse<object>.SuccessResponse(report);
     }
 
@@ -390,36 +392,39 @@ public class ReportingService : IReportingService
 
         // Detailed room information
         var roomDetails = await _context.Rooms
-            .Include(r => r.Tenants.Where(t => t.IsActive))
             .Select(r => new {
                 RoomId = r.Id,
                 RoomNumber = r.RoomNumber,
                 Floor = r.Floor,
                 Status = r.Status.ToString(),
                 MonthlyRent = r.MonthlyRent,
-                CurrentTenant = r.Tenants.Where(t => t.IsActive).Select(t => new {
-                    Id = t.Id,
-                    Name = $"{t.FirstName} {t.LastName}",
-                    ContractStart = t.ContractStartDate,
-                    ContractEnd = t.ContractEndDate,
-                    MonthlyRent = t.MonthlyRent
-                }).FirstOrDefault(),
-                IsOccupied = r.Tenants.Any(t => t.IsActive)
+                CurrentCustomer = r.RentalContracts
+                    .Where(c => c.Status == RentalContractStatus.Active)
+                    .Select(c => new {
+                        Id = c.CustomerId,
+                        Name = $"{c.Customer.FirstName} {c.Customer.LastName}",
+                        ContractStart = (DateTime?)c.StartDate,
+                        ContractEnd = c.EndDate,
+                        MonthlyRent = c.MonthlyRent
+                    }).FirstOrDefault(),
+                IsOccupied = r.RentalContracts.Any(c => c.Status == RentalContractStatus.Active)
             })
             .OrderBy(r => r.RoomNumber)
             .ToListAsync();
 
         // Revenue by room type analysis
         var revenueByFloor = await _context.Rooms
-            .Include(r => r.Tenants.Where(t => t.IsActive))
             .GroupBy(r => r.Floor)
             .Select(g => new {
                 Floor = g.Key,
                 TotalRooms = g.Count(),
-                OccupiedRooms = g.Count(r => r.Tenants.Any(t => t.IsActive)),
-                TotalRevenue = g.SelectMany(r => r.Tenants.Where(t => t.IsActive)).Sum(t => t.MonthlyRent),
-                AverageRent = g.SelectMany(r => r.Tenants.Where(t => t.IsActive)).Any() 
-                    ? g.SelectMany(r => r.Tenants.Where(t => t.IsActive)).Average(t => t.MonthlyRent) 
+                OccupiedRooms = g.Count(r => r.RentalContracts.Any(c => c.Status == RentalContractStatus.Active)),
+                TotalRevenue = g.SelectMany(r => r.RentalContracts
+                    .Where(c => c.Status == RentalContractStatus.Active)).Sum(c => c.MonthlyRent),
+                AverageRent = g.SelectMany(r => r.RentalContracts
+                    .Where(c => c.Status == RentalContractStatus.Active)).Any()
+                    ? g.SelectMany(r => r.RentalContracts
+                        .Where(c => c.Status == RentalContractStatus.Active)).Average(c => c.MonthlyRent)
                     : 0
             })
             .OrderBy(f => f.Floor)
@@ -450,13 +455,13 @@ public class ReportingService : IReportingService
             }).ToList(),
             RoomDetails = roomDetails,
             Revenue = new {
-                TotalMonthlyRevenue = occupiedRooms.Sum(r => r.CurrentTenant?.MonthlyRent ?? 0),
+                TotalMonthlyRevenue = occupiedRooms.Sum(r => r.CurrentCustomer?.MonthlyRent ?? 0),
                 AverageRentPerRoom = occupiedRooms.Count > 0 
-                    ? Math.Round(occupiedRooms.Average(r => r.CurrentTenant?.MonthlyRent ?? 0), 2) 
+                    ? Math.Round(occupiedRooms.Average(r => r.CurrentCustomer?.MonthlyRent ?? 0), 2) 
                     : 0,
                 PotentialRevenue = roomDetails.Sum(r => r.MonthlyRent),
                 RevenueEfficiency = roomDetails.Sum(r => r.MonthlyRent) > 0 
-                    ? Math.Round(occupiedRooms.Sum(r => r.CurrentTenant?.MonthlyRent ?? 0) / roomDetails.Sum(r => r.MonthlyRent) * 100, 2) 
+                    ? Math.Round(occupiedRooms.Sum(r => r.CurrentCustomer?.MonthlyRent ?? 0) / roomDetails.Sum(r => r.MonthlyRent) * 100, 2) 
                     : 0
             }
         };
@@ -518,12 +523,13 @@ public class ReportingService : IReportingService
 
         // Room statistics
         var totalRooms = await _context.Rooms.CountAsync();
-        var occupiedRooms = await _context.Tenants.CountAsync(t => t.IsActive && t.RoomId.HasValue);
+        var occupiedRooms = await _context.RentalContracts
+            .CountAsync(c => c.Status == RentalContractStatus.Active);
         var occupancyRate = totalRooms > 0 ? Math.Round((double)occupiedRooms / totalRooms * 100, 2) : 0;
 
-        // Tenant statistics
-        var totalTenants = await _context.Tenants.CountAsync(t => t.IsActive);
-        var newTenantsThisMonth = await _context.Tenants
+        // Customer statistics
+        var totalCustomers = await _context.Customers.CountAsync(t => t.IsActive);
+        var newCustomersThisMonth = await _context.Customers
             .CountAsync(t => t.CreatedAt >= currentMonth);
 
         // Financial overview
@@ -543,13 +549,13 @@ public class ReportingService : IReportingService
             .CountAsync(i => i.Status != InvoiceStatus.Paid && i.DueDate < now);
 
         // Upcoming events
-        var contractsExpiringInNext30Days = await _context.Tenants
-            .Where(t => t.IsActive && t.ContractEndDate.HasValue && 
-                       t.ContractEndDate.Value <= next30Days && t.ContractEndDate.Value >= now)
-            .Select(t => new {
-                TenantName = $"{t.FirstName} {t.LastName}",
-                RoomNumber = t.Room != null ? t.Room.RoomNumber : "N/A",
-                ExpiryDate = t.ContractEndDate
+        var contractsExpiringInNext30Days = await _context.RentalContracts
+            .Where(c => c.Status == RentalContractStatus.Active && c.EndDate.HasValue &&
+                       c.EndDate.Value <= next30Days && c.EndDate.Value >= now)
+            .Select(c => new {
+                CustomerName = $"{c.Customer.FirstName} {c.Customer.LastName}",
+                RoomNumber = c.Room.RoomNumber,
+                ExpiryDate = c.EndDate
             })
             .OrderBy(x => x.ExpiryDate)
             .ToListAsync();
@@ -568,9 +574,9 @@ public class ReportingService : IReportingService
                 VacantRooms = totalRooms - occupiedRooms,
                 OccupancyRate = occupancyRate
             },
-            Tenants = new {
-                TotalActive = totalTenants,
-                NewThisMonth = newTenantsThisMonth
+            Customers = new {
+                TotalActive = totalCustomers,
+                NewThisMonth = newCustomersThisMonth
             },
             Financials = new {
                 MonthlyRevenue = monthlyRevenue,
@@ -603,7 +609,7 @@ public class ReportingService : IReportingService
 
         byte[] csvData = reportType.ToLower() switch
         {
-            "tenants" => await ExportTenantsToCSV(),
+            "customers" => await ExportCustomersToCSV(),
             "rooms" => await ExportRoomsToCSV(),
             "invoices" => await ExportInvoicesToCSV(startDate, endDate),
             "payments" => await ExportPaymentsToCSV(startDate, endDate),
@@ -614,22 +620,31 @@ public class ReportingService : IReportingService
         return ApiResponse<byte[]>.SuccessResponse(csvData);
     }
 
-    private async Task<byte[]> ExportTenantsToCSV()
+    private async Task<byte[]> ExportCustomersToCSV()
     {
-        var tenants = await _context.Tenants
-            .Include(t => t.Room)
+        var customers = await _context.Customers
             .Select(t => new {
                 t.Id,
                 FirstName = t.FirstName,
                 LastName = t.LastName,
                 Email = t.Email,
                 PhoneNumber = t.PhoneNumber,
-                RoomNumber = t.Room != null ? t.Room.RoomNumber : "",
-                MonthlyRent = t.MonthlyRent,
-                SecurityDeposit = t.SecurityDeposit,
+                RoomNumber = t.RentalContracts
+                    .Where(c => c.Status == RentalContractStatus.Active)
+                    .Select(c => c.Room.RoomNumber).FirstOrDefault() ?? "",
+                MonthlyRent = t.RentalContracts
+                    .Where(c => c.Status == RentalContractStatus.Active)
+                    .Select(c => c.MonthlyRent).FirstOrDefault(),
+                SecurityDeposit = t.RentalContracts
+                    .Where(c => c.Status == RentalContractStatus.Active)
+                    .Select(c => c.SecurityDeposit).FirstOrDefault(),
                 IsActive = t.IsActive,
-                ContractStart = t.ContractStartDate,
-                ContractEnd = t.ContractEndDate,
+                ContractStart = t.RentalContracts
+                    .Where(c => c.Status == RentalContractStatus.Active)
+                    .Select(c => (DateTime?)c.StartDate).FirstOrDefault(),
+                ContractEnd = t.RentalContracts
+                    .Where(c => c.Status == RentalContractStatus.Active)
+                    .Select(c => c.EndDate).FirstOrDefault(),
                 CreatedAt = t.CreatedAt
             })
             .ToListAsync();
@@ -637,9 +652,9 @@ public class ReportingService : IReportingService
         var csv = new StringBuilder();
         csv.AppendLine("Id,FirstName,LastName,Email,PhoneNumber,RoomNumber,MonthlyRent,SecurityDeposit,IsActive,ContractStart,ContractEnd,CreatedAt");
         
-        foreach (var tenant in tenants)
+        foreach (var customer in customers)
         {
-            csv.AppendLine($"{tenant.Id},{tenant.FirstName},{tenant.LastName},{tenant.Email},{tenant.PhoneNumber},{tenant.RoomNumber},{tenant.MonthlyRent},{tenant.SecurityDeposit},{tenant.IsActive},{tenant.ContractStart:yyyy-MM-dd},{tenant.ContractEnd:yyyy-MM-dd},{tenant.CreatedAt:yyyy-MM-dd}");
+            csv.AppendLine($"{customer.Id},{customer.FirstName},{customer.LastName},{customer.Email},{customer.PhoneNumber},{customer.RoomNumber},{customer.MonthlyRent},{customer.SecurityDeposit},{customer.IsActive},{customer.ContractStart:yyyy-MM-dd},{customer.ContractEnd:yyyy-MM-dd},{customer.CreatedAt:yyyy-MM-dd}");
         }
 
         return Encoding.UTF8.GetBytes(csv.ToString());
@@ -648,7 +663,6 @@ public class ReportingService : IReportingService
     private async Task<byte[]> ExportRoomsToCSV()
     {
         var rooms = await _context.Rooms
-            .Include(r => r.Tenants.Where(t => t.IsActive))
             .Select(r => new {
                 r.Id,
                 r.RoomNumber,
@@ -656,20 +670,21 @@ public class ReportingService : IReportingService
                 r.Floor,
                 r.Status,
                 r.MonthlyRent,
-                CurrentTenant = r.Tenants.Where(t => t.IsActive).FirstOrDefault() != null 
-                    ? $"{r.Tenants.Where(t => t.IsActive).First().FirstName} {r.Tenants.Where(t => t.IsActive).First().LastName}"
-                    : "",
-                IsOccupied = r.Tenants.Any(t => t.IsActive),
+                CurrentCustomer = r.RentalContracts
+                    .Where(c => c.Status == RentalContractStatus.Active)
+                    .Select(c => c.Customer.FirstName + " " + c.Customer.LastName)
+                    .FirstOrDefault() ?? "",
+                IsOccupied = r.RentalContracts.Any(c => c.Status == RentalContractStatus.Active),
                 r.CreatedAt
             })
             .ToListAsync();
 
         var csv = new StringBuilder();
-        csv.AppendLine("Id,RoomNumber,RoomType,Floor,Status,MonthlyRent,CurrentTenant,IsOccupied,CreatedAt");
+        csv.AppendLine("Id,RoomNumber,RoomType,Floor,Status,MonthlyRent,CurrentCustomer,IsOccupied,CreatedAt");
         
         foreach (var room in rooms)
         {
-            csv.AppendLine($"{room.Id},{room.RoomNumber},{room.Type},{room.Floor},{room.Status},{room.MonthlyRent},{room.CurrentTenant},{room.IsOccupied},{room.CreatedAt:yyyy-MM-dd}");
+            csv.AppendLine($"{room.Id},{room.RoomNumber},{room.Type},{room.Floor},{room.Status},{room.MonthlyRent},{room.CurrentCustomer},{room.IsOccupied},{room.CreatedAt:yyyy-MM-dd}");
         }
 
         return Encoding.UTF8.GetBytes(csv.ToString());
@@ -678,13 +693,13 @@ public class ReportingService : IReportingService
     private async Task<byte[]> ExportInvoicesToCSV(DateTime startDate, DateTime endDate)
     {
         var invoices = await _context.Invoices
-            .Include(i => i.Tenant)
+            .Include(i => i.Customer)
             .Include(i => i.Room)
             .Where(i => i.IssueDate >= startDate && i.IssueDate <= endDate)
             .Select(i => new {
                 i.Id,
                 i.InvoiceNumber,
-                TenantName = $"{i.Tenant.FirstName} {i.Tenant.LastName}",
+                CustomerName = $"{i.Customer.FirstName} {i.Customer.LastName}",
                 RoomNumber = i.Room.RoomNumber,
                 i.MonthlyRent,
                 i.AdditionalCharges,
@@ -699,11 +714,11 @@ public class ReportingService : IReportingService
             .ToListAsync();
 
         var csv = new StringBuilder();
-        csv.AppendLine("Id,InvoiceNumber,TenantName,RoomNumber,MonthlyRent,AdditionalCharges,Discount,TotalAmount,PaidAmount,RemainingBalance,Status,IssueDate,DueDate");
+        csv.AppendLine("Id,InvoiceNumber,CustomerName,RoomNumber,MonthlyRent,AdditionalCharges,Discount,TotalAmount,PaidAmount,RemainingBalance,Status,IssueDate,DueDate");
         
         foreach (var invoice in invoices)
         {
-            csv.AppendLine($"{invoice.Id},{invoice.InvoiceNumber},{invoice.TenantName},{invoice.RoomNumber},{invoice.MonthlyRent},{invoice.AdditionalCharges},{invoice.Discount},{invoice.TotalAmount},{invoice.PaidAmount},{invoice.RemainingBalance},{invoice.Status},{invoice.IssueDate:yyyy-MM-dd},{invoice.DueDate:yyyy-MM-dd}");
+            csv.AppendLine($"{invoice.Id},{invoice.InvoiceNumber},{invoice.CustomerName},{invoice.RoomNumber},{invoice.MonthlyRent},{invoice.AdditionalCharges},{invoice.Discount},{invoice.TotalAmount},{invoice.PaidAmount},{invoice.RemainingBalance},{invoice.Status},{invoice.IssueDate:yyyy-MM-dd},{invoice.DueDate:yyyy-MM-dd}");
         }
 
         return Encoding.UTF8.GetBytes(csv.ToString());
@@ -713,12 +728,12 @@ public class ReportingService : IReportingService
     {
         var payments = await _context.Payments
             .Include(p => p.Invoice)
-                .ThenInclude(i => i.Tenant)
+                .ThenInclude(i => i.Customer)
             .Where(p => p.PaymentDate >= startDate && p.PaymentDate <= endDate)
             .Select(p => new {
                 p.Id,
                 PaymentReference = p.ReferenceNumber,
-                TenantName = $"{p.Invoice.Tenant.FirstName} {p.Invoice.Tenant.LastName}",
+                CustomerName = $"{p.Invoice.Customer.FirstName} {p.Invoice.Customer.LastName}",
                 InvoiceNumber = p.Invoice.InvoiceNumber,
                 p.Amount,
                 PaymentMethod = p.Method,
@@ -729,11 +744,11 @@ public class ReportingService : IReportingService
             .ToListAsync();
 
         var csv = new StringBuilder();
-        csv.AppendLine("Id,PaymentReference,TenantName,InvoiceNumber,Amount,PaymentMethod,PaymentDate,IsVerified,Description");
+        csv.AppendLine("Id,PaymentReference,CustomerName,InvoiceNumber,Amount,PaymentMethod,PaymentDate,IsVerified,Description");
         
         foreach (var payment in payments)
         {
-            csv.AppendLine($"{payment.Id},{payment.PaymentReference},{payment.TenantName},{payment.InvoiceNumber},{payment.Amount},{payment.PaymentMethod},{payment.PaymentDate:yyyy-MM-dd},{payment.IsVerified},{payment.Description}");
+            csv.AppendLine($"{payment.Id},{payment.PaymentReference},{payment.CustomerName},{payment.InvoiceNumber},{payment.Amount},{payment.PaymentMethod},{payment.PaymentDate:yyyy-MM-dd},{payment.IsVerified},{payment.Description}");
         }
 
         return Encoding.UTF8.GetBytes(csv.ToString());

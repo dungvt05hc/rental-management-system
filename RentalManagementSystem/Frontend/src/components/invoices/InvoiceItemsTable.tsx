@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
 import { Plus, Trash2, Edit2, Save, X, ChevronDown, ChevronRight, Search } from 'lucide-react';
-import { Button, Input, AlertDialog } from '../ui';
+import { Button, Input, NumericInput, AlertDialog } from '../ui';
 import type { InvoiceItem, Item } from '../../types';
 import { itemService } from '../../services';
 import { calculateItemTotals, calculateInvoiceItemsTotals } from './invoiceItemCalculations';
+import { formatCurrency } from '../../utils';
+import { useTranslation } from '../../hooks/useTranslation';
 
 interface InvoiceItemsTableProps {
   items: InvoiceItem[];
@@ -30,6 +32,7 @@ const defaultItem: InvoiceItem = {
 };
 
 export function InvoiceItemsTable({ items, onChange, disabled = false }: InvoiceItemsTableProps) {
+  const { t } = useTranslation();
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editingItem, setEditingItem] = useState<InvoiceItem | null>(null);
   const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
@@ -163,8 +166,8 @@ export function InvoiceItemsTable({ items, onChange, disabled = false }: Invoice
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-lg font-semibold text-gray-900">Invoice Line Items</h3>
-          <p className="text-xs text-gray-500 mt-1">All item details are displayed including calculations</p>
+          <h3 className="text-lg font-semibold text-gray-900">{t('invoices.lineItems', 'Invoice Line Items')}</h3>
+          <p className="text-xs text-gray-500 mt-1">{t('invoices.lineItemsHint', 'Every field of each line is shown, calculations included')}</p>
         </div>
         <Button
           type="button"
@@ -175,7 +178,7 @@ export function InvoiceItemsTable({ items, onChange, disabled = false }: Invoice
           className="flex items-center space-x-2"
         >
           <Plus className="h-4 w-4" />
-          <span>Add Item</span>
+          <span>{t('invoices.addItem', 'Add Item')}</span>
         </Button>
       </div>
 
@@ -186,18 +189,18 @@ export function InvoiceItemsTable({ items, onChange, disabled = false }: Invoice
               <tr>
                 <th className="px-3 py-3 text-left text-xs font-bold text-gray-700 w-10"></th>
                 <th className="px-3 py-3 text-left text-xs font-bold text-gray-700 w-12">#</th>
-                <th className="px-3 py-3 text-left text-xs font-bold text-gray-700 min-w-[120px]">Item</th>
-                <th className="px-3 py-3 text-left text-xs font-bold text-gray-700 min-w-[140px]">Item Name</th>
-                <th className="px-3 py-3 text-left text-xs font-bold text-gray-700 min-w-[150px]">Description</th>
-                <th className="px-3 py-3 text-right text-xs font-bold text-gray-700 w-20">Qty</th>
-                <th className="px-3 py-3 text-left text-xs font-bold text-gray-700 w-20">UoM</th>
-                <th className="px-3 py-3 text-right text-xs font-bold text-gray-700 w-28">Unit Price</th>
-                <th className="px-3 py-3 text-right text-xs font-bold text-gray-700 w-24">Disc %</th>
-                <th className="px-3 py-3 text-right text-xs font-bold text-gray-700 w-28">Disc Amt</th>
-                <th className="px-3 py-3 text-right text-xs font-bold text-gray-700 w-24">Tax %</th>
-                <th className="px-3 py-3 text-right text-xs font-bold text-gray-700 w-28">Tax Amt</th>
-                <th className="px-3 py-3 text-right text-xs font-bold text-gray-700 w-32">Line Total</th>
-                <th className="px-3 py-3 text-center text-xs font-bold text-gray-700 w-24">Action</th>
+                <th className="px-3 py-3 text-left text-xs font-bold text-gray-700 min-w-[120px]">{t('items.itemCode', 'Item Code')}</th>
+                <th className="px-3 py-3 text-left text-xs font-bold text-gray-700 min-w-[140px]">{t('items.itemName', 'Item Name')}</th>
+                <th className="px-3 py-3 text-left text-xs font-bold text-gray-700 min-w-[150px]">{t('items.description', 'Description')}</th>
+                <th className="px-3 py-3 text-right text-xs font-bold text-gray-700 w-20">{t('invoices.quantityShort', 'Qty')}</th>
+                <th className="px-3 py-3 text-left text-xs font-bold text-gray-700 w-20">{t('invoices.unitShort', 'Unit')}</th>
+                <th className="px-3 py-3 text-right text-xs font-bold text-gray-700 w-28">{t('items.unitPrice', 'Unit Price')}</th>
+                <th className="px-3 py-3 text-right text-xs font-bold text-gray-700 w-24">{t('invoices.discountPercentShort', 'Disc %')}</th>
+                <th className="px-3 py-3 text-right text-xs font-bold text-gray-700 w-28">{t('invoices.discountAmountShort', 'Disc Amt')}</th>
+                <th className="px-3 py-3 text-right text-xs font-bold text-gray-700 w-24">{t('items.taxPercent', 'Tax %')}</th>
+                <th className="px-3 py-3 text-right text-xs font-bold text-gray-700 w-28">{t('invoices.taxAmountShort', 'Tax Amt')}</th>
+                <th className="px-3 py-3 text-right text-xs font-bold text-gray-700 w-32">{t('invoices.lineTotal', 'Line Total')}</th>
+                <th className="px-3 py-3 text-center text-xs font-bold text-gray-700 w-24">{t('common.actions', 'Actions')}</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
@@ -205,8 +208,8 @@ export function InvoiceItemsTable({ items, onChange, disabled = false }: Invoice
                 <tr>
                   <td colSpan={14} className="px-3 py-12 text-center">
                     <div className="flex flex-col items-center justify-center space-y-2">
-                      <p className="text-gray-500 font-medium">No items added yet</p>
-                      <p className="text-gray-400 text-xs">Click "Add Item" button to add line items to this invoice</p>
+                      <p className="text-gray-500 font-medium">{t('invoices.noItemsYet', 'No line items yet')}</p>
+                      <p className="text-gray-400 text-xs">{t('invoices.noItemsHint', 'Use the Add Item button to put lines on this invoice')}</p>
                     </div>
                   </td>
                 </tr>
@@ -227,7 +230,7 @@ export function InvoiceItemsTable({ items, onChange, disabled = false }: Invoice
                                 value={editingItem?.itemCode || ''}
                                 onChange={(e) => handleFieldChange('itemCode', e.target.value)}
                                 className="h-9 text-xs"
-                                placeholder="Item Code"
+                                placeholder={t('items.itemCode', 'Item Code')}
                               />
                             </td>
                             <td className="px-3 py-2">
@@ -235,7 +238,7 @@ export function InvoiceItemsTable({ items, onChange, disabled = false }: Invoice
                                 value={editingItem?.itemName || ''}
                                 onChange={(e) => handleFieldChange('itemName', e.target.value)}
                                 className="h-9 text-xs"
-                                placeholder="Item name"
+                                placeholder={t('items.itemName', 'Item Name')}
                               />
                             </td>
                             <td className="px-3 py-2">
@@ -243,15 +246,13 @@ export function InvoiceItemsTable({ items, onChange, disabled = false }: Invoice
                                 value={editingItem?.description || ''}
                                 onChange={(e) => handleFieldChange('description', e.target.value)}
                                 className="h-9 text-xs"
-                                placeholder="Description"
+                                placeholder={t('items.description', 'Description')}
                               />
                             </td>
                             <td className="px-3 py-2">
-                              <Input
-                                type="number"
-                                step="0.001"
-                                value={editingItem?.quantity || 0}
-                                onChange={(e) => handleFieldChange('quantity', parseFloat(e.target.value) || 0)}
+                              <NumericInput
+                                value={editingItem?.quantity ?? 0}
+                                onValueChange={(value) => handleFieldChange('quantity', value ?? 0)}
                                 className="h-9 text-xs text-right"
                               />
                             </td>
@@ -262,7 +263,7 @@ export function InvoiceItemsTable({ items, onChange, disabled = false }: Invoice
                                 value={editingItem?.unitOfMeasure || 'pcs'}
                                 onChange={(e) => handleFieldChange('unitOfMeasure', e.target.value)}
                                 className="h-9 text-xs border border-gray-300 rounded px-2 w-full focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                placeholder="UoM"
+                                placeholder={t('invoices.unitShort', 'Unit')}
                               />
                               <datalist id="uom-options">
                                 <option value="pcs">pcs</option>
@@ -294,44 +295,34 @@ export function InvoiceItemsTable({ items, onChange, disabled = false }: Invoice
                               </datalist>
                             </td>
                             <td className="px-3 py-2">
-                              <Input
-                                type="number"
-                                step="0.01"
-                                value={editingItem?.unitPrice || 0}
-                                onChange={(e) => handleFieldChange('unitPrice', parseFloat(e.target.value) || 0)}
+                              <NumericInput
+                                value={editingItem?.unitPrice ?? 0}
+                                onValueChange={(value) => handleFieldChange('unitPrice', value ?? 0)}
                                 className="h-9 text-xs text-right"
                               />
                             </td>
                             <td className="px-3 py-2">
-                              <Input
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                max="100"
-                                value={editingItem?.discountPercent || 0}
-                                onChange={(e) => handleFieldChange('discountPercent', parseFloat(e.target.value) || 0)}
+                              <NumericInput
+                                value={editingItem?.discountPercent ?? 0}
+                                onValueChange={(value) => handleFieldChange('discountPercent', value ?? 0)}
                                 className="h-9 text-xs text-right"
                               />
                             </td>
                             <td className="px-3 py-2 text-right text-gray-600 font-medium">
-                              ${calculateItemTotals(editingItem!).discountAmount.toFixed(2)}
+                              {formatCurrency(calculateItemTotals(editingItem!).discountAmount)}
                             </td>
                             <td className="px-3 py-2">
-                              <Input
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                max="100"
-                                value={editingItem?.taxPercent || 0}
-                                onChange={(e) => handleFieldChange('taxPercent', parseFloat(e.target.value) || 0)}
+                              <NumericInput
+                                value={editingItem?.taxPercent ?? 0}
+                                onValueChange={(value) => handleFieldChange('taxPercent', value ?? 0)}
                                 className="h-9 text-xs text-right"
                               />
                             </td>
                             <td className="px-3 py-2 text-right text-gray-600 font-medium">
-                              ${calculateItemTotals(editingItem!).taxAmount.toFixed(2)}
+                              {formatCurrency(calculateItemTotals(editingItem!).taxAmount)}
                             </td>
                             <td className="px-3 py-2 text-right font-bold text-blue-600">
-                              ${calculateItemTotals(editingItem!).lineTotalWithTax.toFixed(2)}
+                              {formatCurrency(calculateItemTotals(editingItem!).lineTotalWithTax)}
                             </td>
                             <td className="px-3 py-2">
                               <div className="flex items-center justify-center space-x-1">
@@ -341,7 +332,7 @@ export function InvoiceItemsTable({ items, onChange, disabled = false }: Invoice
                                   size="sm"
                                   onClick={handleSaveRow}
                                   className="h-8 w-8 p-0 bg-green-50 hover:bg-green-100 text-green-600"
-                                  title="Save"
+                                  title={t('common.save', 'Save')}
                                 >
                                   <Save className="h-4 w-4" />
                                 </Button>
@@ -351,7 +342,7 @@ export function InvoiceItemsTable({ items, onChange, disabled = false }: Invoice
                                   size="sm"
                                   onClick={handleCancelEdit}
                                   className="h-8 w-8 p-0 bg-gray-50 hover:bg-gray-100"
-                                  title="Cancel"
+                                  title={t('common.cancel', 'Cancel')}
                                 >
                                   <X className="h-4 w-4" />
                                 </Button>
@@ -380,17 +371,17 @@ export function InvoiceItemsTable({ items, onChange, disabled = false }: Invoice
                             <td className="px-3 py-2 text-gray-600 text-xs">{item.description || '-'}</td>
                             <td className="px-3 py-2 text-right font-medium text-gray-900">{item.quantity}</td>
                             <td className="px-3 py-2 text-gray-600 text-xs">{item.unitOfMeasure}</td>
-                            <td className="px-3 py-2 text-right font-medium text-gray-900">${item.unitPrice.toFixed(2)}</td>
+                            <td className="px-3 py-2 text-right font-medium text-gray-900">{formatCurrency(item.unitPrice)}</td>
                             <td className="px-3 py-2 text-right text-orange-600 font-medium">{item.discountPercent}%</td>
                             <td className="px-3 py-2 text-right text-orange-600 font-medium">
-                              ${item.discountAmount.toFixed(2)}
+                              {formatCurrency(item.discountAmount)}
                             </td>
                             <td className="px-3 py-2 text-right text-purple-600 font-medium">{item.taxPercent}%</td>
                             <td className="px-3 py-2 text-right text-purple-600 font-medium">
-                              ${item.taxAmount.toFixed(2)}
+                              {formatCurrency(item.taxAmount)}
                             </td>
                             <td className="px-3 py-2 text-right font-bold text-blue-600 text-base">
-                              ${item.lineTotalWithTax.toFixed(2)}
+                              {formatCurrency(item.lineTotalWithTax)}
                             </td>
                             <td className="px-3 py-2">
                               <div className="flex items-center justify-center space-x-1">
@@ -401,7 +392,7 @@ export function InvoiceItemsTable({ items, onChange, disabled = false }: Invoice
                                   onClick={() => handleEditRow(index)}
                                   disabled={disabled || editingIndex !== null}
                                   className="h-8 w-8 p-0 hover:bg-blue-50"
-                                  title="Edit"
+                                  title={t('common.edit', 'Edit')}
                                 >
                                   <Edit2 className="h-4 w-4" />
                                 </Button>
@@ -412,7 +403,7 @@ export function InvoiceItemsTable({ items, onChange, disabled = false }: Invoice
                                   onClick={() => handleDeleteRow(index, item.itemName)}
                                   disabled={disabled || editingIndex !== null}
                                   className="h-8 w-8 p-0 text-red-600 hover:bg-red-50 hover:text-red-700"
-                                  title="Delete"
+                                  title={t('common.delete', 'Delete')}
                                 >
                                   <Trash2 className="h-4 w-4" />
                                 </Button>
@@ -428,45 +419,45 @@ export function InvoiceItemsTable({ items, onChange, disabled = false }: Invoice
                           <td colSpan={14} className="px-6 py-4">
                             <div className="grid grid-cols-2 gap-6">
                               <div>
-                                <label className="block text-xs font-semibold text-gray-700 mb-1">Category</label>
+                                <label className="block text-xs font-semibold text-gray-700 mb-1">{t('items.category', 'Category')}</label>
                                 <p className="text-sm text-gray-900 bg-white px-3 py-2 rounded border border-gray-200">
-                                  {item.category || <span className="text-gray-400 italic">No category specified</span>}
+                                  {item.category || <span className="text-gray-400 italic">{t('items.noCategory', 'No category')}</span>}
                                 </p>
                               </div>
                               <div>
-                                <label className="block text-xs font-semibold text-gray-700 mb-1">Additional Notes</label>
+                                <label className="block text-xs font-semibold text-gray-700 mb-1">{t('common.notes', 'Notes')}</label>
                                 <p className="text-sm text-gray-900 bg-white px-3 py-2 rounded border border-gray-200 min-h-[40px]">
-                                  {item.notes || <span className="text-gray-400 italic">No additional notes</span>}
+                                  {item.notes || <span className="text-gray-400 italic">{t('invoices.noNotes', 'No notes')}</span>}
                                 </p>
                               </div>
                             </div>
                             
                             {/* Calculation breakdown */}
                             <div className="mt-4 pt-4 border-t border-blue-200">
-                              <p className="text-xs font-semibold text-gray-700 mb-2">Calculation Breakdown:</p>
+                              <p className="text-xs font-semibold text-gray-700 mb-2">{t('invoices.calculationBreakdown', 'Calculation breakdown')}</p>
                               <div className="grid grid-cols-4 gap-4 text-xs">
                                 <div className="bg-white px-3 py-2 rounded border border-gray-200">
-                                  <span className="text-gray-600">Subtotal:</span>
+                                  <span className="text-gray-600">{t('invoices.subtotal', 'Subtotal')}</span>
                                   <span className="ml-2 font-semibold text-gray-900">
-                                    ${(item.quantity * item.unitPrice).toFixed(2)}
+                                    {formatCurrency((item.quantity * item.unitPrice))}
                                   </span>
                                 </div>
                                 <div className="bg-white px-3 py-2 rounded border border-orange-200">
-                                  <span className="text-gray-600">- Discount:</span>
+                                  <span className="text-gray-600">- {t('invoices.discount', 'Discount')}</span>
                                   <span className="ml-2 font-semibold text-orange-600">
-                                    ${item.discountAmount.toFixed(2)}
+                                    {formatCurrency(item.discountAmount)}
                                   </span>
                                 </div>
                                 <div className="bg-white px-3 py-2 rounded border border-purple-200">
-                                  <span className="text-gray-600">+ Tax:</span>
+                                  <span className="text-gray-600">+ {t('invoices.tax', 'Tax')}</span>
                                   <span className="ml-2 font-semibold text-purple-600">
-                                    ${item.taxAmount.toFixed(2)}
+                                    {formatCurrency(item.taxAmount)}
                                   </span>
                                 </div>
                                 <div className="bg-blue-100 px-3 py-2 rounded border border-blue-300">
-                                  <span className="text-gray-600">= Total:</span>
+                                  <span className="text-gray-600">= {t('invoices.total', 'Total')}</span>
                                   <span className="ml-2 font-bold text-blue-600">
-                                    ${item.lineTotalWithTax.toFixed(2)}
+                                    {formatCurrency(item.lineTotalWithTax)}
                                   </span>
                                 </div>
                               </div>
@@ -504,7 +495,7 @@ export function InvoiceItemsTable({ items, onChange, disabled = false }: Invoice
                                       <Input
                                         value={itemSearchTerm}
                                         onChange={(e) => setItemSearchTerm(e.target.value)}
-                                        placeholder="Search by item code, name, or category..."
+                                        placeholder={t('items.searchPlaceholder', 'Search by item code, name or category...')}
                                         className="w-full"
                                       />
                                     </div>
@@ -512,20 +503,20 @@ export function InvoiceItemsTable({ items, onChange, disabled = false }: Invoice
                                     <div className="max-h-60 overflow-y-auto border border-gray-200 rounded">
                                       {filteredItems.length === 0 ? (
                                         <div className="p-8 text-center text-gray-500">
-                                          <p className="font-medium">No items found</p>
-                                          <p className="text-xs mt-1">Try a different search term</p>
+                                          <p className="font-medium">{t('items.noItemsFound', 'No items found')}</p>
+                                          <p className="text-xs mt-1">{t('items.tryAnotherSearch', 'Try a different search term')}</p>
                                         </div>
                                       ) : (
                                         <table className="w-full text-xs">
                                           <thead className="bg-gray-100 sticky top-0">
                                             <tr>
-                                              <th className="px-3 py-2 text-left font-semibold">Code</th>
-                                              <th className="px-3 py-2 text-left font-semibold">Name</th>
-                                              <th className="px-3 py-2 text-left font-semibold">Category</th>
-                                              <th className="px-3 py-2 text-right font-semibold">Unit Price</th>
+                                              <th className="px-3 py-2 text-left font-semibold">{t('items.itemCode', 'Item Code')}</th>
+                                              <th className="px-3 py-2 text-left font-semibold">{t('items.itemName', 'Item Name')}</th>
+                                              <th className="px-3 py-2 text-left font-semibold">{t('items.category', 'Category')}</th>
+                                              <th className="px-3 py-2 text-right font-semibold">{t('items.unitPrice', 'Unit Price')}</th>
                                               <th className="px-3 py-2 text-center font-semibold">UoM</th>
-                                              <th className="px-3 py-2 text-right font-semibold">Tax %</th>
-                                              <th className="px-3 py-2 text-center font-semibold">Action</th>
+                                              <th className="px-3 py-2 text-right font-semibold">{t('items.taxPercent', 'Tax %')}</th>
+                                              <th className="px-3 py-2 text-center font-semibold">{t('common.actions', 'Actions')}</th>
                                             </tr>
                                           </thead>
                                           <tbody className="divide-y divide-gray-200">
@@ -545,7 +536,7 @@ export function InvoiceItemsTable({ items, onChange, disabled = false }: Invoice
                                                   {availableItem.category || '-'}
                                                 </td>
                                                 <td className="px-3 py-2 text-right font-medium text-gray-900">
-                                                  ${availableItem.unitPrice.toFixed(2)}
+                                                  {formatCurrency(availableItem.unitPrice)}
                                                 </td>
                                                 <td className="px-3 py-2 text-center text-gray-700">
                                                   {availableItem.unitOfMeasure}
@@ -561,7 +552,7 @@ export function InvoiceItemsTable({ items, onChange, disabled = false }: Invoice
                                                     onClick={() => handleSelectItem(availableItem)}
                                                     className="h-7 px-3 text-xs bg-blue-50 hover:bg-blue-100 text-blue-600"
                                                   >
-                                                    Select
+                                                    {t('invoices.selectItem', 'Select an item')}
                                                   </Button>
                                                 </td>
                                               </tr>
@@ -585,24 +576,24 @@ export function InvoiceItemsTable({ items, onChange, disabled = false }: Invoice
                               <div className="grid grid-cols-2 gap-6">
                                 <div>
                                   <label className="block text-xs font-semibold text-gray-700 mb-2">
-                                    Category
+                                    {t('items.category', 'Category')}
                                   </label>
                                   <Input
                                     value={editingItem?.category || ''}
                                     onChange={(e) => handleFieldChange('category', e.target.value)}
                                     className="h-9 text-sm"
-                                    placeholder="e.g., Rent, Utilities, Services, etc."
+                                    placeholder={t('items.categoryPlaceholder', 'e.g. Rent, Utilities, Services')}
                                   />
                                 </div>
                                 <div>
                                   <label className="block text-xs font-semibold text-gray-700 mb-2">
-                                    Additional Notes
+                                    {t('common.notes', 'Notes')}
                                   </label>
                                   <textarea
                                     value={editingItem?.notes || ''}
                                     onChange={(e) => handleFieldChange('notes', e.target.value)}
                                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                                    placeholder="Any additional notes or special instructions for this line item..."
+                                    placeholder={t('invoices.lineNotesPlaceholder', 'Notes or special instructions for this line...')}
                                     rows={2}
                                   />
                                 </div>
@@ -620,46 +611,46 @@ export function InvoiceItemsTable({ items, onChange, disabled = false }: Invoice
               <tfoot className="bg-gray-50 border-t-2 border-gray-300">
                 <tr>
                   <td colSpan={7} className="px-3 py-3 text-right font-semibold text-gray-700">
-                    Subtotal (before discounts):
+                    {t('invoices.subtotalBeforeDiscount', 'Subtotal before discounts')}
                   </td>
                   <td className="px-3 py-3 text-right font-bold text-gray-900" colSpan={6}>
-                    ${totals.subtotal.toFixed(2)}
+                    {formatCurrency(totals.subtotal)}
                   </td>
                   <td></td>
                 </tr>
                 <tr>
                   <td colSpan={7} className="px-3 py-2 text-right font-semibold text-orange-700">
-                    Total Discounts:
+                    {t('invoices.totalDiscounts', 'Total discounts')}
                   </td>
                   <td className="px-3 py-2 text-right font-bold text-orange-600" colSpan={6}>
-                    -${totals.discount.toFixed(2)}
+                    -{formatCurrency(totals.discount)}
                   </td>
                   <td></td>
                 </tr>
                 <tr>
                   <td colSpan={7} className="px-3 py-2 text-right font-semibold text-gray-700">
-                    Subtotal (after discounts):
+                    {t('invoices.subtotalAfterDiscount', 'Subtotal after discounts')}
                   </td>
                   <td className="px-3 py-2 text-right font-bold text-gray-900" colSpan={6}>
-                    ${totals.afterDiscount.toFixed(2)}
+                    {formatCurrency(totals.afterDiscount)}
                   </td>
                   <td></td>
                 </tr>
                 <tr>
                   <td colSpan={7} className="px-3 py-2 text-right font-semibold text-purple-700">
-                    Total Tax:
+                    {t('invoices.totalTax', 'Total tax')}
                   </td>
                   <td className="px-3 py-2 text-right font-bold text-purple-600" colSpan={6}>
-                    +${totals.tax.toFixed(2)}
+                    +{formatCurrency(totals.tax)}
                   </td>
                   <td></td>
                 </tr>
                 <tr className="bg-blue-100 border-t-2 border-blue-300">
                   <td colSpan={7} className="px-3 py-4 text-right font-bold text-gray-900 text-lg">
-                    Items Total:
+                    {t('invoices.itemsTotal', 'Line items total')}
                   </td>
                   <td className="px-3 py-4 text-right font-bold text-blue-600 text-xl" colSpan={6}>
-                    ${totals.total.toFixed(2)}
+                    {formatCurrency(totals.total)}
                   </td>
                   <td></td>
                 </tr>
@@ -671,12 +662,12 @@ export function InvoiceItemsTable({ items, onChange, disabled = false }: Invoice
 
       {items.length > 0 && (
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-xs text-gray-700">
-          <p className="font-semibold text-blue-900 mb-2">💡 Tips:</p>
+          <p className="font-semibold text-blue-900 mb-2">💡 {t('invoices.tips', 'Tips')}</p>
           <ul className="space-y-1 ml-4">
-            <li>• <strong>Click the arrow (▶/▼)</strong> on the left to expand/collapse additional details (Category & Notes)</li>
-            <li>• <strong>Edit button</strong> allows you to modify all item fields including Category and Notes</li>
-            <li>• <strong>Discount Amount</strong> and <strong>Tax Amount</strong> are automatically calculated</li>
-            <li>• <strong>Line Total</strong> = (Qty × Unit Price) - Discount + Tax</li>
+            <li>• {t('invoices.tipExpand', 'The arrow on the left opens and closes the extra details of a line (category and notes).')}</li>
+            <li>• {t('invoices.tipEdit', 'The edit button opens every field of the line, category and notes included.')}</li>
+            <li>• {t('invoices.tipAutoCalc', 'Discount amount and tax amount are worked out for you.')}</li>
+            <li>• {t('invoices.tipLineTotal', 'Line total = quantity × unit price − discount + tax.')}</li>
           </ul>
         </div>
       )}
@@ -687,10 +678,14 @@ export function InvoiceItemsTable({ items, onChange, disabled = false }: Invoice
         onOpenChange={(open) =>
           setConfirmDialog({ open, itemIndex: null, itemName: '' })
         }
-        title="Delete Item"
-        description={`Are you sure you want to remove "${confirmDialog.itemName}" from this invoice? This action cannot be undone.`}
-        confirmText="Delete"
-        cancelText="Cancel"
+        title={t('invoices.deleteItemTitle', 'Delete Item')}
+        description={t(
+          'invoices.deleteItemMessage',
+          'Remove "{name}" from this invoice?',
+          { name: confirmDialog.itemName }
+        )}
+        confirmText={t('common.delete', 'Delete')}
+        cancelText={t('common.cancel', 'Cancel')}
         onConfirm={confirmDeleteItem}
         variant="warning"
       />

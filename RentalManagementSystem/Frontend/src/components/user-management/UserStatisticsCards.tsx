@@ -1,6 +1,7 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui';
 import type { UserStatisticsDto } from '../../types';
+import { useTranslation } from '../../hooks/useTranslation';
 import { Users, UserCheck, UserX, UserPlus, TrendingUp } from 'lucide-react';
 
 interface UserStatisticsCardsProps {
@@ -12,36 +13,37 @@ interface UserStatisticsCardsProps {
  * Displays key metrics about users in the system
  */
 export function UserStatisticsCards({ statistics }: UserStatisticsCardsProps) {
+  const { t } = useTranslation();
   const stats = [
     {
-      title: 'Total Users',
+      title: t('users.totalUsers', 'Total Users'),
       value: statistics.totalUsers,
       icon: Users,
-      description: 'All registered users',
+      description: t('users.totalUsersHint', 'Every registered account'),
       color: 'text-blue-600',
       bgColor: 'bg-blue-100',
     },
     {
-      title: 'Active Users',
+      title: t('users.activeUsers', 'Active Users'),
       value: statistics.activeUsers,
       icon: UserCheck,
-      description: 'Currently active',
+      description: t('users.activeUsersHint', 'Can sign in right now'),
       color: 'text-green-600',
       bgColor: 'bg-green-100',
     },
     {
-      title: 'Inactive Users',
+      title: t('users.inactiveUsers', 'Inactive Users'),
       value: statistics.inactiveUsers,
       icon: UserX,
-      description: 'Deactivated accounts',
+      description: t('users.inactiveUsersHint', 'Accounts that were switched off'),
       color: 'text-red-600',
       bgColor: 'bg-red-100',
     },
     {
-      title: 'New Users (30 days)',
+      title: t('users.newUsers30Days', 'New users (30 days)'),
       value: statistics.newUsersLast30Days,
       icon: UserPlus,
-      description: 'Recently joined',
+      description: t('users.newUsersHint', 'Joined recently'),
       color: 'text-purple-600',
       bgColor: 'bg-purple-100',
     },

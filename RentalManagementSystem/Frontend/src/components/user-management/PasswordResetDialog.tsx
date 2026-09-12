@@ -10,6 +10,7 @@ import { Switch } from '../ui/Switch';
 import { useResetUserPassword } from '../../hooks/useUserManagement';
 import { useToast } from '../../contexts/ToastContext';
 import type { User } from '../../types';
+import { useTranslation } from '../../hooks/useTranslation';
 import { Loader2, AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription } from '../ui/Alert';
 
@@ -35,6 +36,7 @@ interface PasswordResetDialogProps {
  * Allows administrators to reset user passwords
  */
 export function PasswordResetDialog({ user, open, onOpenChange }: PasswordResetDialogProps) {
+  const { t } = useTranslation();
   const toast = useToast();
   const resetPasswordMutation = useResetUserPassword();
 
@@ -71,7 +73,7 @@ export function PasswordResetDialog({ user, open, onOpenChange }: PasswordResetD
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Reset Password</DialogTitle>
+          <DialogTitle>{t('auth.resetPassword', 'Reset password')}</DialogTitle>
           <DialogDescription>
             Reset password for <strong>{user.fullName}</strong> ({user.email})
           </DialogDescription>
@@ -80,7 +82,7 @@ export function PasswordResetDialog({ user, open, onOpenChange }: PasswordResetD
         <Alert>
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>
-            The user will need to use this new password to log in. Make sure to communicate it securely.
+            {t('users.resetPasswordHint', 'The user signs in with this new password. Send it to them through a safe channel.')}
           </AlertDescription>
         </Alert>
 
@@ -92,11 +94,11 @@ export function PasswordResetDialog({ user, open, onOpenChange }: PasswordResetD
               name="newPassword"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>New Password *</FormLabel>
+                  <FormLabel>{t('auth.newPassword', 'New password')} *</FormLabel>
                   <FormControl>
-                    <Input type="password" placeholder="Enter new password" {...field} />
+                    <Input type="password" placeholder={t('auth.enterNewPassword', 'Enter your new password')} {...field} />
                   </FormControl>
-                  <FormDescription>Minimum 6 characters required</FormDescription>
+                  <FormDescription>{t('users.passwordMinLength', 'At least 10 characters')}</FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
@@ -108,9 +110,9 @@ export function PasswordResetDialog({ user, open, onOpenChange }: PasswordResetD
               name="confirmPassword"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Confirm Password *</FormLabel>
+                  <FormLabel>{t('auth.confirmNewPassword', 'Confirm new password')} *</FormLabel>
                   <FormControl>
-                    <Input type="password" placeholder="Confirm new password" {...field} />
+                    <Input type="password" placeholder={t('auth.reenterNewPassword', 'Re-enter your new password')} {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -124,9 +126,9 @@ export function PasswordResetDialog({ user, open, onOpenChange }: PasswordResetD
               render={({ field }) => (
                 <FormItem className="flex items-center justify-between rounded-lg border p-4">
                   <div className="space-y-0.5">
-                    <FormLabel className="text-base">Email Notification</FormLabel>
+                    <FormLabel className="text-base">{t('users.emailNotification', 'Notify by email')}</FormLabel>
                     <FormDescription className="text-sm">
-                      Send password reset notification to user's email
+                      {t('users.emailNotificationHint', 'Send the new password to the account email.')}
                     </FormDescription>
                   </div>
                   <FormControl>
@@ -143,13 +145,13 @@ export function PasswordResetDialog({ user, open, onOpenChange }: PasswordResetD
                 onClick={() => onOpenChange(false)}
                 disabled={resetPasswordMutation.isPending}
               >
-                Cancel
+                {t('common.cancel', 'Cancel')}
               </Button>
               <Button type="submit" disabled={resetPasswordMutation.isPending}>
                 {resetPasswordMutation.isPending && (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 )}
-                Reset Password
+                {t('auth.resetPassword', 'Reset password')}
               </Button>
             </DialogFooter>
           </form>

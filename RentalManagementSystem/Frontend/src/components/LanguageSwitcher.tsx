@@ -7,7 +7,7 @@ import { Globe } from 'lucide-react';
  * Provides a button-based switcher with flag-like icons
  */
 export const LanguageSwitcher: React.FC = () => {
-  const { currentLanguage, availableLanguages, changeLanguage, isLoading } = useTranslation();
+  const { t, currentLanguage, availableLanguages, changeLanguage, isLoading } = useTranslation();
 
   const handleLanguageChange = async (languageCode: string) => {
     if (languageCode && languageCode !== currentLanguage?.code) {
@@ -23,7 +23,7 @@ export const LanguageSwitcher: React.FC = () => {
     return (
       <div className="flex items-center gap-2">
         <Globe className="h-4 w-4 text-gray-400 animate-pulse" />
-        <span className="text-sm text-gray-500">Loading...</span>
+        <span className="text-sm text-gray-500">{t('common.loading', 'Loading...')}</span>
       </div>
     );
   }

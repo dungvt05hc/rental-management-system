@@ -122,9 +122,15 @@ builder.Services.AddIdentity<User, IdentityRole>(options =>
     // User settings
     options.User.AllowedUserNameCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._@+";
     options.User.RequireUniqueEmail = true;
+
+    // Token xác nhận email dùng provider riêng, chỉ để nó có thời hạn khác với
+    // token đặt lại mật khẩu (xem EmailConfirmationTokenProviderOptions).
+    options.Tokens.EmailConfirmationTokenProvider = EmailConfirmationTokenProviderOptions.ProviderName;
 })
 .AddEntityFrameworkStores<RentalManagementContext>()
-.AddDefaultTokenProviders();
+.AddDefaultTokenProviders()
+.AddTokenProvider<EmailConfirmationTokenProvider<User>>(
+    EmailConfirmationTokenProviderOptions.ProviderName);
 
 // Thời hạn token sinh bởi DataProtectorTokenProvider — trong đó có token đặt
 // lại mật khẩu. Mặc định của Identity là 1 ngày, quá dài cho một link nằm sẵn
@@ -266,6 +272,45 @@ builder.Services.AddRateLimiter(options =>
                 QueueLimit = 0
             }));
 
+    // Tự đăng ký là endpoint ẩn danh DUY NHẤT tạo ra dữ liệu: mỗi lần gọi thành
+    // công là một tài khoản mới và một email gửi đi. 5 lần/giờ đủ cho người gõ
+    // nhầm vài lần, và cắt hẳn khả năng dựng hàng loạt tài khoản từ một máy.
+    options.AddPolicy(RateLimitPolicies.Register, httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 5,
+                Window = TimeSpan.FromHours(1),
+                QueueLimit = 0
+            }));
+
+    // check-email trả lời đúng câu hỏi "địa chỉ này có tài khoản không", nên nó
+    // là kênh user enumeration. Form đăng ký chỉ gọi nó mỗi lần rời ô email, tức
+    // vài lần cho một lần điền form; 30 lần/5 phút thoải mái cho việc đó nhưng
+    // vô dụng với ai muốn quét cả danh sách địa chỉ.
+    options.AddPolicy(RateLimitPolicies.CheckEmail, httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 30,
+                Window = TimeSpan.FromMinutes(5),
+                QueueLimit = 0
+            }));
+
+    // Gửi lại link xác nhận cũng là một email mỗi lần gọi, nên chặt như quên
+    // mật khẩu. Số email tối đa tới cùng một địa chỉ vẫn do IEmailRateLimiter lo.
+    options.AddPolicy(RateLimitPolicies.ResendConfirmation, httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 5,
+                Window = TimeSpan.FromMinutes(15),
+                QueueLimit = 0
+            }));
+
     options.OnRejected = (context, _) =>
     {
         Log.Warning("Rate limit exceeded for {Path} from {RemoteIp}",
@@ -324,7 +369,8 @@ builder.Services.AddCors(options =>
 // Register Services
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IRoomService, RoomService>();
-builder.Services.AddScoped<ITenantService, TenantService>();
+builder.Services.AddScoped<ICustomerService, CustomerService>();
+builder.Services.AddScoped<IRentalContractService, RentalContractService>();
 builder.Services.AddScoped<IInvoiceService, InvoiceService>();
 builder.Services.AddScoped<IPaymentService, PaymentService>();
 builder.Services.AddScoped<IReportingService, ReportingService>();
@@ -333,6 +379,7 @@ builder.Services.AddScoped<IPdfService, PdfService>();
 builder.Services.AddScoped<ILocalizationService, LocalizationService>();
 builder.Services.AddScoped<ISystemManagementService, SystemManagementService>();
 builder.Services.AddScoped<IUserManagementService, UserManagementService>();
+builder.Services.AddScoped<IInvitationService, InvitationService>();
 
 // Email infrastructure.
 // Cấu hình đọc từ biến môi trường, không có gì trong appsettings, để mật khẩu
@@ -491,6 +538,13 @@ using (var scope = app.Services.CreateScope())
 
         // Seed admin user
         await SeedAdminUserAsync(userManager);
+
+        // Seed bảng dịch từ locales/*.json đã nhúng trong assembly.
+        // Trước đây việc này chỉ chạy khi admin bấm nút, nên một môi trường mới
+        // lên là không có chữ nào trong DB. Seed theo kiểu chỉ-thêm-khoá-mới,
+        // an toàn để chạy ở mỗi lần khởi động.
+        var localizationService = services.GetRequiredService<ILocalizationService>();
+        await localizationService.SeedDefaultTranslationsAsync();
 
         Log.Information("Database initialization completed successfully");
     }

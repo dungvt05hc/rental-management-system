@@ -3,6 +3,7 @@ import { Plus, Search, Edit, Trash2, X } from 'lucide-react';
 import { itemService } from '../../services';
 import type { Item, ItemSearchRequest } from '../../types';
 import { AlertDialog } from '../ui';
+import { formatCurrency } from '../../utils';
 import { ItemDialog } from './ItemDialog';
 import { useToast } from '../../contexts/ToastContext';
 import { useTranslation } from '../../hooks/useTranslation';
@@ -125,7 +126,7 @@ export const ItemsPage: React.FC = () => {
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-gray-800">Item Management</h1>
+        <h1 className="text-3xl font-bold text-gray-800">{t('items.title', 'Items')}</h1>
         <button
           onClick={() => {
             setSelectedItem(null);
@@ -134,7 +135,7 @@ export const ItemsPage: React.FC = () => {
           className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2"
         >
           <Plus size={20} />
-          Add Item
+          {t('items.createItem', 'Create New Item')}
         </button>
       </div>
 
@@ -145,7 +146,7 @@ export const ItemsPage: React.FC = () => {
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
             <input
               type="text"
-              placeholder="Search items..."
+              placeholder={t('items.searchShortPlaceholder', 'Search items...')}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
@@ -157,7 +158,7 @@ export const ItemsPage: React.FC = () => {
             onChange={(e) => setSelectedCategory(e.target.value)}
             className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
           >
-            <option value="">All Categories</option>
+            <option value="">{t('items.allCategories', 'All categories')}</option>
             {categories.map((cat) => (
               <option key={cat} value={cat}>
                 {cat}
@@ -172,7 +173,7 @@ export const ItemsPage: React.FC = () => {
               onChange={(e) => setShowActiveOnly(e.target.checked)}
               className="w-4 h-4 text-blue-600"
             />
-            <span>Active Only</span>
+            <span>{t('items.activeOnly', 'Active only')}</span>
           </label>
 
           <button
@@ -184,7 +185,7 @@ export const ItemsPage: React.FC = () => {
             className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center justify-center gap-2"
           >
             <X size={20} />
-            Clear Filters
+            {t('items.clearFilters', 'Clear filters')}
           </button>
         </div>
       </div>
@@ -197,7 +198,7 @@ export const ItemsPage: React.FC = () => {
           </div>
         ) : items.length === 0 ? (
           <div className="text-center py-12 text-gray-500">
-            No items found. Create your first item to get started.
+            {t('items.emptyState', 'No items yet. Create the first one to get started.')}
           </div>
         ) : (
           <>
@@ -212,22 +213,22 @@ export const ItemsPage: React.FC = () => {
                       Name
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Category
+                      {t('items.category', 'Category')}
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Unit Price
+                      {t('items.unitPrice', 'Unit Price')}
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       UOM
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Tax %
+                      {t('items.taxPercent', 'Tax %')}
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Status
+                      {t('rooms.status', 'Status')}
                     </th>
                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Actions
+                      {t('common.actions', 'Actions')}
                     </th>
                   </tr>
                 </thead>
@@ -249,7 +250,7 @@ export const ItemsPage: React.FC = () => {
                         {item.category || '-'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        ${item.unitPrice.toFixed(2)}
+                        {formatCurrency(item.unitPrice)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {item.unitOfMeasure}
@@ -301,14 +302,14 @@ export const ItemsPage: React.FC = () => {
                   disabled={pagination.page === 1}
                   className="px-4 py-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100"
                 >
-                  Previous
+                  {t('common.previous', 'Previous')}
                 </button>
                 <button
                   onClick={() => setPagination(prev => ({ ...prev, page: prev.page + 1 }))}
                   disabled={pagination.page >= pagination.totalPages}
                   className="px-4 py-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100"
                 >
-                  Next
+                  {t('common.next', 'Next')}
                 </button>
               </div>
             </div>
@@ -333,7 +334,8 @@ export const ItemsPage: React.FC = () => {
         title={t('items.deleteConfirmTitle', 'Delete Item')}
         description={t(
           'items.deleteConfirmMessage',
-          `Are you sure you want to delete item "${confirmDialog.itemName}"? This action cannot be undone.`
+          'Delete item "{name}"? This cannot be undone.',
+          { name: confirmDialog.itemName }
         )}
         confirmText={t('common.delete', 'Delete')}
         cancelText={t('common.cancel', 'Cancel')}

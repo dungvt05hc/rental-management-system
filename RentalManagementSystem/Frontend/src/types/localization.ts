@@ -30,6 +30,14 @@ export interface Translation {
 }
 
 /**
+ * Giá trị thay vào chỗ trống `{name}` của một chuỗi dịch.
+ *
+ * Cần tham số hoá thay vì nối chuỗi vì trật tự từ giữa hai ngôn ngữ khác nhau:
+ * "85% occupancy" nhưng "tỷ lệ lấp đầy 85%".
+ */
+export type TranslationParams = Record<string, string | number>;
+
+/**
  * Localization context value
  */
 export interface LocalizationContextValue {
@@ -39,5 +47,5 @@ export interface LocalizationContextValue {
   isLoading: boolean;
   error: string | null;
   changeLanguage: (languageCode: string) => Promise<void>;
-  t: (key: string, fallback?: string) => string;
+  t: (key: string, fallback?: string, params?: TranslationParams) => string;
 }

@@ -50,6 +50,12 @@ jobs:
       - name: Install
         run: npm ci
 
+      # Fails when a key used in the code has no Vietnamese translation, or when
+      # locales/en.json has drifted from the t() calls in src/. Runs before the
+      # build so a coverage regression is the first thing reported.
+      - name: i18n coverage
+        run: npm run i18n:check
+
       # Typechecks (tsc -b) as well as bundling — a red build is not mergeable.
       - name: Build
         run: npm run build

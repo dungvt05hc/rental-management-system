@@ -4,22 +4,25 @@ import { Card, CardContent } from '../ui';
 import SystemSettingsTab from './SystemSettingsTab';
 import LanguageManagement from '../admin/LanguageManagement';
 import TranslationManagement from './TranslationManagement';
+import { useTranslation } from '../../hooks/useTranslation';
+import { defineMessage } from '../../utils/i18n';
 
 const SystemManagement: React.FC = () => {
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<'settings' | 'languages' | 'translations'>('settings');
   const [error, setError] = useState<string | null>(null);
 
   const tabs = [
-    { id: 'settings' as const, label: 'Settings', icon: Settings },
-    { id: 'languages' as const, label: 'Languages', icon: Globe },
-    { id: 'translations' as const, label: 'Translations', icon: Languages },
+    { id: 'settings' as const, message: defineMessage('system.tabSettings', 'Settings'), icon: Settings },
+    { id: 'languages' as const, message: defineMessage('languages.title', 'Languages'), icon: Globe },
+    { id: 'translations' as const, message: defineMessage('translations.title', 'Translations'), icon: Languages },
   ];
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">System Management</h1>
-        <p className="text-gray-600 mt-1">Manage system settings, languages, and translations</p>
+        <h1 className="text-2xl font-bold text-gray-900">{t('system.pageTitle', 'System Management')}</h1>
+        <p className="text-gray-600 mt-1">{t('system.subtitle', 'Settings, languages and translations')}</p>
       </div>
 
       {error && (
@@ -35,7 +38,7 @@ const SystemManagement: React.FC = () => {
       <Card>
         <CardContent className="p-0">
           <div className="border-b border-gray-200">
-            <nav className="flex space-x-8 px-6" aria-label="Tabs">
+            <nav className="flex space-x-8 px-6" aria-label={t('system.tabs', 'Tabs')}>
               {tabs.map((tab) => {
                 const Icon = tab.icon;
                 return (
@@ -51,7 +54,7 @@ const SystemManagement: React.FC = () => {
                     `}
                   >
                     <Icon className="h-5 w-5" />
-                    <span>{tab.label}</span>
+                    <span>{t(tab.message.key, tab.message.defaultValue)}</span>
                   </button>
                 );
               })}

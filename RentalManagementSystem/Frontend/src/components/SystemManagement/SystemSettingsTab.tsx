@@ -83,7 +83,7 @@ const SystemSettingsTab: React.FC = () => {
       await systemManagementApi.bulkUpdateSettings({ settings: settingsToUpdate });
       showSuccess(
         t('common.success', 'Success'),
-        t('system.settingsUpdated', `Successfully updated ${settingsToUpdate.length} settings`)
+        t('system.settingsUpdated', 'Updated {count} settings.', { count: settingsToUpdate.length })
       );
       await loadSettings();
     } catch {
@@ -191,8 +191,8 @@ const SystemSettingsTab: React.FC = () => {
           disabled={!setting.isEditable || loading}
           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
         >
-          <option value="true">True</option>
-          <option value="false">False</option>
+          <option value="true">{t('system.valueTrue', 'True')}</option>
+          <option value="false">{t('system.valueFalse', 'False')}</option>
         </select>
       );
     }
@@ -244,19 +244,19 @@ const SystemSettingsTab: React.FC = () => {
             </Button>
             <Button variant="outline" onClick={loadSettings} disabled={loading}>
               <RefreshCw className="h-4 w-4 mr-2" />
-              Refresh
+              {t('common.refresh', 'Refresh')}
             </Button>
             <Button variant="outline" onClick={() => setCreateDialogOpen(true)}>
               <Plus className="h-4 w-4 mr-2" />
-              Create Setting
+              {t('system.createSetting', 'Create setting')}
             </Button>
             <Button variant="outline" onClick={handleSeedSettings} disabled={loading}>
               <Upload className="h-4 w-4 mr-2" />
-              Seed Defaults
+              {t('system.seedSettingsTitle', 'Seed Default Settings')}
             </Button>
             <Button variant="outline" onClick={handleExportSettings}>
               <Download className="h-4 w-4 mr-2" />
-              Export
+              {t('system.export', 'Export')}
             </Button>
           </div>
         </CardContent>
@@ -306,7 +306,7 @@ const SystemSettingsTab: React.FC = () => {
                               size="sm"
                               onClick={() => handleDeleteSetting(setting.key)}
                               disabled={loading}
-                              title="Delete"
+                              title={t('common.delete', 'Delete')}
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>
@@ -326,7 +326,7 @@ const SystemSettingsTab: React.FC = () => {
       <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle className="text-2xl">Create New Setting</DialogTitle>
+            <DialogTitle className="text-2xl">{t('system.createSetting', 'Create setting')}</DialogTitle>
           </DialogHeader>
           <div className="px-6 py-6">
             <div className="space-y-6">
@@ -334,77 +334,77 @@ const SystemSettingsTab: React.FC = () => {
                 {/* Key Field */}
                 <div className="md:col-span-2">
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Key <span className="text-red-500">*</span>
+                    {t('system.settingKey', 'Key')} <span className="text-red-500">*</span>
                   </label>
                   <Input
                     value={newSetting.key}
                     onChange={(e) => setNewSetting({ ...newSetting, key: e.target.value })}
-                    placeholder="e.g., app.theme"
+                    placeholder={t('system.keyPlaceholder', 'e.g. app.theme')}
                     className="text-base h-11"
                   />
-                  <p className="text-xs text-gray-500 mt-1">A unique identifier for this setting</p>
+                  <p className="text-xs text-gray-500 mt-1">{t('system.keyHint', 'A unique name for this setting')}</p>
                 </div>
 
                 {/* Value Field */}
                 <div className="md:col-span-2">
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Value <span className="text-red-500">*</span>
+                    {t('system.settingValue', 'Value')} <span className="text-red-500">*</span>
                   </label>
                   <Input
                     value={newSetting.value}
                     onChange={(e) => setNewSetting({ ...newSetting, value: e.target.value })}
-                    placeholder="e.g., dark"
+                    placeholder={t('system.valuePlaceholder', 'e.g. dark')}
                     className="text-base h-11"
                   />
-                  <p className="text-xs text-gray-500 mt-1">The value for this setting</p>
+                  <p className="text-xs text-gray-500 mt-1">{t('system.valueHint', 'What this setting is set to')}</p>
                 </div>
 
                 {/* Category Field */}
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Category <span className="text-red-500">*</span>
+                    {t('items.category', 'Category')} <span className="text-red-500">*</span>
                   </label>
                   <Input
                     value={newSetting.category}
                     onChange={(e) => setNewSetting({ ...newSetting, category: e.target.value })}
-                    placeholder="e.g., General"
+                    placeholder={t('system.categoryPlaceholder', 'e.g. General')}
                     className="text-base h-11"
                   />
-                  <p className="text-xs text-gray-500 mt-1">Group similar settings together</p>
+                  <p className="text-xs text-gray-500 mt-1">{t('system.categoryHint', 'Groups related settings together')}</p>
                 </div>
 
                 {/* Data Type Field */}
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Data Type
+                    {t('system.dataType', 'Data type')}
                   </label>
                   <select
                     value={newSetting.dataType}
                     onChange={(e) => setNewSetting({ ...newSetting, dataType: e.target.value })}
                     className="w-full px-4 py-2.5 text-base border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
                   >
-                    <option value="string">String</option>
-                    <option value="number">Number</option>
-                    <option value="boolean">Boolean</option>
+                    <option value="string">{t('system.typeString', 'Text')}</option>
+                    <option value="number">{t('system.typeNumber', 'Number')}</option>
+                    <option value="boolean">{t('system.typeBoolean', 'True/false')}</option>
                     <option value="json">JSON</option>
                   </select>
-                  <p className="text-xs text-gray-500 mt-1">The type of data stored</p>
+                  <p className="text-xs text-gray-500 mt-1">{t('system.dataTypeHint', 'The kind of value stored')}</p>
                 </div>
               </div>
 
               {/* Description Field */}
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Description
+                  {t('items.description', 'Description')}
                 </label>
                 <textarea
                   value={newSetting.description}
                   onChange={(e) => setNewSetting({ ...newSetting, description: e.target.value })}
                   rows={3}
                   className="w-full px-4 py-3 text-base border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
-                  placeholder="Optional description (explain what this setting does)"
+                  placeholder={t('system.descriptionPlaceholder', 'What this setting does (optional)')}
                 />
-                <p className="text-xs text-gray-500 mt-1">Help others understand the purpose of this setting</p>
+                <p className="text-xs text-gray-500 mt-1">{t('system.descriptionHint', 'Helps the next person understand what this setting is for')}</p>
               </div>
             </div>
           </div>
@@ -417,7 +417,7 @@ const SystemSettingsTab: React.FC = () => {
                 onClick={() => setCreateDialogOpen(false)}
                 className="px-6 py-2.5"
               >
-                Cancel
+                {t('common.cancel', 'Cancel')}
               </Button>
               <Button
                 onClick={handleCreateSetting}
@@ -446,7 +446,8 @@ const SystemSettingsTab: React.FC = () => {
           confirmDialog.action === 'delete'
             ? t(
                 'system.deleteSettingMessage',
-                `Are you sure you want to delete setting "${confirmDialog.settingKey}"?`
+                'Delete the setting "{key}"?',
+                { key: confirmDialog.settingKey }
               )
             : t(
                 'system.seedSettingsMessage',

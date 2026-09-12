@@ -154,6 +154,158 @@ namespace RentalManagement.Api.Migrations
                     b.ToTable("AspNetUserTokens", (string)null);
                 });
 
+            modelBuilder.Entity("RentalManagement.Api.Models.Entities.Customer", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("NOW() AT TIME ZONE 'UTC'");
+
+                    b.Property<DateTime?>("DateOfBirth")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
+
+                    b.Property<string>("EmergencyContactName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("EmergencyContactPhone")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("FirstName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("IdentificationNumber")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("LastName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("Notes")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("PhoneNumber")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("SearchText")
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("text")
+                        .HasComputedColumnSql("lower(immutable_unaccent(coalesce(\"FirstName\", '') || ' ' || coalesce(\"LastName\", '') || ' ' || coalesce(\"Email\", '') || ' ' || coalesce(\"PhoneNumber\", '')))", true);
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("NOW() AT TIME ZONE 'UTC'");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Email")
+                        .IsUnique()
+                        .HasDatabaseName("IX_Customers_Email");
+
+                    b.HasIndex("IdentificationNumber")
+                        .IsUnique()
+                        .HasDatabaseName("IX_Customers_IdentificationNumber")
+                        .HasFilter("\"IdentificationNumber\" IS NOT NULL AND \"IdentificationNumber\" != ''");
+
+                    b.ToTable("Customers");
+                });
+
+            modelBuilder.Entity("RentalManagement.Api.Models.Entities.Invitation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("CodeHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("CodePrefix")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("NOW() AT TIME ZONE 'UTC'");
+
+                    b.Property<string>("CreatedByUserId")
+                        .IsRequired()
+                        .HasMaxLength(450)
+                        .HasColumnType("character varying(450)");
+
+                    b.Property<string>("Email")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTime?>("RedeemedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("RedeemedByUserId")
+                        .HasMaxLength(450)
+                        .HasColumnType("character varying(450)");
+
+                    b.Property<DateTime?>("RevokedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("RevokedByUserId")
+                        .HasMaxLength(450)
+                        .HasColumnType("character varying(450)");
+
+                    b.Property<string>("Role")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CodeHash")
+                        .IsUnique()
+                        .HasDatabaseName("IX_Invitations_CodeHash");
+
+                    b.HasIndex("CreatedAt")
+                        .HasDatabaseName("IX_Invitations_CreatedAt");
+
+                    b.ToTable("Invitations");
+                });
+
             modelBuilder.Entity("RentalManagement.Api.Models.Entities.Invoice", b =>
                 {
                     b.Property<int>("Id")
@@ -178,6 +330,9 @@ namespace RentalManagement.Api.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("NOW() AT TIME ZONE 'UTC'");
+
+                    b.Property<int>("CustomerId")
+                        .HasColumnType("integer");
 
                     b.Property<decimal>("Discount")
                         .HasPrecision(18, 2)
@@ -214,13 +369,13 @@ namespace RentalManagement.Api.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
 
+                    b.Property<int?>("RentalContractId")
+                        .HasColumnType("integer");
+
                     b.Property<int>("RoomId")
                         .HasColumnType("integer");
 
                     b.Property<int>("Status")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("TenantId")
                         .HasColumnType("integer");
 
                     b.Property<decimal>("TotalAmount")
@@ -238,10 +393,12 @@ namespace RentalManagement.Api.Migrations
                         .IsUnique()
                         .HasDatabaseName("IX_Invoices_InvoiceNumber");
 
+                    b.HasIndex("RentalContractId");
+
                     b.HasIndex("RoomId");
 
-                    b.HasIndex("TenantId", "BillingPeriod")
-                        .HasDatabaseName("IX_Invoices_TenantId_BillingPeriod");
+                    b.HasIndex("CustomerId", "BillingPeriod")
+                        .HasDatabaseName("IX_Invoices_CustomerId_BillingPeriod");
 
                     b.ToTable("Invoices");
                 });
@@ -530,6 +687,63 @@ namespace RentalManagement.Api.Migrations
                     b.ToTable("Payments");
                 });
 
+            modelBuilder.Entity("RentalManagement.Api.Models.Entities.RentalContract", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("NOW() AT TIME ZONE 'UTC'");
+
+                    b.Property<int>("CustomerId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("EndDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal>("MonthlyRent")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("Notes")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<int>("RoomId")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("SecurityDeposit")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime>("StartDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("NOW() AT TIME ZONE 'UTC'");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CustomerId", "Status")
+                        .HasDatabaseName("IX_RentalContracts_CustomerId_Status");
+
+                    b.HasIndex("RoomId", "Status")
+                        .HasDatabaseName("IX_RentalContracts_RoomId_Status");
+
+                    b.ToTable("RentalContracts");
+                });
+
             modelBuilder.Entity("RentalManagement.Api.Models.Entities.Room", b =>
                 {
                     b.Property<int>("Id")
@@ -573,6 +787,12 @@ namespace RentalManagement.Api.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
 
+                    b.Property<string>("SearchText")
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("text")
+                        .HasComputedColumnSql("lower(immutable_unaccent(coalesce(\"RoomNumber\", '') || ' ' || coalesce(\"Description\", '')))", true);
+
                     b.Property<int>("Status")
                         .HasColumnType("integer");
 
@@ -605,6 +825,7 @@ namespace RentalManagement.Api.Migrations
                             IsFurnished = false,
                             MonthlyRent = 800.00m,
                             RoomNumber = "101",
+                            SearchText = "",
                             Status = 1,
                             Type = 1,
                             UpdatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
@@ -621,6 +842,7 @@ namespace RentalManagement.Api.Migrations
                             IsFurnished = true,
                             MonthlyRent = 1200.00m,
                             RoomNumber = "102",
+                            SearchText = "",
                             Status = 1,
                             Type = 2,
                             UpdatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
@@ -637,6 +859,7 @@ namespace RentalManagement.Api.Migrations
                             IsFurnished = true,
                             MonthlyRent = 1800.00m,
                             RoomNumber = "201",
+                            SearchText = "",
                             Status = 3,
                             Type = 4,
                             UpdatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
@@ -702,103 +925,6 @@ namespace RentalManagement.Api.Migrations
                         .HasDatabaseName("IX_SystemSettings_Key");
 
                     b.ToTable("SystemSettings");
-                });
-
-            modelBuilder.Entity("RentalManagement.Api.Models.Entities.Tenant", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime?>("ContractEndDate")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime?>("ContractStartDate")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("NOW() AT TIME ZONE 'UTC'");
-
-                    b.Property<DateTime?>("DateOfBirth")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Email")
-                        .IsRequired()
-                        .HasMaxLength(255)
-                        .HasColumnType("character varying(255)");
-
-                    b.Property<string>("EmergencyContactName")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.Property<string>("EmergencyContactPhone")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
-
-                    b.Property<string>("FirstName")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<string>("IdentificationNumber")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("LastName")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<decimal>("MonthlyRent")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<string>("Notes")
-                        .IsRequired()
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
-
-                    b.Property<string>("PhoneNumber")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
-
-                    b.Property<int?>("RoomId")
-                        .HasColumnType("integer");
-
-                    b.Property<decimal>("SecurityDeposit")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("NOW() AT TIME ZONE 'UTC'");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Email")
-                        .IsUnique()
-                        .HasDatabaseName("IX_Tenants_Email");
-
-                    b.HasIndex("IdentificationNumber")
-                        .IsUnique()
-                        .HasDatabaseName("IX_Tenants_IdentificationNumber")
-                        .HasFilter("\"IdentificationNumber\" IS NOT NULL AND \"IdentificationNumber\" != ''");
-
-                    b.HasIndex("RoomId");
-
-                    b.ToTable("Tenants");
                 });
 
             modelBuilder.Entity("RentalManagement.Api.Models.Entities.Translation", b =>
@@ -989,21 +1115,28 @@ namespace RentalManagement.Api.Migrations
 
             modelBuilder.Entity("RentalManagement.Api.Models.Entities.Invoice", b =>
                 {
+                    b.HasOne("RentalManagement.Api.Models.Entities.Customer", "Customer")
+                        .WithMany("Invoices")
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("RentalManagement.Api.Models.Entities.RentalContract", "RentalContract")
+                        .WithMany("Invoices")
+                        .HasForeignKey("RentalContractId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("RentalManagement.Api.Models.Entities.Room", "Room")
                         .WithMany("Invoices")
                         .HasForeignKey("RoomId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("RentalManagement.Api.Models.Entities.Tenant", "Tenant")
-                        .WithMany("Invoices")
-                        .HasForeignKey("TenantId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                    b.Navigation("Customer");
+
+                    b.Navigation("RentalContract");
 
                     b.Navigation("Room");
-
-                    b.Navigation("Tenant");
                 });
 
             modelBuilder.Entity("RentalManagement.Api.Models.Entities.InvoiceItem", b =>
@@ -1028,12 +1161,21 @@ namespace RentalManagement.Api.Migrations
                     b.Navigation("Invoice");
                 });
 
-            modelBuilder.Entity("RentalManagement.Api.Models.Entities.Tenant", b =>
+            modelBuilder.Entity("RentalManagement.Api.Models.Entities.RentalContract", b =>
                 {
+                    b.HasOne("RentalManagement.Api.Models.Entities.Customer", "Customer")
+                        .WithMany("RentalContracts")
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
                     b.HasOne("RentalManagement.Api.Models.Entities.Room", "Room")
-                        .WithMany("Tenants")
+                        .WithMany("RentalContracts")
                         .HasForeignKey("RoomId")
-                        .OnDelete(DeleteBehavior.SetNull);
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Customer");
 
                     b.Navigation("Room");
                 });
@@ -1049,6 +1191,13 @@ namespace RentalManagement.Api.Migrations
                     b.Navigation("Language");
                 });
 
+            modelBuilder.Entity("RentalManagement.Api.Models.Entities.Customer", b =>
+                {
+                    b.Navigation("Invoices");
+
+                    b.Navigation("RentalContracts");
+                });
+
             modelBuilder.Entity("RentalManagement.Api.Models.Entities.Invoice", b =>
                 {
                     b.Navigation("InvoiceItems");
@@ -1061,16 +1210,16 @@ namespace RentalManagement.Api.Migrations
                     b.Navigation("Translations");
                 });
 
+            modelBuilder.Entity("RentalManagement.Api.Models.Entities.RentalContract", b =>
+                {
+                    b.Navigation("Invoices");
+                });
+
             modelBuilder.Entity("RentalManagement.Api.Models.Entities.Room", b =>
                 {
                     b.Navigation("Invoices");
 
-                    b.Navigation("Tenants");
-                });
-
-            modelBuilder.Entity("RentalManagement.Api.Models.Entities.Tenant", b =>
-                {
-                    b.Navigation("Invoices");
+                    b.Navigation("RentalContracts");
                 });
 #pragma warning restore 612, 618
         }

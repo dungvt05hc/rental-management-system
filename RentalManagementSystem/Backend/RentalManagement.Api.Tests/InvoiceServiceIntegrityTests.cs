@@ -20,7 +20,7 @@ public class InvoiceServiceIntegrityTests : IAsyncLifetime
     private readonly PostgresFixture _fixture;
     private readonly IMapper _mapper;
 
-    private int _tenantId;
+    private int _customerId;
     private int _roomId;
 
     public InvoiceServiceIntegrityTests(PostgresFixture fixture)
@@ -32,14 +32,14 @@ public class InvoiceServiceIntegrityTests : IAsyncLifetime
     }
 
     /// <summary>
-    /// Each test starts from an empty invoice table with exactly one tenant in one room.
+    /// Each test starts from an empty invoice table with exactly one customer in one room.
     /// </summary>
     public async Task InitializeAsync()
     {
         await using var context = _fixture.CreateContext();
 
         await context.Database.ExecuteSqlRawAsync("""
-            TRUNCATE "InvoiceItems", "Invoices", "Tenants", "Rooms", "InvoiceNumberCounters"
+            TRUNCATE "InvoiceItems", "Invoices", "Customers", "Rooms", "InvoiceNumberCounters"
             RESTART IDENTITY CASCADE;
             """);
 
@@ -52,21 +52,29 @@ public class InvoiceServiceIntegrityTests : IAsyncLifetime
         context.Rooms.Add(room);
         await context.SaveChangesAsync();
 
-        var tenant = new Tenant
+        var customer = new Customer
         {
             FirstName = "Test",
-            LastName = "Tenant",
+            LastName = "Customer",
             Email = $"{Guid.NewGuid():N}@example.test",
             IdentificationNumber = Guid.NewGuid().ToString("N"),
-            RoomId = room.Id,
-            MonthlyRent = 1_000m,
             IsActive = true
         };
-        context.Tenants.Add(tenant);
+        context.Customers.Add(customer);
+        await context.SaveChangesAsync();
+
+        context.RentalContracts.Add(new RentalContract
+        {
+            CustomerId = customer.Id,
+            RoomId = room.Id,
+            StartDate = DateTime.UtcNow.AddMonths(-1),
+            MonthlyRent = 1_000m,
+            Status = RentalContractStatus.Active
+        });
         await context.SaveChangesAsync();
 
         _roomId = room.Id;
-        _tenantId = tenant.Id;
+        _customerId = customer.Id;
     }
 
     public Task DisposeAsync() => Task.CompletedTask;
@@ -76,7 +84,7 @@ public class InvoiceServiceIntegrityTests : IAsyncLifetime
 
     private CreateInvoiceDto BuildDto(List<CreateInvoiceItemDto>? items = null) => new()
     {
-        TenantId = _tenantId,
+        CustomerId = _customerId,
         RoomId = _roomId,
         BillingPeriod = new DateTime(2026, 9, 1, 0, 0, 0, DateTimeKind.Utc),
         DueDate = new DateTime(2026, 9, 15, 0, 0, 0, DateTimeKind.Utc),
@@ -103,7 +111,7 @@ public class InvoiceServiceIntegrityTests : IAsyncLifetime
 
         Assert.Equal(concurrentRequests, numbers.Distinct().Count());
 
-        // The format tenants already have on paper must not drift.
+        // The format customers already have on paper must not drift.
         Assert.All(numbers, n => Assert.Matches(@"^INV-\d{6}-\d{4}$", n));
 
         // 50 invoices in one month means a contiguous 0001..0050 run.
@@ -178,26 +186,35 @@ public class InvoiceServiceIntegrityTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task GenerateMonthlyInvoices_GivesEachTenantADistinctNumber()
+    public async Task GenerateMonthlyInvoices_GivesEachCustomerADistinctNumber()
     {
         await using (var seedContext = _fixture.CreateContext())
         {
-            // Five more tenants, each in their own room, all billed in one run.
+            // Five more customers, each in their own room, all billed in one run.
             for (var i = 0; i < 5; i++)
             {
                 var room = new Room { RoomNumber = $"M{i}-{Guid.NewGuid():N}"[..8], MonthlyRent = 500m, Floor = 2 };
                 seedContext.Rooms.Add(room);
                 await seedContext.SaveChangesAsync();
 
-                seedContext.Tenants.Add(new Tenant
+                var batchCustomer = new Customer
                 {
                     FirstName = $"Batch{i}",
-                    LastName = "Tenant",
+                    LastName = "Customer",
                     Email = $"{Guid.NewGuid():N}@example.test",
                     IdentificationNumber = Guid.NewGuid().ToString("N"),
-                    RoomId = room.Id,
-                    MonthlyRent = 500m,
                     IsActive = true
+                };
+                seedContext.Customers.Add(batchCustomer);
+                await seedContext.SaveChangesAsync();
+
+                seedContext.RentalContracts.Add(new RentalContract
+                {
+                    CustomerId = batchCustomer.Id,
+                    RoomId = room.Id,
+                    StartDate = DateTime.UtcNow.AddMonths(-1),
+                    MonthlyRent = 500m,
+                    Status = RentalContractStatus.Active
                 });
             }
 

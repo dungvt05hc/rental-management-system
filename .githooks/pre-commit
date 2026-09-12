@@ -30,6 +30,7 @@ STAGED_DIFF="$(git diff --cached --unified=0 --no-color \
   -- . \
   ':(exclude)**/node_modules/**' \
   ':(exclude)**/package-lock.json' \
+  ':(exclude).gitleaks.toml' \
   ':(exclude)**/bin/**' ':(exclude)**/obj/**' ':(exclude)**/dist/**' \
   | grep -E '^\+' | grep -vF '+++' || true)"
 
@@ -47,6 +48,36 @@ PLACEHOLDER='\$\{|\$\(|\{\{|<[A-Za-z_]|__[A-Z_]+__|%[A-Z_]+%|YOUR|CHANGE_?ME|PLA
 # Phần giá trị chỉ được chứa code không nháy, hoặc chuỗi VIẾT HOA kiểu tên biến
 # môi trường ("SEED_ADMIN_PASSWORD"). Nhờ vậy `... ?? "literalthatleaks"` vẫn bị chặn.
 CODE_EXPR='^[0-9]+:\+[[:space:]]*(#|//)?[[:space:]]*(var|string\??|const[[:space:]]+string|(static[[:space:]]+)?readonly[[:space:]]+string)[[:space:]]+[A-Za-z0-9_]*[Pp]assword[A-Za-z0-9_]*[[:space:]]*=[[:space:]]*[^"'"'"'[:space:]]([^"'"'"']|"[A-Z0-9_]+")*$'
+
+# Hằng chứa tên định danh dạng slug (route, policy, cache key…) → cho qua.
+#   public const string ForgotPassword = "forgot-password";
+#   export const FORGOT_PASSWORD = '"'"'forgot-password'"'"';
+# Cho phép tiền tố comment (#, //) để ví dụ trong tài liệu không bị chặn.
+# Group 7 = tên hằng, group 8 = literal.
+SLUG_CONST='^[0-9]+:\+[[:space:]]*(#|//)?[[:space:]]*(export[[:space:]]+)?(public|private|internal|protected)?[[:space:]]*(static[[:space:]]+)?(const|readonly)([[:space:]]+string)?[[:space:]]+([A-Za-z0-9_]+)[[:space:]]*=[[:space:]]*["'"'"']([a-z][a-z0-9]*([-_./][a-z0-9]+)+)["'"'"'][[:space:]]*;?[[:space:]]*$'
+
+# Chỉ tha khi MỌI từ (>=4 ký tự) của slug đều nằm trong tên hằng
+# (ForgotPassword → "forgot-password"). Nhờ vậy một hằng `SeedPassword`
+# gán literal "correct-horse-battery" vẫn bị chặn.
+drop_slug_consts() {
+  local line ident tok ok matched
+  while IFS= read -r line; do
+    if [[ $line =~ $SLUG_CONST ]]; then
+      ident="$(printf '%s' "${BASH_REMATCH[7]}" | tr '[:upper:]' '[:lower:]')"
+      ok=1; matched=0
+      for tok in ${BASH_REMATCH[8]//[-_.\/]/ }; do
+        [ "${#tok}" -lt 4 ] && continue
+        matched=1
+        [[ $ident == *"$tok"* ]] || { ok=0; break; }
+      done
+      if [ "$ok" -eq 1 ] && [ "$matched" -eq 1 ]; then
+        continue
+      fi
+    fi
+    printf '%s\n' "$line"
+  done
+  return 0
+}
 
 PATTERNS=(
   # Password= với giá trị >=8 ký tự
@@ -69,8 +100,10 @@ for p in "${PATTERNS[@]}"; do
   [ -z "$matches" ] && continue
   matches="$(printf '%s\n' "$matches" | grep -vE "$CODE_EXPR" || true)"
   [ -z "$matches" ] && continue
+  matches="$(printf '%s\n' "$matches" | drop_slug_consts)"
+  [ -z "$matches" ] && continue
   HITS=1
-  printf '%s\n' "$matches" | sed -E 's/([Pp]assword[[:space:]]*=[[:space:]]*)[^;"'"'"' ]+/\1***/g' >&2
+  printf '%s\n' "$matches" | sed -E 's/([Pp]assword[[:space:]]*=[[:space:]]*)["'"'"']?[^;"'"'"' ]+["'"'"']?/\1***/g' >&2
 done
 
 [ "$HITS" -eq 1 ] && fail

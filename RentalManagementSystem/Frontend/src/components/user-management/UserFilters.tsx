@@ -22,6 +22,8 @@ interface UserFiltersProps {
  * User Filters Component
  * Provides filtering, search, and bulk operation controls
  */
+import { useTranslation } from '../../hooks/useTranslation';
+
 export function UserFilters({
   filters,
   onFilterChange,
@@ -31,6 +33,7 @@ export function UserFilters({
   onBulkDelete,
   isPerformingBulkOperation,
 }: UserFiltersProps) {
+  const { t } = useTranslation();
   const { data: roles } = useRoles();
 
   const hasActiveFilters =
@@ -54,7 +57,7 @@ export function UserFilters({
             <div className="flex-1 relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search by name or email..."
+                placeholder={t('users.searchPlaceholder', 'Search by name or email...')}
                 value={filters.searchTerm || ''}
                 onChange={(e) => onFilterChange({ searchTerm: e.target.value })}
                 className="pl-10"
@@ -69,10 +72,10 @@ export function UserFilters({
               }
             >
               <SelectTrigger className="w-full sm:w-[180px]">
-                <SelectValue placeholder="Filter by role" />
+                <SelectValue placeholder={t('users.filterByRole', 'Filter by role')} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Roles</SelectItem>
+                <SelectItem value="all">{t('users.allRoles', 'All roles')}</SelectItem>
                 {roles?.map((role) => (
                   <SelectItem key={role.id} value={role.name}>
                     {role.name} ({role.userCount})
@@ -98,12 +101,12 @@ export function UserFilters({
               }
             >
               <SelectTrigger className="w-full sm:w-[180px]">
-                <SelectValue placeholder="Filter by status" />
+                <SelectValue placeholder={t('users.filterByStatus', 'Filter by status')} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="inactive">Inactive</SelectItem>
+                <SelectItem value="all">{t('common.filter', 'All Status')}</SelectItem>
+                <SelectItem value="active">{t('customers.active', 'Active')}</SelectItem>
+                <SelectItem value="inactive">{t('customers.inactive', 'Inactive')}</SelectItem>
               </SelectContent>
             </Select>
 
@@ -121,7 +124,7 @@ export function UserFilters({
               <div className="flex items-center gap-2">
                 <Badge variant="secondary">{selectedCount} selected</Badge>
                 <span className="text-sm text-muted-foreground">
-                  Bulk operations:
+                  {t('users.bulkOperations', 'Bulk actions')}
                 </span>
               </div>
               <div className="flex gap-2">
@@ -136,7 +139,7 @@ export function UserFilters({
                   ) : (
                     <UserCheck className="h-4 w-4 mr-2" />
                   )}
-                  Activate
+                  {t('users.activate', 'Activate')}
                 </Button>
                 <Button
                   variant="outline"
@@ -149,7 +152,7 @@ export function UserFilters({
                   ) : (
                     <UserX className="h-4 w-4 mr-2" />
                   )}
-                  Deactivate
+                  {t('users.deactivate', 'Deactivate')}
                 </Button>
                 <Button
                   variant="destructive"
@@ -162,7 +165,7 @@ export function UserFilters({
                   ) : (
                     <Trash2 className="h-4 w-4 mr-2" />
                   )}
-                  Delete
+                  {t('common.delete', 'Delete')}
                 </Button>
               </div>
             </div>

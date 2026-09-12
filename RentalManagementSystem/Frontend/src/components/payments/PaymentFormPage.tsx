@@ -1,21 +1,23 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Save, DollarSign, Calendar, CreditCard, FileText, AlertCircle } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle, Button, Input } from '../ui';
+import { Card, CardContent, CardHeader, CardTitle, Button, Input, NumericInput } from '../ui';
 import { paymentService, invoiceService } from '../../services';
 import type { Invoice, CreatePaymentRequest } from '../../types';
 import { PaymentMethod, InvoiceStatus } from '../../types';
 import { useTranslation } from '../../hooks/useTranslation';
 import { useToast } from '../../contexts/ToastContext';
 import { formatCurrency, formatDate } from '../../utils';
+import { defineMessage } from '../../utils/i18n';
+import type { Message } from '../../utils/i18n';
 
 // Các phương thức thanh toán cho người dùng chọn. Value là số vì backend
 // serialize enum PaymentMethod dạng số (không có JsonStringEnumConverter).
-const PAYMENT_METHOD_OPTIONS: Array<{ value: PaymentMethod; label: string }> = [
-  { value: PaymentMethod.Cash, label: 'Cash' },
-  { value: PaymentMethod.BankTransfer, label: 'Bank Transfer' },
-  { value: PaymentMethod.Check, label: 'Check' },
-  { value: PaymentMethod.CreditCard, label: 'Credit Card' },
+const PAYMENT_METHOD_OPTIONS: Array<{ value: PaymentMethod; message: Message }> = [
+  { value: PaymentMethod.Cash, message: defineMessage('payments.cash', 'Cash') },
+  { value: PaymentMethod.BankTransfer, message: defineMessage('payments.bankTransfer', 'Bank Transfer') },
+  { value: PaymentMethod.Check, message: defineMessage('payments.check', 'Check') },
+  { value: PaymentMethod.CreditCard, message: defineMessage('payments.creditCard', 'Credit Card') },
 ];
 
 export function PaymentFormPage() {
@@ -189,7 +191,7 @@ export function PaymentFormPage() {
             <h1 className="text-3xl font-bold text-gray-900">
               {isEditMode
                 ? t('payments.editPayment', 'Edit Payment')
-                : t('payments.recordPayment', 'Record New Payment')}
+                : t('payments.recordNewPayment', 'Record New Payment')}
             </h1>
             <p className="text-sm text-gray-500 mt-1">
               {isEditMode
@@ -228,7 +230,7 @@ export function PaymentFormPage() {
                 {invoices.map((invoice: Invoice) => (
                   <option key={invoice.id} value={invoice.id}>
                     #{invoice.invoiceNumber || invoice.id} -{' '}
-                    {invoice.tenant?.firstName} {invoice.tenant?.lastName} -{' '}
+                    {invoice.customer?.firstName} {invoice.customer?.lastName} -{' '}
                     {formatCurrency(invoice.remainingBalance || invoice.amount)} remaining
                   </option>
                 ))}
@@ -245,10 +247,10 @@ export function PaymentFormPage() {
               <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
-                    <p className="text-xs text-gray-600 mb-1">{t('invoices.tenant', 'Tenant')}</p>
+                    <p className="text-xs text-gray-600 mb-1">{t('invoices.customer', 'Customer')}</p>
                     <p className="font-semibold text-gray-900">
-                      {selectedInvoice.tenant?.firstName}{' '}
-                      {selectedInvoice.tenant?.lastName}
+                      {selectedInvoice.customer?.firstName}{' '}
+                      {selectedInvoice.customer?.lastName}
                     </p>
                   </div>
                   <div>
@@ -286,16 +288,11 @@ export function PaymentFormPage() {
                 </label>
                 <div className="relative">
                   <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
-                  <Input
-                    type="number"
-                    step="0.01"
-                    min="0"
+                  <NumericInput
                     value={formData.amount}
-                    onChange={(e) =>
-                      setFormData({ ...formData, amount: parseFloat(e.target.value) || 0 })
-                    }
+                    onValueChange={(value) => setFormData({ ...formData, amount: value ?? 0 })}
                     className={`pl-10 ${errors.amount ? 'border-red-500' : ''}`}
-                    placeholder="0.00"
+                    placeholder="0"
                   />
                 </div>
                 {errors.amount && (
@@ -315,7 +312,7 @@ export function PaymentFormPage() {
               {/* Payment Date */}
               <div>
                 <label className="block text-sm font-semibold text-gray-900 mb-2">
-                  {t('payments.date', 'Payment Date')} *
+                  {t('payments.paymentDate', 'Payment Date')} *
                 </label>
                 <div className="relative">
                   <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
@@ -341,10 +338,10 @@ export function PaymentFormPage() {
             <div>
               <label className="block text-sm font-semibold text-gray-900 mb-3">
                 <CreditCard className="inline h-4 w-4 mr-2" />
-                {t('payments.method', 'Payment Method')} *
+                {t('payments.paymentMethod', 'Payment Method')} *
               </label>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                {PAYMENT_METHOD_OPTIONS.map(({ value, label }) => (
+                {PAYMENT_METHOD_OPTIONS.map(({ value, message }) => (
                   <button
                     key={value}
                     type="button"
@@ -356,7 +353,7 @@ export function PaymentFormPage() {
                     }`}
                   >
                     <CreditCard className="h-6 w-6 mx-auto mb-2" />
-                    <span className="text-sm font-medium">{label}</span>
+                    <span className="text-sm font-medium">{t(message.key, message.defaultValue)}</span>
                   </button>
                 ))}
               </div>
@@ -371,7 +368,7 @@ export function PaymentFormPage() {
             {/* Reference */}
             <div>
               <label className="block text-sm font-semibold text-gray-900 mb-2">
-                {t('payments.reference', 'Reference Number')}
+                {t('payments.referenceNumber', 'Reference Number')}
               </label>
               <Input
                 value={formData.referenceNumber}
@@ -419,7 +416,7 @@ export function PaymentFormPage() {
             ) : (
               <>
                 <Save className="h-4 w-4 mr-2" />
-                {isEditMode ? t('common.update', 'Update Payment') : t('payments.recordPayment', 'Record Payment')}
+                {isEditMode ? t('payments.updatePayment', 'Update Payment') : t('payments.recordPayment', 'Record Payment')}
               </>
             )}
           </Button>

@@ -83,14 +83,20 @@ public class Room
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
     /// <summary>
-    /// Collection of tenants who have rented this room
+    /// Collection of rental contracts covering this room, past and present
     /// </summary>
-    public virtual ICollection<Tenant> Tenants { get; set; } = new List<Tenant>();
+    public virtual ICollection<RentalContract> RentalContracts { get; set; } = new List<RentalContract>();
 
     /// <summary>
     /// Collection of invoices associated with this room
     /// </summary>
     public virtual ICollection<Invoice> Invoices { get; set; } = new List<Invoice>();
+
+    /// <summary>
+    /// Số phòng và mô tả đã bỏ dấu và hạ chữ thường, phục vụ tìm kiếm.
+    /// Xem ghi chú ở <see cref="Customer.SearchText"/>.
+    /// </summary>
+    public string SearchText { get; private set; } = string.Empty;
 }
 
 /// <summary>

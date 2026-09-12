@@ -9,10 +9,10 @@ namespace RentalManagement.Api.Models.DTOs;
 public class CreateInvoiceDto
 {
     /// <summary>
-    /// ID of the tenant this invoice belongs to
+    /// ID of the customer this invoice belongs to
     /// </summary>
     [Required]
-    public int TenantId { get; set; }
+    public int CustomerId { get; set; }
 
     /// <summary>
     /// ID of the room this invoice is for
@@ -123,9 +123,9 @@ public class InvoiceDto
     public string InvoiceNumber { get; set; } = string.Empty;
 
     /// <summary>
-    /// Tenant information
+    /// Customer information
     /// </summary>
-    public TenantSummaryDto Tenant { get; set; } = null!;
+    public CustomerSummaryDto Customer { get; set; } = null!;
 
     /// <summary>
     /// Room information
@@ -249,9 +249,9 @@ public class InvoiceSummaryDto
     public string InvoiceNumber { get; set; } = string.Empty;
 
     /// <summary>
-    /// Tenant's full name
+    /// Customer's full name
     /// </summary>
-    public string TenantName { get; set; } = string.Empty;
+    public string CustomerName { get; set; } = string.Empty;
 
     /// <summary>
     /// Room number
@@ -445,7 +445,7 @@ public class PaymentSummaryDto
 public class InvoiceSearchDto
 {
     /// <summary>
-    /// Search term for invoice number, tenant name, or room number
+    /// Search term for invoice number, customer name, or room number
     /// </summary>
     public string? SearchTerm { get; set; }
 
@@ -455,9 +455,9 @@ public class InvoiceSearchDto
     public InvoiceStatus? Status { get; set; }
 
     /// <summary>
-    /// Filter by specific tenant
+    /// Filter by specific customer
     /// </summary>
-    public int? TenantId { get; set; }
+    public int? CustomerId { get; set; }
 
     /// <summary>
     /// Filter by specific room

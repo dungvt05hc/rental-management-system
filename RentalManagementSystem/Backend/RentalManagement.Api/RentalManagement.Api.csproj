@@ -42,4 +42,34 @@
     </EmbeddedResource>
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Font cho PDF. Không dựa vào font hệ thống: container deploy thường
+         không có font nào ngoài vài font cơ bản, và font mặc định của QuestPDF
+         thiếu glyph tiếng Việt — hoá đơn in ra thành "Phong tro" hoặc đầy ô
+         vuông. Roboto phủ đủ Latin Extended Additional (U+1EA0–U+1EF9), tức
+         toàn bộ nguyên âm có dấu của tiếng Việt.
+         Roboto phát hành theo Apache License 2.0, xem Resources/Fonts/LICENSE.txt. -->
+    <EmbeddedResource Include="Resources/Fonts/*.ttf">
+      <WithCulture>false</WithCulture>
+    </EmbeddedResource>
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Bảng dịch dùng chung với frontend. Một nguồn sự thật duy nhất:
+         locales/*.json vừa được Vite nhúng vào bundle làm lớp dự phòng, vừa
+         được nhúng vào assembly này để seed vào DB.
+
+         LogicalName đặt tường minh vì file nằm ngoài cây thư mục dự án; nếu để
+         MSBuild tự sinh, tên resource sẽ bám theo đường dẫn tương đối và đổi
+         theo cấu trúc thư mục. WithCulture=false vì lý do đã nêu ở trên. -->
+    <EmbeddedResource Include="../../Frontend/locales/en.json"
+                      LogicalName="RentalManagement.Api.Resources.Locales.en.json">
+      <WithCulture>false</WithCulture>
+    </EmbeddedResource>
+    <EmbeddedResource Include="../../Frontend/locales/vi.json"
+                      LogicalName="RentalManagement.Api.Resources.Locales.vi.json">
+      <WithCulture>false</WithCulture>
+    </EmbeddedResource>
+  </ItemGroup>
+
 </Project>

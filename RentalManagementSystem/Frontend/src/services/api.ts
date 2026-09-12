@@ -1,5 +1,6 @@
 import axios, { type AxiosInstance, type AxiosResponse, AxiosError } from 'axios';
 import type { ApiResponse } from '../types';
+import { translate } from '../utils/i18n';
 
 // API Configuration
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5152/api';
@@ -116,7 +117,18 @@ export const apiService = {
 function handleApiError<T>(error: unknown): ApiResponse<T> {
   if (axios.isAxiosError(error)) {
     const axiosError = error as AxiosError;
-    
+
+    // Rate limiter của ASP.NET trả 429 với body rỗng, nên nhánh đọc data bên
+    // dưới không thấy gì và người dùng sẽ nhận "An unexpected error occurred"
+    // cho một tình huống hoàn toàn xác định.
+    if (axiosError.response?.status === 429) {
+      return {
+        success: false,
+        message: translate('errors.rateLimited', 'Too many attempts. Wait a few minutes before trying again.'),
+        errors: ['Rate limit exceeded']
+      };
+    }
+
     if (axiosError.response?.data) {
       // Return API error response
       return axiosError.response.data as ApiResponse<T>;
@@ -125,7 +137,7 @@ function handleApiError<T>(error: unknown): ApiResponse<T> {
     if (axiosError.code === 'ECONNABORTED') {
       return {
         success: false,
-        message: 'Request timeout. Please try again.',
+        message: translate('errors.timeout', 'The server took too long to answer. Please try again.'),
         errors: ['Request timeout']
       };
     }
@@ -133,7 +145,7 @@ function handleApiError<T>(error: unknown): ApiResponse<T> {
     if (!axiosError.response) {
       return {
         success: false,
-        message: 'Network error. Please check your connection.',
+        message: translate('errors.network', 'Could not reach the server. Check your connection and try again.'),
         errors: ['Network error']
       };
     }
@@ -141,7 +153,7 @@ function handleApiError<T>(error: unknown): ApiResponse<T> {
   
   return {
     success: false,
-    message: 'An unexpected error occurred.',
+    message: translate('errors.unexpected', 'Something went wrong. Please try again.'),
     errors: ['Unknown error']
   };
 }

@@ -2,6 +2,7 @@ import * as React from 'react';
 import * as PopoverPrimitive from '@radix-ui/react-popover';
 import { Check, ChevronDown, X } from 'lucide-react';
 import { Button } from './Button';
+import { useTranslation } from '../../hooks/useTranslation';
 
 export interface MultiSelectOption {
   value: string;
@@ -26,10 +27,11 @@ export function MultiSelect({
   options,
   value,
   onChange,
-  placeholder = 'Select items...',
+  placeholder,
   className = '',
   disabled = false,
 }: MultiSelectProps) {
+  const { t } = useTranslation();
   const [open, setOpen] = React.useState(false);
 
   const handleToggle = (optionValue: string) => {
@@ -58,7 +60,7 @@ export function MultiSelect({
         >
           <div className="flex flex-1 flex-wrap gap-1">
             {selectedOptions.length === 0 ? (
-              <span className="text-gray-500">{placeholder}</span>
+              <span className="text-gray-500">{placeholder ?? t('common.selectItems', 'Select items...')}</span>
             ) : (
               selectedOptions.map((option) => (
                 <span
@@ -89,7 +91,7 @@ export function MultiSelect({
           <div className="max-h-64 overflow-y-auto">
             {options.length === 0 ? (
               <div className="py-6 text-center text-sm text-gray-500">
-                No options available
+                {t('common.noOptions', 'No options available')}
               </div>
             ) : (
               options.map((option) => {

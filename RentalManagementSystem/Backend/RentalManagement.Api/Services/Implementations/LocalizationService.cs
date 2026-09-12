@@ -1,3 +1,4 @@
+using System.Text.Json;
 using AutoMapper;
 using Microsoft.EntityFrameworkCore;
 using RentalManagement.Api.Data;
@@ -365,201 +366,145 @@ public class LocalizationService : ILocalizationService
 
     public async Task SeedDefaultTranslationsAsync()
     {
-        // Create English language
-        var english = await _context.Languages.FirstOrDefaultAsync(l => l.Code == "en");
-        if (english is null)
+        var english = await EnsureLanguageAsync("en", "English", "English", isDefault: false);
+        var vietnamese = await EnsureLanguageAsync("vi", "Vietnamese", "Tiếng Việt", isDefault: true);
+
+        var englishCount = await UpsertSeedAsync(english.Id, LoadEmbeddedLocale("en"));
+        var vietnameseCount = await UpsertSeedAsync(vietnamese.Id, LoadEmbeddedLocale("vi"));
+
+        _logger.LogInformation(
+            "Seeded translations from locales/*.json: {EnglishCount} new for en, {VietnameseCount} new for vi",
+            englishCount,
+            vietnameseCount);
+    }
+
+    /// <summary>
+    /// Lấy ngôn ngữ theo mã, tạo mới nếu chưa có.
+    /// </summary>
+    /// <remarks>
+    /// Chỉ đặt IsDefault khi tạo mới. Nếu ngôn ngữ đã tồn tại thì tôn trọng lựa
+    /// chọn hiện tại của admin — seed không được giành quyền quyết định ngôn ngữ
+    /// mặc định ở mỗi lần khởi động.
+    /// </remarks>
+    private async Task<Language> EnsureLanguageAsync(string code, string name, string nativeName, bool isDefault)
+    {
+        var language = await _context.Languages.FirstOrDefaultAsync(l => l.Code == code);
+
+        if (language is not null)
         {
-            english = new Language
-            {
-                Code = "en",
-                Name = "English",
-                NativeName = "English",
-                IsDefault = true,
-                IsActive = true,
-                CreatedAt = DateTime.UtcNow
-            };
-            _context.Languages.Add(english);
-            await _context.SaveChangesAsync();
+            return language;
         }
 
-        // Create Vietnamese language
-        var vietnamese = await _context.Languages.FirstOrDefaultAsync(l => l.Code == "vi");
-        if (vietnamese is null)
+        if (isDefault)
         {
-            vietnamese = new Language
+            var currentDefault = await _context.Languages.FirstOrDefaultAsync(l => l.IsDefault);
+            if (currentDefault is not null)
             {
-                Code = "vi",
-                Name = "Vietnamese",
-                NativeName = "Tiếng Việt",
-                IsDefault = false,
-                IsActive = true,
-                CreatedAt = DateTime.UtcNow
-            };
-            _context.Languages.Add(vietnamese);
-            await _context.SaveChangesAsync();
-        }
-
-        // Seed English translations
-        await SeedEnglishTranslationsAsync(english.Id);
-
-        // Seed Vietnamese translations
-        await SeedVietnameseTranslationsAsync(vietnamese.Id);
-
-        _logger.LogInformation("Default translations seeded successfully");
-    }
-
-    private async Task SeedEnglishTranslationsAsync(int languageId)
-    {
-        var translations = GetEnglishTranslations(languageId);
-        await UpsertTranslationsAsync(translations);
-    }
-
-    private async Task SeedVietnameseTranslationsAsync(int languageId)
-    {
-        var translations = GetVietnameseTranslations(languageId);
-        await UpsertTranslationsAsync(translations);
-    }
-
-    private async Task UpsertTranslationsAsync(List<Translation> translations)
-    {
-        var keys = translations.Select(t => t.Key).ToList();
-        var languageId = translations.First().LanguageId;
-
-        var existingTranslations = await _context.Translations
-            .Where(t => t.LanguageId == languageId && keys.Contains(t.Key))
-            .ToListAsync();
-
-        foreach (var translation in translations)
-        {
-            var existing = existingTranslations.FirstOrDefault(t => t.Key == translation.Key);
-            if (existing is null)
-            {
-                _context.Translations.Add(translation);
+                currentDefault.IsDefault = false;
             }
         }
 
+        language = new Language
+        {
+            Code = code,
+            Name = name,
+            NativeName = nativeName,
+            IsDefault = isDefault,
+            IsActive = true,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        _context.Languages.Add(language);
         await _context.SaveChangesAsync();
+
+        return language;
     }
 
-    private static List<Translation> GetEnglishTranslations(int languageId)
+    /// <summary>
+    /// Thêm những khoá chưa có trong DB, giữ nguyên khoá đã có.
+    /// </summary>
+    /// <remarks>
+    /// Cố tình KHÔNG ghi đè: admin sửa bản dịch qua màn hình quản trị thì phải
+    /// giữ được, kể cả khi seed chạy lại ở lần khởi động sau. Muốn quay về bản
+    /// gốc thì xoá khoá đó đi rồi seed lại.
+    /// </remarks>
+    private async Task<int> UpsertSeedAsync(int languageId, IReadOnlyDictionary<string, string> messages)
     {
-        var now = DateTime.UtcNow;
-        return new List<Translation>
+        if (messages.Count == 0)
         {
-            // Common
-            new() { LanguageId = languageId, Key = "common.save", Value = "Save", Category = "common", CreatedAt = now, UpdatedAt = now },
-            new() { LanguageId = languageId, Key = "common.cancel", Value = "Cancel", Category = "common", CreatedAt = now, UpdatedAt = now },
-            new() { LanguageId = languageId, Key = "common.delete", Value = "Delete", Category = "common", CreatedAt = now, UpdatedAt = now },
-            new() { LanguageId = languageId, Key = "common.edit", Value = "Edit", Category = "common", CreatedAt = now, UpdatedAt = now },
-            new() { LanguageId = languageId, Key = "common.add", Value = "Add", Category = "common", CreatedAt = now, UpdatedAt = now },
-            new() { LanguageId = languageId, Key = "common.search", Value = "Search", Category = "common", CreatedAt = now, UpdatedAt = now },
-            new() { LanguageId = languageId, Key = "common.filter", Value = "Filter", Category = "common", CreatedAt = now, UpdatedAt = now },
-            new() { LanguageId = languageId, Key = "common.refresh", Value = "Refresh", Category = "common", CreatedAt = now, UpdatedAt = now },
-            new() { LanguageId = languageId, Key = "common.loading", Value = "Loading...", Category = "common", CreatedAt = now, UpdatedAt = now },
-            new() { LanguageId = languageId, Key = "common.success", Value = "Success", Category = "common", CreatedAt = now, UpdatedAt = now },
-            new() { LanguageId = languageId, Key = "common.error", Value = "Error", Category = "common", CreatedAt = now, UpdatedAt = now },
-            new() { LanguageId = languageId, Key = "common.confirm", Value = "Confirm", Category = "common", CreatedAt = now, UpdatedAt = now },
-            new() { LanguageId = languageId, Key = "common.yes", Value = "Yes", Category = "common", CreatedAt = now, UpdatedAt = now },
-            new() { LanguageId = languageId, Key = "common.no", Value = "No", Category = "common", CreatedAt = now, UpdatedAt = now },
+            return 0;
+        }
 
-            // Authentication
-            new() { LanguageId = languageId, Key = "auth.login", Value = "Login", Category = "auth", CreatedAt = now, UpdatedAt = now },
-            new() { LanguageId = languageId, Key = "auth.logout", Value = "Logout", Category = "auth", CreatedAt = now, UpdatedAt = now },
-            new() { LanguageId = languageId, Key = "auth.register", Value = "Register", Category = "auth", CreatedAt = now, UpdatedAt = now },
-            new() { LanguageId = languageId, Key = "auth.username", Value = "Username", Category = "auth", CreatedAt = now, UpdatedAt = now },
-            new() { LanguageId = languageId, Key = "auth.password", Value = "Password", Category = "auth", CreatedAt = now, UpdatedAt = now },
-            new() { LanguageId = languageId, Key = "auth.email", Value = "Email", Category = "auth", CreatedAt = now, UpdatedAt = now },
-            new() { LanguageId = languageId, Key = "auth.forgotPassword", Value = "Forgot Password?", Category = "auth", CreatedAt = now, UpdatedAt = now },
+        var existingKeys = await _context.Translations
+            .Where(t => t.LanguageId == languageId)
+            .Select(t => t.Key)
+            .ToListAsync();
 
-            // Rooms
-            new() { LanguageId = languageId, Key = "rooms.title", Value = "Rooms", Category = "rooms", CreatedAt = now, UpdatedAt = now },
-            new() { LanguageId = languageId, Key = "rooms.roomNumber", Value = "Room Number", Category = "rooms", CreatedAt = now, UpdatedAt = now },
-            new() { LanguageId = languageId, Key = "rooms.roomType", Value = "Room Type", Category = "rooms", CreatedAt = now, UpdatedAt = now },
-            new() { LanguageId = languageId, Key = "rooms.status", Value = "Status", Category = "rooms", CreatedAt = now, UpdatedAt = now },
-            new() { LanguageId = languageId, Key = "rooms.price", Value = "Price", Category = "rooms", CreatedAt = now, UpdatedAt = now },
-            new() { LanguageId = languageId, Key = "rooms.available", Value = "Available", Category = "rooms", CreatedAt = now, UpdatedAt = now },
-            new() { LanguageId = languageId, Key = "rooms.occupied", Value = "Occupied", Category = "rooms", CreatedAt = now, UpdatedAt = now },
+        var known = existingKeys.ToHashSet(StringComparer.Ordinal);
+        var now = DateTime.UtcNow;
+        var added = 0;
 
-            // Tenants
-            new() { LanguageId = languageId, Key = "tenants.title", Value = "Tenants", Category = "tenants", CreatedAt = now, UpdatedAt = now },
-            new() { LanguageId = languageId, Key = "tenants.name", Value = "Name", Category = "tenants", CreatedAt = now, UpdatedAt = now },
-            new() { LanguageId = languageId, Key = "tenants.phone", Value = "Phone", Category = "tenants", CreatedAt = now, UpdatedAt = now },
-            new() { LanguageId = languageId, Key = "tenants.idCard", Value = "ID Card", Category = "tenants", CreatedAt = now, UpdatedAt = now },
+        foreach (var (key, value) in messages)
+        {
+            if (known.Contains(key))
+            {
+                continue;
+            }
 
-            // Invoices
-            new() { LanguageId = languageId, Key = "invoices.title", Value = "Invoices", Category = "invoices", CreatedAt = now, UpdatedAt = now },
-            new() { LanguageId = languageId, Key = "invoices.invoiceNumber", Value = "Invoice Number", Category = "invoices", CreatedAt = now, UpdatedAt = now },
-            new() { LanguageId = languageId, Key = "invoices.amount", Value = "Amount", Category = "invoices", CreatedAt = now, UpdatedAt = now },
-            new() { LanguageId = languageId, Key = "invoices.dueDate", Value = "Due Date", Category = "invoices", CreatedAt = now, UpdatedAt = now },
-            new() { LanguageId = languageId, Key = "invoices.paid", Value = "Paid", Category = "invoices", CreatedAt = now, UpdatedAt = now },
-            new() { LanguageId = languageId, Key = "invoices.unpaid", Value = "Unpaid", Category = "invoices", CreatedAt = now, UpdatedAt = now },
+            _context.Translations.Add(new Translation
+            {
+                Key = key,
+                Value = value,
+                Category = CategoryOf(key),
+                LanguageId = languageId,
+                CreatedAt = now,
+                UpdatedAt = now
+            });
+            added++;
+        }
 
-            // Dashboard
-            new() { LanguageId = languageId, Key = "dashboard.title", Value = "Dashboard", Category = "dashboard", CreatedAt = now, UpdatedAt = now },
-            new() { LanguageId = languageId, Key = "dashboard.totalRooms", Value = "Total Rooms", Category = "dashboard", CreatedAt = now, UpdatedAt = now },
-            new() { LanguageId = languageId, Key = "dashboard.occupiedRooms", Value = "Occupied Rooms", Category = "dashboard", CreatedAt = now, UpdatedAt = now },
-            new() { LanguageId = languageId, Key = "dashboard.revenue", Value = "Revenue", Category = "dashboard", CreatedAt = now, UpdatedAt = now },
-        };
+        if (added > 0)
+        {
+            await _context.SaveChangesAsync();
+        }
+
+        return added;
     }
 
-    private static List<Translation> GetVietnameseTranslations(int languageId)
+    /// <summary>
+    /// Nhóm của một khoá là đoạn trước dấu chấm đầu tiên: "invoices.dueDate" → "invoices".
+    /// GetTranslationResourcesAsync gom bản dịch theo nhóm này.
+    /// </summary>
+    private static string CategoryOf(string key)
     {
-        var now = DateTime.UtcNow;
-        return new List<Translation>
+        var separator = key.IndexOf('.');
+        return separator > 0 ? key[..separator] : "common";
+    }
+
+    /// <summary>
+    /// Đọc locales/{code}.json đã nhúng trong assembly.
+    /// </summary>
+    private IReadOnlyDictionary<string, string> LoadEmbeddedLocale(string code)
+    {
+        var resourceName = $"RentalManagement.Api.Resources.Locales.{code}.json";
+        using var stream = typeof(LocalizationService).Assembly.GetManifestResourceStream(resourceName);
+
+        if (stream is null)
         {
-            // Common
-            new() { LanguageId = languageId, Key = "common.save", Value = "Lưu", Category = "common", CreatedAt = now, UpdatedAt = now },
-            new() { LanguageId = languageId, Key = "common.cancel", Value = "Hủy", Category = "common", CreatedAt = now, UpdatedAt = now },
-            new() { LanguageId = languageId, Key = "common.delete", Value = "Xóa", Category = "common", CreatedAt = now, UpdatedAt = now },
-            new() { LanguageId = languageId, Key = "common.edit", Value = "Chỉnh sửa", Category = "common", CreatedAt = now, UpdatedAt = now },
-            new() { LanguageId = languageId, Key = "common.add", Value = "Thêm", Category = "common", CreatedAt = now, UpdatedAt = now },
-            new() { LanguageId = languageId, Key = "common.search", Value = "Tìm kiếm", Category = "common", CreatedAt = now, UpdatedAt = now },
-            new() { LanguageId = languageId, Key = "common.filter", Value = "Lọc", Category = "common", CreatedAt = now, UpdatedAt = now },
-            new() { LanguageId = languageId, Key = "common.refresh", Value = "Làm mới", Category = "common", CreatedAt = now, UpdatedAt = now },
-            new() { LanguageId = languageId, Key = "common.loading", Value = "Đang tải...", Category = "common", CreatedAt = now, UpdatedAt = now },
-            new() { LanguageId = languageId, Key = "common.success", Value = "Thành công", Category = "common", CreatedAt = now, UpdatedAt = now },
-            new() { LanguageId = languageId, Key = "common.error", Value = "Lỗi", Category = "common", CreatedAt = now, UpdatedAt = now },
-            new() { LanguageId = languageId, Key = "common.confirm", Value = "Xác nhận", Category = "common", CreatedAt = now, UpdatedAt = now },
-            new() { LanguageId = languageId, Key = "common.yes", Value = "Có", Category = "common", CreatedAt = now, UpdatedAt = now },
-            new() { LanguageId = languageId, Key = "common.no", Value = "Không", Category = "common", CreatedAt = now, UpdatedAt = now },
+            // Không ném lỗi: seed chạy trong đường khởi động, thiếu một ngôn ngữ
+            // không đáng để cả API không lên được.
+            _logger.LogError("Embedded locale {ResourceName} not found; skipping seed for {Code}", resourceName, code);
+            return new Dictionary<string, string>();
+        }
 
-            // Authentication
-            new() { LanguageId = languageId, Key = "auth.login", Value = "Đăng nhập", Category = "auth", CreatedAt = now, UpdatedAt = now },
-            new() { LanguageId = languageId, Key = "auth.logout", Value = "Đăng xuất", Category = "auth", CreatedAt = now, UpdatedAt = now },
-            new() { LanguageId = languageId, Key = "auth.register", Value = "Đăng ký", Category = "auth", CreatedAt = now, UpdatedAt = now },
-            new() { LanguageId = languageId, Key = "auth.username", Value = "Tên đăng nhập", Category = "auth", CreatedAt = now, UpdatedAt = now },
-            new() { LanguageId = languageId, Key = "auth.password", Value = "Mật khẩu", Category = "auth", CreatedAt = now, UpdatedAt = now },
-            new() { LanguageId = languageId, Key = "auth.email", Value = "Email", Category = "auth", CreatedAt = now, UpdatedAt = now },
-            new() { LanguageId = languageId, Key = "auth.forgotPassword", Value = "Quên mật khẩu?", Category = "auth", CreatedAt = now, UpdatedAt = now },
+        var messages = JsonSerializer.Deserialize<Dictionary<string, string>>(stream);
 
-            // Rooms
-            new() { LanguageId = languageId, Key = "rooms.title", Value = "Phòng trọ", Category = "rooms", CreatedAt = now, UpdatedAt = now },
-            new() { LanguageId = languageId, Key = "rooms.roomNumber", Value = "Số phòng", Category = "rooms", CreatedAt = now, UpdatedAt = now },
-            new() { LanguageId = languageId, Key = "rooms.roomType", Value = "Loại phòng", Category = "rooms", CreatedAt = now, UpdatedAt = now },
-            new() { LanguageId = languageId, Key = "rooms.status", Value = "Trạng thái", Category = "rooms", CreatedAt = now, UpdatedAt = now },
-            new() { LanguageId = languageId, Key = "rooms.price", Value = "Giá", Category = "rooms", CreatedAt = now, UpdatedAt = now },
-            new() { LanguageId = languageId, Key = "rooms.available", Value = "Còn trống", Category = "rooms", CreatedAt = now, UpdatedAt = now },
-            new() { LanguageId = languageId, Key = "rooms.occupied", Value = "Đã thuê", Category = "rooms", CreatedAt = now, UpdatedAt = now },
+        if (messages is null)
+        {
+            _logger.LogError("Embedded locale {ResourceName} is not a flat JSON object; skipping seed", resourceName);
+            return new Dictionary<string, string>();
+        }
 
-            // Tenants
-            new() { LanguageId = languageId, Key = "tenants.title", Value = "Người thuê", Category = "tenants", CreatedAt = now, UpdatedAt = now },
-            new() { LanguageId = languageId, Key = "tenants.name", Value = "Họ tên", Category = "tenants", CreatedAt = now, UpdatedAt = now },
-            new() { LanguageId = languageId, Key = "tenants.phone", Value = "Số điện thoại", Category = "tenants", CreatedAt = now, UpdatedAt = now },
-            new() { LanguageId = languageId, Key = "tenants.idCard", Value = "CMND/CCCD", Category = "tenants", CreatedAt = now, UpdatedAt = now },
-
-            // Invoices
-            new() { LanguageId = languageId, Key = "invoices.title", Value = "Hóa đơn", Category = "invoices", CreatedAt = now, UpdatedAt = now },
-            new() { LanguageId = languageId, Key = "invoices.invoiceNumber", Value = "Số hóa đơn", Category = "invoices", CreatedAt = now, UpdatedAt = now },
-            new() { LanguageId = languageId, Key = "invoices.amount", Value = "Số tiền", Category = "invoices", CreatedAt = now, UpdatedAt = now },
-            new() { LanguageId = languageId, Key = "invoices.dueDate", Value = "Hạn thanh toán", Category = "invoices", CreatedAt = now, UpdatedAt = now },
-            new() { LanguageId = languageId, Key = "invoices.paid", Value = "Đã thanh toán", Category = "invoices", CreatedAt = now, UpdatedAt = now },
-            new() { LanguageId = languageId, Key = "invoices.unpaid", Value = "Chưa thanh toán", Category = "invoices", CreatedAt = now, UpdatedAt = now },
-
-            // Dashboard
-            new() { LanguageId = languageId, Key = "dashboard.title", Value = "Bảng điều khiển", Category = "dashboard", CreatedAt = now, UpdatedAt = now },
-            new() { LanguageId = languageId, Key = "dashboard.totalRooms", Value = "Tổng số phòng", Category = "dashboard", CreatedAt = now, UpdatedAt = now },
-            new() { LanguageId = languageId, Key = "dashboard.occupiedRooms", Value = "Phòng đã thuê", Category = "dashboard", CreatedAt = now, UpdatedAt = now },
-            new() { LanguageId = languageId, Key = "dashboard.revenue", Value = "Doanh thu", Category = "dashboard", CreatedAt = now, UpdatedAt = now },
-        };
+        return messages;
     }
 }

@@ -37,10 +37,10 @@ public interface IReportingService
     Task<ApiResponse<object>> GetFinancialSummaryAsync(DateTime fromDate, DateTime toDate);
 
     /// <summary>
-    /// Gets tenant statistics report
+    /// Gets customer statistics report
     /// </summary>
-    /// <returns>Tenant statistics</returns>
-    Task<ApiResponse<object>> GetTenantStatisticsAsync();
+    /// <returns>Customer statistics</returns>
+    Task<ApiResponse<object>> GetCustomerStatisticsAsync();
 
     /// <summary>
     /// Gets room utilization report

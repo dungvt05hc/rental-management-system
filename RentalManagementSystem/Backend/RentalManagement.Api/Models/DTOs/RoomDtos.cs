@@ -194,9 +194,9 @@ public class RoomDto
     public bool IsFurnished { get; set; }
 
     /// <summary>
-    /// Current tenant information (if occupied)
+    /// Current customer information (if occupied)
     /// </summary>
-    public TenantSummaryDto? CurrentTenant { get; set; }
+    public CustomerSummaryDto? CurrentCustomer { get; set; }
 
     /// <summary>
     /// When the room was created
@@ -278,4 +278,35 @@ public class RoomSearchDto
     /// Sort direction (asc/desc)
     /// </summary>
     public string SortDirection { get; set; } = "asc";
+}
+
+/// <summary>
+/// DTO for room summary information
+/// </summary>
+public class RoomSummaryDto
+{
+    /// <summary>
+    /// Unique identifier for the room
+    /// </summary>
+    public int Id { get; set; }
+
+    /// <summary>
+    /// Room number for identification
+    /// </summary>
+    public string RoomNumber { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Type of room as string
+    /// </summary>
+    public string TypeName { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Monthly rent price for the room
+    /// </summary>
+    public decimal MonthlyRent { get; set; }
+
+    /// <summary>
+    /// Floor number where the room is located
+    /// </summary>
+    public int Floor { get; set; }
 }

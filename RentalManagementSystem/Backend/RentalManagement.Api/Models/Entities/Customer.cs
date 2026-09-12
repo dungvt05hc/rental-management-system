@@ -1,35 +1,35 @@
 using System.ComponentModel.DataAnnotations;
-using System.ComponentModel.DataAnnotations.Schema;
 
 namespace RentalManagement.Api.Models.Entities;
 
 /// <summary>
-/// Represents a tenant who rents rooms in the system
+/// Represents a customer — a person who may hold one or more rental contracts.
+/// Holds personal details only; everything about what they rent lives on <see cref="RentalContract"/>.
 /// </summary>
-public class Tenant
+public class Customer
 {
     /// <summary>
-    /// Unique identifier for the tenant
+    /// Unique identifier for the customer
     /// </summary>
     [Key]
     public int Id { get; set; }
 
     /// <summary>
-    /// Tenant's first name
+    /// Customer's first name
     /// </summary>
     [Required]
     [StringLength(100)]
     public string FirstName { get; set; } = string.Empty;
 
     /// <summary>
-    /// Tenant's last name
+    /// Customer's last name
     /// </summary>
     [Required]
     [StringLength(100)]
     public string LastName { get; set; } = string.Empty;
 
     /// <summary>
-    /// Tenant's email address
+    /// Customer's email address
     /// </summary>
     [Required]
     [EmailAddress]
@@ -37,7 +37,7 @@ public class Tenant
     public string Email { get; set; } = string.Empty;
 
     /// <summary>
-    /// Tenant's phone number
+    /// Customer's phone number
     /// </summary>
     [Required]
     [Phone]
@@ -45,12 +45,12 @@ public class Tenant
     public string PhoneNumber { get; set; } = string.Empty;
 
     /// <summary>
-    /// Tenant's date of birth
+    /// Customer's date of birth
     /// </summary>
     public DateTime? DateOfBirth { get; set; }
 
     /// <summary>
-    /// Tenant's national ID or identification number
+    /// Customer's national ID or identification number
     /// </summary>
     [StringLength(50)]
     public string IdentificationNumber { get; set; } = string.Empty;
@@ -68,76 +68,48 @@ public class Tenant
     public string EmergencyContactPhone { get; set; } = string.Empty;
 
     /// <summary>
-    /// ID of the room currently assigned to this tenant
-    /// </summary>
-    [ForeignKey(nameof(Room))]
-    public int? RoomId { get; set; }
-
-    /// <summary>
-    /// The room currently assigned to this tenant
-    /// </summary>
-    public virtual Room? Room { get; set; }
-
-    /// <summary>
-    /// When the rental contract started
-    /// </summary>
-    public DateTime? ContractStartDate { get; set; }
-
-    /// <summary>
-    /// When the rental contract ends
-    /// </summary>
-    public DateTime? ContractEndDate { get; set; }
-
-    /// <summary>
-    /// Security deposit amount paid by the tenant
-    /// </summary>
-    [Column(TypeName = "decimal(18,2)")]
-    public decimal SecurityDeposit { get; set; }
-
-    /// <summary>
-    /// Monthly rent amount for this tenant (may differ from room base rent)
-    /// </summary>
-    [Column(TypeName = "decimal(18,2)")]
-    public decimal MonthlyRent { get; set; }
-
-    /// <summary>
-    /// Whether the tenant is currently active
+    /// Whether the customer is currently active
     /// </summary>
     public bool IsActive { get; set; } = true;
 
     /// <summary>
-    /// Additional notes about the tenant
+    /// Additional notes about the customer
     /// </summary>
     [StringLength(1000)]
     public string Notes { get; set; } = string.Empty;
 
     /// <summary>
-    /// When the tenant record was created
+    /// When the customer record was created
     /// </summary>
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     /// <summary>
-    /// When the tenant record was last updated
+    /// When the customer record was last updated
     /// </summary>
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
     /// <summary>
-    /// Collection of invoices for this tenant
+    /// Every rental contract this customer has held, past and present
+    /// </summary>
+    public virtual ICollection<RentalContract> RentalContracts { get; set; } = new List<RentalContract>();
+
+    /// <summary>
+    /// Collection of invoices for this customer
     /// </summary>
     public virtual ICollection<Invoice> Invoices { get; set; } = new List<Invoice>();
 
     /// <summary>
-    /// Tenant's full name for display purposes
+    /// Customer's full name for display purposes
     /// </summary>
     public string FullName => $"{FirstName} {LastName}".Trim();
 
     /// <summary>
-    /// Whether the tenant currently has an active rental contract
+    /// Họ tên, email, điện thoại đã bỏ dấu và hạ chữ thường, phục vụ tìm kiếm.
     /// </summary>
-    public bool HasActiveContract => 
-        ContractStartDate.HasValue && 
-        ContractEndDate.HasValue && 
-        DateTime.UtcNow >= ContractStartDate && 
-        DateTime.UtcNow <= ContractEndDate && 
-        IsActive;
+    /// <remarks>
+    /// PostgreSQL tự tính cột này (GENERATED ALWAYS ... STORED) nên nó luôn khớp
+    /// với dữ liệu, không cần code nào nhớ cập nhật. Chỉ đọc, không ghi.
+    /// Chuẩn hoá từ khoá phía C# bằng <see cref="Services.SearchText.Normalize"/>.
+    /// </remarks>
+    public string SearchText { get; private set; } = string.Empty;
 }

@@ -154,7 +154,11 @@ export function DashboardPage() {
         id: 'low-occupancy',
         type: 'warning',
         title: t('dashboard.lowOccupancy', 'Low Occupancy Rate'),
-        message: `${t('dashboard.currentOccupancyRate', 'Current occupancy rate is')} ${formatPercentage(occupancy.occupancyRate)}. ${t('dashboard.considerMarketing', 'Consider marketing strategies.')}.`,
+        message: t(
+          'dashboard.lowOccupancyMessage',
+          'Current occupancy rate is {rate}. Consider marketing strategies.',
+          { rate: formatPercentage(occupancy.occupancyRate) }
+        ),
         timestamp: new Date(),
       });
     }
@@ -165,7 +169,11 @@ export function DashboardPage() {
         id: 'high-overdue',
         type: 'error',
         title: t('dashboard.highOverdue', 'High Overdue Amount'),
-        message: `${formatCurrency(revenue.overdueAmount)} ${t('dashboard.overdueRequiresAttention', 'in overdue payments requires immediate attention')}.`,
+        message: t(
+          'dashboard.overdueRequiresAttention',
+          '{amount} in overdue payments requires immediate attention.',
+          { amount: formatCurrency(revenue.overdueAmount) }
+        ),
         timestamp: new Date(),
       });
     }
@@ -176,7 +184,11 @@ export function DashboardPage() {
         id: 'good-collection',
         type: 'success',
         title: t('dashboard.excellentCollection', 'Excellent Collection Rate'),
-        message: `${t('dashboard.currentCollectionRate', 'Current collection rate is')} ${formatPercentage(revenue.collectionRate)}. ${t('dashboard.keepUpGoodWork', 'Keep up the good work!')}`,
+        message: t(
+          'dashboard.excellentCollectionMessage',
+          'Current collection rate is {rate}. Keep up the good work!',
+          { rate: formatPercentage(revenue.collectionRate) }
+        ),
         timestamp: new Date(),
       });
     }
@@ -187,7 +199,11 @@ export function DashboardPage() {
         id: 'high-occupancy',
         type: 'info',
         title: t('dashboard.highOccupancyTitle', 'High Occupancy Rate'),
-        message: `${t('dashboard.occupancyRateIs', 'Occupancy rate is')} ${formatPercentage(occupancy.occupancyRate)}. ${t('dashboard.considerExpanding', 'Consider expanding capacity.')}.`,
+        message: t(
+          'dashboard.highOccupancyMessage',
+          'Occupancy rate is {rate}. Consider expanding capacity.',
+          { rate: formatPercentage(occupancy.occupancyRate) }
+        ),
         timestamp: new Date(),
       });
     }
@@ -229,7 +245,7 @@ export function DashboardPage() {
     }
   };
 
-  const handleQuickAction = (action: 'rooms' | 'tenants' | 'invoices') => {
+  const handleQuickAction = (action: 'rooms' | 'customers' | 'invoices') => {
     navigate(`/${action}`);
   };
 
@@ -262,27 +278,27 @@ export function DashboardPage() {
     {
       title: t('dashboard.occupiedRooms', 'Occupied Rooms'),
       value: stats.occupiedRooms.toString(),
-      subtitle: `${stats.availableRooms} ${t('rooms.available', 'available')}`,
+      subtitle: t('dashboard.availableRoomsCount', '{count} available', { count: stats.availableRooms }),
       icon: Users,
       color: 'text-green-600',
       bgColor: 'bg-green-100',
       description: t('dashboard.currentlyOccupiedRooms', 'Currently occupied rooms'),
-      trend: `${formatPercentage(stats.occupancyRate)} ${t('dashboard.occupancy', 'occupancy')}`,
+      trend: t('dashboard.occupancyTrend', '{rate} occupancy', { rate: formatPercentage(stats.occupancyRate) }),
     },
     {
       title: t('dashboard.totalRevenue', 'Total Revenue'),
       value: formatCurrency(stats.totalRevenue),
-      subtitle: formatCurrency(stats.paidAmount) + ' ' + t('dashboard.collected', 'collected'),
+      subtitle: t('dashboard.collectedAmount', '{amount} collected', { amount: formatCurrency(stats.paidAmount) }),
       icon: DollarSign,
       color: 'text-purple-600',
       bgColor: 'bg-purple-100',
       description: t('dashboard.totalRevenueThisMonth', 'Total revenue this month'),
-      trend: `${formatPercentage(stats.collectionRate)} ${t('dashboard.collectionRate', 'collection rate')}`,
+      trend: t('dashboard.collectionRateTrend', '{rate} collection rate', { rate: formatPercentage(stats.collectionRate) }),
     },
     {
       title: t('dashboard.pendingAmount', 'Pending Amount'),
       value: formatCurrency(stats.pendingAmount),
-      subtitle: formatCurrency(stats.overdueAmount) + ' ' + t('dashboard.overdue', 'overdue'),
+      subtitle: t('dashboard.overdueAmountSubtitle', '{amount} overdue', { amount: formatCurrency(stats.overdueAmount) }),
       icon: FileText,
       color: stats.overdueAmount > 0 ? 'text-red-600' : 'text-yellow-600',
       bgColor: stats.overdueAmount > 0 ? 'bg-red-100' : 'bg-yellow-100',
@@ -330,7 +346,7 @@ export function DashboardPage() {
             onClick={loadDashboardData}
             disabled={isLoading}
             className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
-            title={t('common.refresh', 'Refresh data')}
+            title={t('common.refresh', 'Refresh')}
           >
             <RefreshCw className={`h-5 w-5 ${isLoading ? 'animate-spin' : ''}`} />
           </button>
@@ -343,12 +359,12 @@ export function DashboardPage() {
           <CardContent className="p-6">
             <div className="flex items-center space-x-2 text-red-800">
               <AlertCircle className="h-5 w-5" />
-              <p>{t('common.error', 'Error loading dashboard data')}: {error}</p>
+              <p>{t('dashboard.loadError', 'Could not load dashboard data')}: {error}</p>
               <button
                 onClick={loadDashboardData}
                 className="ml-4 px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700 transition-colors"
               >
-                {t('common.refresh', 'Retry')}
+                {t('common.tryAgain', 'Try Again')}
               </button>
             </div>
           </CardContent>
@@ -528,14 +544,14 @@ export function DashboardPage() {
             </button>
 
             <button
-              onClick={() => handleQuickAction('tenants')}
+              onClick={() => handleQuickAction('customers')}
               className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-all duration-200 hover:border-green-300 group"
             >
               <div className="flex items-center space-x-3">
                 <Users className="h-8 w-8 text-green-600 group-hover:text-green-700 transition-colors" />
                 <div>
-                  <h3 className="font-medium text-gray-900 group-hover:text-gray-800">{t('dashboard.manageTenants', 'Manage Tenants')}</h3>
-                  <p className="text-sm text-gray-500">{t('dashboard.addEditViewTenants', 'Add, edit, or view tenant information')}</p>
+                  <h3 className="font-medium text-gray-900 group-hover:text-gray-800">{t('dashboard.manageCustomers', 'Manage Customers')}</h3>
+                  <p className="text-sm text-gray-500">{t('dashboard.addEditViewCustomers', 'Add, edit, or view customer information')}</p>
                 </div>
               </div>
             </button>

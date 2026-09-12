@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { formatCurrency, formatPercentage, calculatePagination } from './index';
+import {
+  calculatePagination,
+  formatCurrency,
+  formatDate,
+  formatNumber,
+  formatPercentage,
+  parseDecimalInput,
+} from './index';
 
 // Intl tách phần số và ký hiệu tiền tệ bằng non-breaking space (U+00A0).
 const NBSP = ' ';
@@ -36,6 +43,81 @@ describe('formatCurrency', () => {
     // Documents current behaviour: nothing guards the input, so a missing amount
     // reaches the UI as "NaN ₫".
     expect(formatCurrency(NaN)).toBe(`NaN${NBSP}₫`);
+  });
+});
+
+describe('formatDate', () => {
+  it('renders a date as dd/MM/yyyy', () => {
+    expect(formatDate('2026-03-09T00:00:00.000Z')).toBe('09/03/2026');
+  });
+
+  it('pads single-digit days and months', () => {
+    expect(formatDate(new Date(Date.UTC(2026, 0, 5, 12)))).toBe('05/01/2026');
+  });
+});
+
+describe('formatNumber', () => {
+  it('groups thousands with dots', () => {
+    expect(formatNumber(1500000)).toBe('1.500.000');
+  });
+
+  it('uses a comma for the decimal separator', () => {
+    expect(formatNumber(1234.5)).toBe('1.234,5');
+  });
+});
+
+describe('parseDecimalInput', () => {
+  it('reads a Vietnamese grouped amount', () => {
+    expect(parseDecimalInput('1.500.000')).toBe(1500000);
+    expect(parseDecimalInput('12.000')).toBe(12000);
+  });
+
+  it('reads a plain amount', () => {
+    expect(parseDecimalInput('1500000')).toBe(1500000);
+    expect(parseDecimalInput('0')).toBe(0);
+  });
+
+  it('treats a comma as the decimal separator', () => {
+    expect(parseDecimalInput('1,5')).toBe(1.5);
+    expect(parseDecimalInput('12,75')).toBe(12.75);
+  });
+
+  it('lets the last separator win when both appear', () => {
+    expect(parseDecimalInput('1.500.000,50')).toBe(1500000.5);
+    expect(parseDecimalInput('1,500,000.50')).toBe(1500000.5);
+  });
+
+  it('reads an English decimal that cannot be a thousands group', () => {
+    expect(parseDecimalInput('12.75')).toBe(12.75);
+    expect(parseDecimalInput('1.5')).toBe(1.5);
+  });
+
+  it('resolves the ambiguous three-digit group as thousands, the Vietnamese reading', () => {
+    expect(parseDecimalInput('1.500')).toBe(1500);
+    expect(parseDecimalInput('1,500')).toBe(1500);
+  });
+
+  it('ignores currency decoration, including the non-breaking space Intl emits', () => {
+    expect(parseDecimalInput(formatCurrency(1500000))).toBe(1500000);
+    expect(parseDecimalInput('1.500.000 ₫')).toBe(1500000);
+    expect(parseDecimalInput('1500000 VND')).toBe(1500000);
+  });
+
+  it('keeps the sign', () => {
+    expect(parseDecimalInput('-2.500')).toBe(-2500);
+  });
+
+  it('returns null for anything that is not a number', () => {
+    expect(parseDecimalInput('')).toBeNull();
+    expect(parseDecimalInput('   ')).toBeNull();
+    expect(parseDecimalInput('abc')).toBeNull();
+    expect(parseDecimalInput('1.500.000đ/tháng')).toBeNull();
+    expect(parseDecimalInput('.')).toBeNull();
+  });
+
+  it('accepts a partially typed decimal so typing is not interrupted', () => {
+    expect(parseDecimalInput('12,')).toBe(12);
+    expect(parseDecimalInput(',5')).toBe(0.5);
   });
 });
 

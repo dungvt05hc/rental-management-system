@@ -2,7 +2,11 @@ import { apiService } from './api';
 import type {
   LoginRequest,
   LoginResponse,
-  RegisterRequest,
+  SelfRegisterRequest,
+  SelfRegisterResult,
+  CheckEmailResult,
+  ConfirmEmailRequest,
+  ResendConfirmationRequest,
   ForgotPasswordRequest,
   ResetPasswordRequest,
   User,
@@ -15,9 +19,28 @@ export const authService = {
     return apiService.post<LoginResponse>('/auth/login', credentials);
   },
 
-  // Register new user (Admin only)
-  async register(userData: RegisterRequest): Promise<ApiResponse<User>> {
-    return apiService.post<User>('/auth/register', userData);
+  // Đăng ký bằng mã mời. Không trả về token: tài khoản mới phải xác nhận email
+  // xong mới đăng nhập được.
+  async register(userData: SelfRegisterRequest): Promise<ApiResponse<SelfRegisterResult>> {
+    return apiService.post<SelfRegisterResult>('/auth/register', userData);
+  },
+
+  // Hỏi xem địa chỉ email còn trống không, cho form đăng ký báo trùng tại chỗ.
+  // Endpoint có rate limit theo IP, nên chỉ gọi khi rời ô nhập chứ đừng gọi
+  // theo từng phím gõ.
+  async checkEmail(email: string): Promise<ApiResponse<CheckEmailResult>> {
+    return apiService.get<CheckEmailResult>('/auth/check-email', { email });
+  },
+
+  // Xác nhận địa chỉ email bằng token trong link đã gửi.
+  async confirmEmail(request: ConfirmEmailRequest): Promise<ApiResponse<boolean>> {
+    return apiService.post<boolean>('/auth/confirm-email', request);
+  },
+
+  // Xin một link xác nhận mới. Luôn thành công dù địa chỉ có tài khoản chờ xác
+  // nhận hay không — cùng lý do với forgotPassword.
+  async resendConfirmation(request: ResendConfirmationRequest): Promise<ApiResponse<boolean>> {
+    return apiService.post<boolean>('/auth/resend-confirmation', request);
   },
 
   // Yêu cầu email chứa link đặt lại mật khẩu.

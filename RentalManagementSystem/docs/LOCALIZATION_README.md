@@ -12,7 +12,7 @@ This rental management system now includes a comprehensive localization system s
 - **Translation Management**: Store translations with categories for organization
 - **REST API**: Full CRUD operations for languages and translations
 - **Auto-seeding**: Automatically seeds English and Vietnamese translations on startup
-- **Categorization**: Translations organized by categories (common, auth, rooms, tenants, invoices, dashboard)
+- **Categorization**: Translations organized by categories (common, auth, rooms, customers, invoices, dashboard)
 
 ### API Endpoints
 
@@ -60,7 +60,7 @@ The system includes comprehensive translations for:
 - **Common**: save, cancel, delete, edit, add, search, filter, etc.
 - **Authentication**: login, logout, register, username, password, email
 - **Rooms**: title, roomNumber, roomType, status, price, available, occupied
-- **Tenants**: title, name, phone, idCard
+- **Customers**: title, name, phone, idCard
 - **Invoices**: title, invoiceNumber, amount, dueDate, paid, unpaid
 - **Dashboard**: title, totalRooms, occupiedRooms, revenue
 

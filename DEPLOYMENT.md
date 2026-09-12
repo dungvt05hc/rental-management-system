@@ -46,13 +46,14 @@ the logs.
 Baseline the database instead — record `InitialCreate` as already applied:
 
 **1. Confirm the existing schema matches the migration.** The migration expects
-these 16 tables:
+these 17 tables:
 
 ```
 AspNetRoleClaims  AspNetRoles       AspNetUserClaims  AspNetUserLogins
 AspNetUserRoles   AspNetUserTokens  AspNetUsers       InvoiceItems
 Invoices          Items             Languages         Payments
-Rooms             SystemSettings    Tenants           Translations
+RentalContracts   Rooms             SystemSettings    Customers
+Translations
 ```
 
 Compare against the live database:
@@ -115,7 +116,7 @@ openssl rand -base64 48
 | Resend | `smtp.resend.com` / `587` | `SMTP_USER` is the literal string `resend`, `SMTP_PASSWORD` is the API key. Cleanest deliverability once you verify your own domain via DNS; that verification step is required before real sending. |
 
 Whichever you pick, verify the sending domain (SPF and DKIM records) as soon as the
-system sends to real tenants — unverified senders land in spam.
+system sends to real customers — unverified senders land in spam.
 
 Check the setup after deploy by calling the admin-only endpoint:
 

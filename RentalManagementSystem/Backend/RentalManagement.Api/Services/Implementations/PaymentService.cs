@@ -120,12 +120,12 @@ public class PaymentService : IPaymentService
     }
 
     /// <summary>
-    /// Loads the tenant and room a PaymentDto's invoice summary needs. Runs after the
+    /// Loads the customer and room a PaymentDto's invoice summary needs. Runs after the
     /// transaction commits: it reads no balance, so it needs no lock.
     /// </summary>
     private async Task LoadInvoiceSummaryAsync(Invoice invoice)
     {
-        await _context.Entry(invoice).Reference(i => i.Tenant).LoadAsync();
+        await _context.Entry(invoice).Reference(i => i.Customer).LoadAsync();
         await _context.Entry(invoice).Reference(i => i.Room).LoadAsync();
     }
 
@@ -136,7 +136,7 @@ public class PaymentService : IPaymentService
     {
         var payment = await _context.Payments
             .Include(p => p.Invoice)
-                .ThenInclude(i => i.Tenant)
+                .ThenInclude(i => i.Customer)
             .Include(p => p.Invoice)
                 .ThenInclude(i => i.Room)
             .FirstOrDefaultAsync(p => p.Id == id);
@@ -159,7 +159,7 @@ public class PaymentService : IPaymentService
 
         var query = _context.Payments
             .Include(p => p.Invoice)
-                .ThenInclude(i => i.Tenant)
+                .ThenInclude(i => i.Customer)
             .Include(p => p.Invoice)
                 .ThenInclude(i => i.Room)
             .AsQueryable();
@@ -198,7 +198,7 @@ public class PaymentService : IPaymentService
     {
         var payments = await _context.Payments
             .Include(p => p.Invoice)
-                .ThenInclude(i => i.Tenant)
+                .ThenInclude(i => i.Customer)
             .Include(p => p.Invoice)
                 .ThenInclude(i => i.Room)
             .Where(p => p.InvoiceId == invoiceId)

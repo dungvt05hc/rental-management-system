@@ -10,6 +10,7 @@ import { Switch } from '../ui/Switch';
 import { useUpdateUser } from '../../hooks/useUserManagement';
 import { useToast } from '../../contexts/ToastContext';
 import type { User } from '../../types';
+import { useTranslation } from '../../hooks/useTranslation';
 import { Loader2 } from 'lucide-react';
 
 const editUserSchema = z.object({
@@ -33,6 +34,7 @@ interface EditUserDialogProps {
  * Form for updating user information
  */
 export function EditUserDialog({ user, open, onOpenChange }: EditUserDialogProps) {
+  const { t } = useTranslation();
   const toast = useToast();
   const updateUserMutation = useUpdateUser();
 
@@ -67,9 +69,9 @@ export function EditUserDialog({ user, open, onOpenChange }: EditUserDialogProps
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Edit User</DialogTitle>
+          <DialogTitle>{t('users.editUser', 'Edit User')}</DialogTitle>
           <DialogDescription>
-            Update user information. Role management is available in the user details view.
+            {t('users.editSubtitle', 'Change the user details. Roles are managed in the user details view.')}
           </DialogDescription>
         </DialogHeader>
 
@@ -82,9 +84,9 @@ export function EditUserDialog({ user, open, onOpenChange }: EditUserDialogProps
                 name="firstName"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>First Name *</FormLabel>
+                    <FormLabel>{t('auth.firstName', 'First name')} *</FormLabel>
                     <FormControl>
-                      <Input placeholder="John" {...field} />
+                      <Input placeholder={t('users.firstNamePlaceholder', 'e.g. An')} {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -97,9 +99,9 @@ export function EditUserDialog({ user, open, onOpenChange }: EditUserDialogProps
                 name="lastName"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Last Name *</FormLabel>
+                    <FormLabel>{t('auth.lastName', 'Last name')} *</FormLabel>
                     <FormControl>
-                      <Input placeholder="Doe" {...field} />
+                      <Input placeholder={t('users.lastNamePlaceholder', 'e.g. Nguyen Van')} {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -113,9 +115,9 @@ export function EditUserDialog({ user, open, onOpenChange }: EditUserDialogProps
               name="email"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Email *</FormLabel>
+                  <FormLabel>{t('auth.email', 'Email Address')} *</FormLabel>
                   <FormControl>
-                    <Input type="email" placeholder="john.doe@example.com" {...field} />
+                    <Input type="email" placeholder={t('users.emailPlaceholder', 'name@example.com')} {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -128,9 +130,9 @@ export function EditUserDialog({ user, open, onOpenChange }: EditUserDialogProps
               name="phoneNumber"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Phone Number</FormLabel>
+                  <FormLabel>{t('auth.phoneNumber', 'Phone number')}</FormLabel>
                   <FormControl>
-                    <Input type="tel" placeholder="+1234567890" {...field} />
+                    <Input type="tel" placeholder={t('users.phonePlaceholder', '09xxxxxxxx')} {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -144,7 +146,7 @@ export function EditUserDialog({ user, open, onOpenChange }: EditUserDialogProps
               render={({ field }) => (
                 <FormItem className="flex items-center justify-between rounded-lg border p-4">
                   <div className="space-y-0.5">
-                    <FormLabel className="text-base">Active Status</FormLabel>
+                    <FormLabel className="text-base">{t('users.activeStatus', 'Account active')}</FormLabel>
                     <FormDescription>
                       {field.value
                         ? 'User account is active and can log in'
@@ -165,13 +167,13 @@ export function EditUserDialog({ user, open, onOpenChange }: EditUserDialogProps
                 onClick={() => onOpenChange(false)}
                 disabled={updateUserMutation.isPending}
               >
-                Cancel
+                {t('common.cancel', 'Cancel')}
               </Button>
               <Button type="submit" disabled={updateUserMutation.isPending}>
                 {updateUserMutation.isPending && (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 )}
-                Save Changes
+                {t('common.save', 'Save')}
               </Button>
             </DialogFooter>
           </form>

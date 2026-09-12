@@ -139,10 +139,10 @@ export function RoomsPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">{t('rooms.title', 'Rooms Management')}</h1>
+        <h1 className="text-2xl font-bold text-gray-900">{t('rooms.pageTitle', 'Rooms Management')}</h1>
         <Button onClick={handleCreateRoom} className="flex items-center space-x-2">
           <Plus className="h-4 w-4" />
-          <span>{t('common.add', 'Add Room')}</span>
+          <span>{t('rooms.addRoom', 'Add Room')}</span>
         </Button>
       </div>
 
@@ -154,7 +154,7 @@ export function RoomsPage() {
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                 <Input
-                  placeholder={t('common.search', 'Search rooms...')}
+                  placeholder={t('rooms.searchPlaceholder', 'Search rooms...')}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-10"
@@ -170,7 +170,7 @@ export function RoomsPage() {
                 <option value="">{t('common.filter', 'All Status')}</option>
                 <option value="Available">{t('rooms.available', 'Available')}</option>
                 <option value="Occupied">{t('rooms.occupied', 'Occupied')}</option>
-                <option value="Maintenance">Maintenance</option>
+                <option value="Maintenance">{t('rooms.statusMaintenance', 'Maintenance')}</option>
               </select>
             </div>
           </div>
@@ -253,14 +253,14 @@ export function RoomsPage() {
             <div className="text-center py-8">
               <p className="text-red-600">{error}</p>
               <Button onClick={loadRooms} className="mt-4">
-                {t('common.refresh', 'Try Again')}
+                {t('common.tryAgain', 'Try Again')}
               </Button>
             </div>
           ) : rooms.length === 0 ? (
             <div className="text-center py-8">
-              <p className="text-gray-500">{t('common.loading', 'No rooms found')}</p>
+              <p className="text-gray-500">{t('rooms.noRoomsFound', 'No rooms found')}</p>
               <Button onClick={handleCreateRoom} className="mt-4">
-                {t('common.add', 'Add Your First Room')}
+                {t('rooms.addFirstRoom', 'Add Your First Room')}
               </Button>
             </div>
           ) : (
@@ -282,10 +282,10 @@ export function RoomsPage() {
                         {t('rooms.price', 'Monthly Rent')}
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Floor
+                        {t('rooms.floor', 'Floor')}
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        {t('common.edit', 'Actions')}
+                        {t('common.actions', 'Actions')}
                       </th>
                     </tr>
                   </thead>
@@ -309,7 +309,7 @@ export function RoomsPage() {
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-gray-700">Floor {room.floor}</div>
+                          <div className="text-gray-700">{t('rooms.floorLabel', 'Floor {number}', { number: room.floor })}</div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex space-x-2">
@@ -318,7 +318,7 @@ export function RoomsPage() {
                               size="sm"
                               onClick={() => handleEditRoom(room)}
                               className="h-8 w-8 p-0"
-                              title={t('common.edit', 'Edit Room')}
+                              title={t('rooms.editRoom', 'Edit Room')}
                             >
                               <Edit className="h-4 w-4" />
                             </Button>
@@ -327,7 +327,7 @@ export function RoomsPage() {
                               size="sm"
                               onClick={() => handleDeleteRoom(String(room.id), room.roomNumber)}
                               className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
-                              title={t('common.delete', 'Delete Room')}
+                              title={t('rooms.deleteRoom', 'Delete Room')}
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>
@@ -352,7 +352,7 @@ export function RoomsPage() {
                       onClick={() => handlePageChange(pagination.page - 1)}
                       disabled={pagination.page <= 1}
                     >
-                      Previous
+                      {t('common.previous', 'Previous')}
                     </Button>
                     {Array.from({ length: Math.min(pagination.totalPages, 5) }, (_, i) => {
                       const startPage = Math.max(1, pagination.page - 2);
@@ -375,7 +375,7 @@ export function RoomsPage() {
                       onClick={() => handlePageChange(pagination.page + 1)}
                       disabled={pagination.page >= pagination.totalPages}
                     >
-                      Next
+                      {t('common.next', 'Next')}
                     </Button>
                   </div>
                 </div>
@@ -402,7 +402,8 @@ export function RoomsPage() {
         title={t('rooms.deleteConfirmTitle', 'Delete Room')}
         description={t(
           'rooms.deleteConfirmMessage',
-          `Are you sure you want to delete room ${confirmDialog.roomNumber}? This action cannot be undone and will remove all associated data.`
+          'Deleting room {number} also removes its contracts, invoices and payments. This cannot be undone.',
+          { number: confirmDialog.roomNumber }
         )}
         confirmText={t('common.delete', 'Delete')}
         cancelText={t('common.cancel', 'Cancel')}

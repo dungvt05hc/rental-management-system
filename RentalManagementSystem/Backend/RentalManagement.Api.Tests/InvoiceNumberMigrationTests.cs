@@ -40,55 +40,43 @@ public class InvoiceNumberMigrationTests : IAsyncLifetime
     [Fact]
     public async Task Migration_OnDatabaseWithExistingInvoices_KeepsThemAndResumesNumbering()
     {
-        int tenantId, roomId;
+        int customerId, roomId;
 
         // --- Arrange: a database at the schema version that predates the counter ---
+        // At this point the schema still calls the table "Tenants" and the rental terms
+        // still live on it, so the rows go in as raw SQL rather than through the
+        // current model, which describes a schema this database has not reached yet.
         await using (var context = CreateContext())
         {
             var migrator = context.GetService<IMigrator>();
             await migrator.MigrateAsync(PreCounterMigration);
 
-            var room = new Room { RoomNumber = "A101", MonthlyRent = 1_000m, Floor = 1 };
-            context.Rooms.Add(room);
-            await context.SaveChangesAsync();
-
-            var tenant = new Tenant
-            {
-                FirstName = "Legacy",
-                LastName = "Tenant",
-                Email = "legacy@example.test",
-                IdentificationNumber = "LEGACY-1",
-                RoomId = room.Id,
-                MonthlyRent = 1_000m,
-                IsActive = true
-            };
-            context.Tenants.Add(tenant);
-            await context.SaveChangesAsync();
-
-            roomId = room.Id;
-            tenantId = tenant.Id;
-
-            // Invoices issued by the old COUNT-based generator, including a gap:
-            // 0007 is the highest, so the next number has to be 0008.
             var period = DateTime.UtcNow.ToString("yyyyMM");
-            foreach (var sequence in new[] { 1, 2, 7 })
-            {
-                context.Invoices.Add(new Invoice
-                {
-                    TenantId = tenant.Id,
-                    RoomId = room.Id,
-                    InvoiceNumber = $"INV-{period}-{sequence:D4}",
-                    MonthlyRent = 1_000m,
-                    TotalAmount = 1_000m,
-                    RemainingBalance = 1_000m,
-                    BillingPeriod = new DateTime(2026, 9, 1, 0, 0, 0, DateTimeKind.Utc),
-                    IssueDate = DateTime.UtcNow,
-                    DueDate = DateTime.UtcNow.AddDays(15),
-                    Status = InvoiceStatus.Issued
-                });
-            }
 
-            await context.SaveChangesAsync();
+            await context.Database.ExecuteSqlRawAsync($"""
+                INSERT INTO "Rooms" ("RoomNumber","Type","MonthlyRent","Status","Floor","Description",
+                                     "HasAirConditioning","HasPrivateBathroom","IsFurnished","CreatedAt","UpdatedAt")
+                VALUES ('A101',1,1000,2,1,'',false,false,false,NOW(),NOW());
+
+                INSERT INTO "Tenants" ("FirstName","LastName","Email","PhoneNumber","IdentificationNumber",
+                                       "EmergencyContactName","EmergencyContactPhone","RoomId",
+                                       "ContractStartDate","ContractEndDate","SecurityDeposit","MonthlyRent",
+                                       "IsActive","Notes","CreatedAt","UpdatedAt")
+                SELECT 'Legacy','Customer','legacy@example.test','0900000000','LEGACY-1','','',
+                       r."Id", NOW() - INTERVAL '1 month', NULL, 0, 1000, true, '', NOW(), NOW()
+                FROM "Rooms" r WHERE r."RoomNumber" = 'A101';
+
+                -- Invoices issued by the old COUNT-based generator, including a gap:
+                -- 0007 is the highest, so the next number has to be 0008.
+                INSERT INTO "Invoices" ("InvoiceNumber","TenantId","RoomId","MonthlyRent","AdditionalCharges",
+                                        "Discount","TotalAmount","PaidAmount","RemainingBalance","Status",
+                                        "BillingPeriod","IssueDate","DueDate","AdditionalChargesDescription",
+                                        "Notes","CreatedAt","UpdatedAt")
+                SELECT 'INV-{period}-' || LPAD(s::text, 4, '0'), t."Id", t."RoomId", 1000, 0, 0, 1000, 0, 1000, 2,
+                       TIMESTAMPTZ '2026-09-01 00:00:00+00', NOW(), NOW() + INTERVAL '15 days', '', '', NOW(), NOW()
+                FROM "Tenants" t, (VALUES (1),(2),(7)) AS v(s)
+                WHERE t."Email" = 'legacy@example.test';
+                """);
         }
 
         // --- Act: apply the counter migration on top of that data ---
@@ -103,6 +91,15 @@ public class InvoiceNumberMigrationTests : IAsyncLifetime
             var existing = await context.Invoices.Select(i => i.InvoiceNumber).ToListAsync();
             Assert.Equal(3, existing.Count);
 
+            // The rename migration carried the legacy tenant across as a customer,
+            // and turned their room assignment into an active contract.
+            var customer = await context.Customers.SingleAsync(c => c.Email == "legacy@example.test");
+            var contract = await context.RentalContracts.SingleAsync(c => c.CustomerId == customer.Id);
+            Assert.Equal(RentalContractStatus.Active, contract.Status);
+
+            customerId = customer.Id;
+            roomId = contract.RoomId;
+
             var currentPeriod = DateTime.UtcNow.ToString("yyyyMM");
             var counter = await context.InvoiceNumberCounters.SingleAsync(c => c.Period == currentPeriod);
             Assert.Equal(7, counter.LastValue);
@@ -115,7 +112,7 @@ public class InvoiceNumberMigrationTests : IAsyncLifetime
 
             var result = await service.CreateInvoiceAsync(new CreateInvoiceDto
             {
-                TenantId = tenantId,
+                CustomerId = customerId,
                 RoomId = roomId,
                 BillingPeriod = new DateTime(2026, 10, 1, 0, 0, 0, DateTimeKind.Utc),
                 DueDate = new DateTime(2026, 10, 15, 0, 0, 0, DateTimeKind.Utc)

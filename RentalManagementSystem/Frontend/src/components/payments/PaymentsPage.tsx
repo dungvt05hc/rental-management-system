@@ -90,7 +90,7 @@ export function PaymentsPage() {
   const filteredPayments = payments.filter((payment: Payment) => {
     const term = searchTerm.toLowerCase();
     const matchesSearch =
-      (payment.invoice?.tenantName || '').toLowerCase().includes(term) ||
+      (payment.invoice?.customerName || '').toLowerCase().includes(term) ||
       (payment.invoice?.invoiceNumber || '').toLowerCase().includes(term) ||
       (payment.invoice?.roomNumber || '').toLowerCase().includes(term) ||
       (payment.methodName || '').toLowerCase().includes(term) ||
@@ -113,7 +113,7 @@ export function PaymentsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">{t('payments.title', 'Payments Management')}</h1>
+          <h1 className="text-3xl font-bold text-gray-900">{t('payments.pageTitle', 'Payments Management')}</h1>
           <p className="text-sm text-gray-500 mt-1">{t('payments.manageTrack', 'Manage and track all payment transactions')}</p>
         </div>
         <button
@@ -134,7 +134,7 @@ export function PaymentsPage() {
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
                 <input
                   type="text"
-                  placeholder={t('payments.searchPlaceholder', 'Search by tenant name, email, method, or reference...')}
+                  placeholder={t('payments.searchPlaceholder', 'Search by customer name, email, method, or reference...')}
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
@@ -166,7 +166,7 @@ export function PaymentsPage() {
           <CardTitle className="text-xl font-bold flex items-center justify-between">
             <span>{t('payments.paymentTransactions', 'Payment Transactions')}</span>
             <span className="text-sm font-medium px-3 py-1 bg-blue-100 text-blue-800 rounded-full">
-              {filteredPayments.length} {t('invoices.total', 'Total')}
+              {t('payments.totalCount', '{count} total', { count: filteredPayments.length })}
             </span>
           </CardTitle>
         </CardHeader>
@@ -176,14 +176,14 @@ export function PaymentsPage() {
               <table className="w-full">
                 <thead className="bg-gray-50 border-b-2 border-gray-200">
                   <tr>
-                    <th className="text-left py-4 px-6 font-semibold text-gray-700 uppercase tracking-wider text-xs">{t('tenants.name', 'Tenant')}</th>
+                    <th className="text-left py-4 px-6 font-semibold text-gray-700 uppercase tracking-wider text-xs">{t('payments.customer', 'Customer')}</th>
                     <th className="text-left py-4 px-6 font-semibold text-gray-700 uppercase tracking-wider text-xs">{t('invoices.invoice', 'Invoice')}</th>
                     <th className="text-left py-4 px-6 font-semibold text-gray-700 uppercase tracking-wider text-xs">{t('invoices.amount', 'Amount')}</th>
                     <th className="text-left py-4 px-6 font-semibold text-gray-700 uppercase tracking-wider text-xs">{t('payments.method', 'Method')}</th>
                     <th className="text-left py-4 px-6 font-semibold text-gray-700 uppercase tracking-wider text-xs">{t('payments.date', 'Date')}</th>
                     <th className="text-left py-4 px-6 font-semibold text-gray-700 uppercase tracking-wider text-xs">{t('rooms.status', 'Status')}</th>
                     <th className="text-left py-4 px-6 font-semibold text-gray-700 uppercase tracking-wider text-xs">{t('payments.reference', 'Reference')}</th>
-                    <th className="text-left py-4 px-6 font-semibold text-gray-700 uppercase tracking-wider text-xs">{t('common.edit', 'Actions')}</th>
+                    <th className="text-left py-4 px-6 font-semibold text-gray-700 uppercase tracking-wider text-xs">{t('common.actions', 'Actions')}</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-100">
@@ -196,11 +196,11 @@ export function PaymentsPage() {
                           </div>
                           <div>
                             <p className="font-medium text-gray-900">
-                              {payment.invoice?.tenantName || '—'}
+                              {payment.invoice?.customerName || '—'}
                             </p>
                             <p className="text-sm text-gray-500">
                               {payment.invoice?.invoiceNumber}
-                              {payment.invoice?.roomNumber && ` • ${t('tenants.room', 'Room')} ${payment.invoice.roomNumber}`}
+                              {payment.invoice?.roomNumber && ` • ${t('customers.room', 'Room')} ${payment.invoice.roomNumber}`}
                             </p>
                           </div>
                         </div>
@@ -250,14 +250,14 @@ export function PaymentsPage() {
                           <button
                             onClick={() => handleEditPayment(payment)}
                             className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                            title={t('common.edit', 'Edit Payment')}
+                            title={t('payments.editPayment', 'Edit Payment')}
                           >
                             <Edit className="h-4 w-4" />
                           </button>
                           <button
                             onClick={() => handleDeletePayment(payment.id, payment.referenceNumber || '')}
                             className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                            title={t('common.delete', 'Delete Payment')}
+                            title={t('payments.deletePayment', 'Delete Payment')}
                           >
                             <Trash2 className="h-4 w-4" />
                           </button>
@@ -289,9 +289,11 @@ export function PaymentsPage() {
       {totalPages > 1 && (
         <div className="flex items-center justify-between bg-white p-6 rounded-lg shadow-lg border-0">
           <p className="text-sm text-gray-700 font-medium">
-            {t('payments.showing', 'Showing')} {((currentPage - 1) * pageSize) + 1} {t('payments.to', 'to')}{' '}
-            {Math.min(currentPage * pageSize, filteredPayments.length)} {t('payments.of', 'of')}{' '}
-            {filteredPayments.length} {t('payments.payments', 'payments')}
+            {t('payments.showingRange', 'Showing {from} to {to} of {total} payments', {
+              from: ((currentPage - 1) * pageSize) + 1,
+              to: Math.min(currentPage * pageSize, filteredPayments.length),
+              total: filteredPayments.length,
+            })}
           </p>
           <div className="flex items-center space-x-2">
             <button
@@ -299,7 +301,7 @@ export function PaymentsPage() {
               disabled={currentPage === 1}
               className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 transition-colors"
             >
-              Previous
+              {t('common.previous', 'Previous')}
             </button>
             {[...Array(totalPages)].map((_, i) => (
               <button
@@ -319,7 +321,7 @@ export function PaymentsPage() {
               disabled={currentPage === totalPages}
               className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 transition-colors"
             >
-              Next
+              {t('common.next', 'Next')}
             </button>
           </div>
         </div>
@@ -334,7 +336,8 @@ export function PaymentsPage() {
         title={t('payments.deleteConfirmTitle', 'Delete Payment')}
         description={t(
           'payments.deleteConfirmMessage',
-          `Are you sure you want to delete payment ${confirmDialog.paymentReference}? This action cannot be undone and will affect the associated invoice balance.`
+          'Deleting payment {reference} changes the outstanding balance of its invoice. This cannot be undone.',
+          { reference: confirmDialog.paymentReference }
         )}
         confirmText={t('common.delete', 'Delete')}
         cancelText={t('common.cancel', 'Cancel')}

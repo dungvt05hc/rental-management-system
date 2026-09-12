@@ -21,9 +21,14 @@ public class RentalManagementContext : IdentityDbContext<User>
     public DbSet<Room> Rooms { get; set; } = null!;
 
     /// <summary>
-    /// Tenants who rent rooms
+    /// Customers who rent rooms
     /// </summary>
-    public DbSet<Tenant> Tenants { get; set; } = null!;
+    public DbSet<Customer> Customers { get; set; } = null!;
+
+    /// <summary>
+    /// Rental contracts between customers and rooms
+    /// </summary>
+    public DbSet<RentalContract> RentalContracts { get; set; } = null!;
 
     /// <summary>
     /// Invoices for rental payments
@@ -65,6 +70,11 @@ public class RentalManagementContext : IdentityDbContext<User>
     /// </summary>
     public DbSet<InvoiceNumberCounter> InvoiceNumberCounters { get; set; } = null!;
 
+    /// <summary>
+    /// Invitation codes issued by administrators for self-registration
+    /// </summary>
+    public DbSet<Invitation> Invitations { get; set; } = null!;
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -87,25 +97,28 @@ public class RentalManagementContext : IdentityDbContext<User>
 
             entity.Property(r => r.UpdatedAt)
                   .HasDefaultValueSql("NOW() AT TIME ZONE 'UTC'");
+
+            // Cột tìm kiếm không dấu — PostgreSQL tự tính, EF chỉ đọc.
+            // immutable_unaccent là wrapper IMMUTABLE quanh unaccent(); bản thân
+            // unaccent() một tham số chỉ STABLE nên không dùng cho cột generated
+            // hay index biểu thức được. Xem migration AddUnaccentSearch.
+            entity.Property(r => r.SearchText)
+                  .HasComputedColumnSql(
+                      "lower(immutable_unaccent(coalesce(\"RoomNumber\", '') || ' ' || coalesce(\"Description\", '')))",
+                      stored: true);
         });
 
-        // Configure Tenant entity
-        modelBuilder.Entity<Tenant>(entity =>
+        // Configure Customer entity
+        modelBuilder.Entity<Customer>(entity =>
         {
             entity.HasIndex(t => t.Email)
                   .IsUnique()
-                  .HasDatabaseName("IX_Tenants_Email");
+                  .HasDatabaseName("IX_Customers_Email");
 
             entity.HasIndex(t => t.IdentificationNumber)
                   .IsUnique()
-                  .HasDatabaseName("IX_Tenants_IdentificationNumber")
+                  .HasDatabaseName("IX_Customers_IdentificationNumber")
                   .HasFilter("\"IdentificationNumber\" IS NOT NULL AND \"IdentificationNumber\" != ''");
-
-            entity.Property(t => t.SecurityDeposit)
-                  .HasPrecision(18, 2);
-
-            entity.Property(t => t.MonthlyRent)
-                  .HasPrecision(18, 2);
 
             entity.Property(t => t.CreatedAt)
                   .HasDefaultValueSql("NOW() AT TIME ZONE 'UTC'");
@@ -113,11 +126,45 @@ public class RentalManagementContext : IdentityDbContext<User>
             entity.Property(t => t.UpdatedAt)
                   .HasDefaultValueSql("NOW() AT TIME ZONE 'UTC'");
 
-            // Configure relationship with Room
-            entity.HasOne(t => t.Room)
-                  .WithMany(r => r.Tenants)
-                  .HasForeignKey(t => t.RoomId)
-                  .OnDelete(DeleteBehavior.SetNull);
+            // Gộp cả họ tên vào một cột để "nguyen van an" khớp được với
+            // "Nguyễn Văn An" — từ khoá trải qua cả FirstName lẫn LastName thì
+            // tìm trên từng cột riêng lẻ sẽ trượt.
+            entity.Property(t => t.SearchText)
+                  .HasComputedColumnSql(
+                      "lower(immutable_unaccent(coalesce(\"FirstName\", '') || ' ' || coalesce(\"LastName\", '') || ' ' || coalesce(\"Email\", '') || ' ' || coalesce(\"PhoneNumber\", '')))",
+                      stored: true);
+        });
+
+        // Configure RentalContract entity
+        modelBuilder.Entity<RentalContract>(entity =>
+        {
+            entity.HasIndex(c => new { c.CustomerId, c.Status })
+                  .HasDatabaseName("IX_RentalContracts_CustomerId_Status");
+
+            entity.HasIndex(c => new { c.RoomId, c.Status })
+                  .HasDatabaseName("IX_RentalContracts_RoomId_Status");
+
+            entity.Property(c => c.MonthlyRent)
+                  .HasPrecision(18, 2);
+
+            entity.Property(c => c.SecurityDeposit)
+                  .HasPrecision(18, 2);
+
+            entity.Property(c => c.CreatedAt)
+                  .HasDefaultValueSql("NOW() AT TIME ZONE 'UTC'");
+
+            entity.Property(c => c.UpdatedAt)
+                  .HasDefaultValueSql("NOW() AT TIME ZONE 'UTC'");
+
+            entity.HasOne(c => c.Customer)
+                  .WithMany(t => t.RentalContracts)
+                  .HasForeignKey(c => c.CustomerId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(c => c.Room)
+                  .WithMany(r => r.RentalContracts)
+                  .HasForeignKey(c => c.RoomId)
+                  .OnDelete(DeleteBehavior.Restrict);
         });
 
         // Configure invoice number counter entity
@@ -136,8 +183,8 @@ public class RentalManagementContext : IdentityDbContext<User>
                   .IsUnique()
                   .HasDatabaseName("IX_Invoices_InvoiceNumber");
 
-            entity.HasIndex(i => new { i.TenantId, i.BillingPeriod })
-                  .HasDatabaseName("IX_Invoices_TenantId_BillingPeriod");
+            entity.HasIndex(i => new { i.CustomerId, i.BillingPeriod })
+                  .HasDatabaseName("IX_Invoices_CustomerId_BillingPeriod");
 
             entity.Property(i => i.MonthlyRent)
                   .HasPrecision(18, 2);
@@ -164,15 +211,20 @@ public class RentalManagementContext : IdentityDbContext<User>
                   .HasDefaultValueSql("NOW() AT TIME ZONE 'UTC'");
 
             // Configure relationships
-            entity.HasOne(i => i.Tenant)
+            entity.HasOne(i => i.Customer)
                   .WithMany(t => t.Invoices)
-                  .HasForeignKey(i => i.TenantId)
+                  .HasForeignKey(i => i.CustomerId)
                   .OnDelete(DeleteBehavior.Cascade);
 
             entity.HasOne(i => i.Room)
                   .WithMany(r => r.Invoices)
                   .HasForeignKey(i => i.RoomId)
                   .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(i => i.RentalContract)
+                  .WithMany(c => c.Invoices)
+                  .HasForeignKey(i => i.RentalContractId)
+                  .OnDelete(DeleteBehavior.SetNull);
         });
 
         // Configure Payment entity
@@ -336,6 +388,23 @@ public class RentalManagementContext : IdentityDbContext<User>
                   .HasDefaultValueSql("NOW() AT TIME ZONE 'UTC'");
 
             entity.Property(s => s.UpdatedAt)
+                  .HasDefaultValueSql("NOW() AT TIME ZONE 'UTC'");
+        });
+
+        // Configure Invitation entity
+        modelBuilder.Entity<Invitation>(entity =>
+        {
+            // Mọi lần đăng ký đều tra bảng này bằng hash của mã vừa nhập, nên
+            // chỉ mục là đường đi chính chứ không phải tối ưu hoá thêm. Unique
+            // vì hai lời mời trùng hash sẽ khiến việc giữ chỗ mơ hồ.
+            entity.HasIndex(i => i.CodeHash)
+                  .IsUnique()
+                  .HasDatabaseName("IX_Invitations_CodeHash");
+
+            entity.HasIndex(i => i.CreatedAt)
+                  .HasDatabaseName("IX_Invitations_CreatedAt");
+
+            entity.Property(i => i.CreatedAt)
                   .HasDefaultValueSql("NOW() AT TIME ZONE 'UTC'");
         });
 

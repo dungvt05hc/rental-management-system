@@ -42,9 +42,9 @@ export const invoiceService = {
     });
   },
 
-  // Get invoices by tenant
-  async getInvoicesByTenant(tenantId: string): Promise<ApiResponse<Invoice[]>> {
-    return apiService.get<Invoice[]>(`/invoices/tenant/${tenantId}`);
+  // Get invoices by customer
+  async getInvoicesByCustomer(customerId: string): Promise<ApiResponse<Invoice[]>> {
+    return apiService.get<Invoice[]>(`/invoices/customer/${customerId}`);
   },
 
   // Get invoices by status

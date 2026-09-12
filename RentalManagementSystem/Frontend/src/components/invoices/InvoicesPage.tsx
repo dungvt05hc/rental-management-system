@@ -214,7 +214,7 @@ export function InvoicesPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">{t('invoices.title', 'Invoices Management')}</h1>
+          <h1 className="text-3xl font-bold text-gray-900">{t('invoices.pageTitle', 'Invoices Management')}</h1>
           <p className="text-sm text-gray-500 mt-1">{t('invoices.manageTrackInvoices', 'Manage and track all rental invoices')}</p>
         </div>
         <Button onClick={handleCreateInvoice} className="flex items-center space-x-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800">
@@ -231,7 +231,7 @@ export function InvoicesPage() {
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
                 <Input
-                  placeholder={t('invoices.searchPlaceholder', 'Search by invoice number, tenant name, or room...')}
+                  placeholder={t('invoices.searchPlaceholder', 'Search by invoice number, customer name, or room...')}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-10 h-11 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
@@ -278,7 +278,7 @@ export function InvoicesPage() {
                   </Tooltip>
                 </div>
                 <p className="text-2xl lg:text-3xl font-bold text-blue-900 truncate">{formatCurrency(totalAmount)}</p>
-                <p className="text-xs text-blue-700 mt-2">{pagination.totalCount} {t('invoices.totalInvoices', 'total invoices')}</p>
+                <p className="text-xs text-blue-700 mt-2">{t('invoices.totalInvoicesCount', '{count} invoices in total', { count: pagination.totalCount })}</p>
               </div>
               <div className="flex-shrink-0 p-4 rounded-2xl bg-blue-200">
                 <DollarSign className="h-8 w-8 text-blue-700" />
@@ -297,7 +297,7 @@ export function InvoicesPage() {
                     content={
                       <div className="space-y-1">
                         <p className="font-semibold">{t('invoices.totalPaidAmount', 'Total Paid Amount')}</p>
-                        <p>{t('invoices.paidAmountDesc', 'The sum of all amounts that have been fully paid by tenants.')}</p>
+                        <p>{t('invoices.paidAmountDesc', 'The sum of all amounts that have been fully paid by customers.')}</p>
                         <p className="text-green-200 mt-2">{t('invoices.revenueCollected', 'This represents the revenue successfully collected.')}</p>
                       </div>
                     }
@@ -339,7 +339,9 @@ export function InvoicesPage() {
                 </div>
                 <p className="text-2xl lg:text-3xl font-bold text-yellow-900 truncate">{formatCurrency(pendingAmount)}</p>
                 <p className="text-xs text-yellow-700 mt-2">
-                  {(invoices || []).filter(i => statusNameOf(i) === 'pending').length} {t('invoices.pending', 'pending')}
+                  {t('invoices.pendingCount', '{count} pending', {
+                    count: (invoices || []).filter(i => statusNameOf(i) === 'pending').length,
+                  })}
                 </p>
               </div>
               <div className="flex-shrink-0 p-4 rounded-2xl bg-yellow-200">
@@ -369,7 +371,7 @@ export function InvoicesPage() {
                   </Tooltip>
                 </div>
                 <p className="text-2xl lg:text-3xl font-bold text-red-900 truncate">{formatCurrency(overdueAmount)}</p>
-                <p className="text-xs text-red-700 mt-2">{overdueInvoices.length} {t('invoices.overdueInvoices', 'overdue invoices')}</p>
+                <p className="text-xs text-red-700 mt-2">{t('invoices.overdueInvoicesCount', '{count} overdue invoices', { count: overdueInvoices.length })}</p>
               </div>
               <div className="flex-shrink-0 p-4 rounded-2xl bg-red-200">
                 <AlertCircle className="h-8 w-8 text-red-700" />
@@ -385,7 +387,7 @@ export function InvoicesPage() {
           <div className="flex items-center justify-between">
             <CardTitle className="text-xl font-bold">{t('invoices.invoiceList', 'Invoice List')}</CardTitle>
             <Badge className="bg-blue-100 text-blue-800 border-blue-300">
-              {pagination.totalCount} {t('invoices.total', 'Total')}
+              {t('invoices.totalCount', '{count} total', { count: pagination.totalCount })}
             </Badge>
           </div>
         </CardHeader>
@@ -394,7 +396,7 @@ export function InvoicesPage() {
             <div className="flex items-center justify-center h-64">
               <div className="text-center">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-4 border-blue-600 mx-auto"></div>
-                <p className="mt-4 text-sm text-gray-600">{t('common.loading', 'Loading invoices...')}</p>
+                <p className="mt-4 text-sm text-gray-600">{t('invoices.loading', 'Loading invoices...')}</p>
               </div>
             </div>
           ) : error ? (
@@ -402,7 +404,7 @@ export function InvoicesPage() {
               <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
               <p className="text-red-600 font-medium">{error}</p>
               <Button onClick={loadInvoices} className="mt-4">
-                {t('common.refresh', 'Try Again')}
+                {t('common.tryAgain', 'Try Again')}
               </Button>
             </div>
           ) : invoices.length === 0 ? (
@@ -412,7 +414,7 @@ export function InvoicesPage() {
               <p className="text-sm text-gray-500 mb-6">
                 {searchQuery || statusFilter 
                   ? t('invoices.adjustSearchFilter', 'Try adjusting your search or filter criteria.') 
-                  : t('invoices.getStartedMessage', 'Get started by creating your first invoice for your tenants.')
+                  : t('invoices.getStartedMessage', 'Get started by creating your first invoice for your customers.')
                 }
               </p>
               {!searchQuery && !statusFilter && (
@@ -431,7 +433,7 @@ export function InvoicesPage() {
                       {t('invoices.invoiceDetails', 'Invoice Details')}
                     </th>
                     <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                      {t('invoices.tenantRoom', 'Tenant & Room')}
+                      {t('invoices.customerRoom', 'Customer & Room')}
                     </th>
                     <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                       {t('invoices.amount', 'Amount')}
@@ -443,7 +445,7 @@ export function InvoicesPage() {
                       {t('invoices.dueDate', 'Due Date')}
                     </th>
                     <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                      {t('common.edit', 'Actions')}
+                      {t('common.actions', 'Actions')}
                     </th>
                   </tr>
                 </thead>
@@ -470,19 +472,19 @@ export function InvoicesPage() {
                           </div>
                         </td>
                         <td className="px-6 py-4">
-                          {invoice.tenant ? (
+                          {invoice.customer ? (
                             <div>
                               <div className="text-sm font-medium text-gray-900">
-                                {invoice.tenant?.fullName || `${invoice.tenant?.firstName} ${invoice.tenant?.lastName}`}
+                                {invoice.customer?.fullName || `${invoice.customer?.firstName} ${invoice.customer?.lastName}`}
                               </div>
                               <div className="text-xs text-gray-500 flex items-center mt-1">
                                 <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
-                                  {t('tenants.room', 'Room')} {invoice.room?.roomNumber || 'N/A'}
+                                  {t('rooms.roomLabel', 'Room {number}', { number: invoice.room?.roomNumber || 'N/A' })}
                                 </span>
                               </div>
                             </div>
                           ) : (
-                            <div className="text-sm text-gray-400">{t('invoices.noTenantInfo', 'No tenant info')}</div>
+                            <div className="text-sm text-gray-400">{t('invoices.noCustomerInfo', 'No customer info')}</div>
                           )}
                         </td>
                         <td className="px-6 py-4">
@@ -492,12 +494,16 @@ export function InvoicesPage() {
                             </div>
                             {invoice.remainingBalance !== undefined && invoice.remainingBalance > 0 && (
                               <div className="text-xs text-orange-600 font-medium mt-1">
-                                {formatCurrency(invoice.remainingBalance)} {t('invoices.due', 'due')}
+                                {t('invoices.dueAmount', '{amount} due', {
+                                  amount: formatCurrency(invoice.remainingBalance),
+                                })}
                               </div>
                             )}
                             {invoice.paidAmount !== undefined && invoice.paidAmount > 0 && (
                               <div className="text-xs text-green-600 mt-1">
-                                {formatCurrency(invoice.paidAmount)} {t('invoices.paid', 'paid')}
+                                {t('invoices.paidAmountSuffix', '{amount} paid', {
+                                  amount: formatCurrency(invoice.paidAmount),
+                                })}
                               </div>
                             )}
                           </div>
@@ -564,7 +570,7 @@ export function InvoicesPage() {
                               size="sm"
                               onClick={() => handleEditInvoice(invoice)}
                               className="h-9 w-9 p-0 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-300"
-                              title={t('common.edit', 'Edit Invoice')}
+                              title={t('invoices.editInvoice', 'Edit Invoice')}
                             >
                               <Edit className="h-4 w-4" />
                             </Button>
@@ -573,7 +579,7 @@ export function InvoicesPage() {
                               size="sm"
                               onClick={() => handleDeleteInvoice(String(invoice.id), invoice.invoiceNumber || '')}
                               className="h-9 w-9 p-0 hover:bg-red-50 hover:text-red-600 hover:border-red-300"
-                              title={t('common.delete', 'Delete Invoice')}
+                              title={t('invoices.deleteInvoice', 'Delete Invoice')}
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>
@@ -603,7 +609,7 @@ export function InvoicesPage() {
                   disabled={pagination.page <= 1}
                   className="h-9"
                 >
-                  Previous
+                  {t('common.previous', 'Previous')}
                 </Button>
                 {Array.from({ length: Math.min(pagination.totalPages, 5) }, (_, i) => {
                   const startPage = Math.max(1, pagination.page - 2);
@@ -628,7 +634,7 @@ export function InvoicesPage() {
                   disabled={pagination.page >= pagination.totalPages}
                   className="h-9"
                 >
-                  Next
+                  {t('common.next', 'Next')}
                 </Button>
               </div>
             </div>
@@ -653,7 +659,8 @@ export function InvoicesPage() {
         title={t('invoices.deleteConfirmTitle', 'Delete Invoice')}
         description={t(
           'invoices.deleteConfirmMessage',
-          `Are you sure you want to delete invoice ${confirmDialog.invoiceNumber}? This action cannot be undone and will remove all associated payment records.`
+          'Deleting invoice {number} also removes the payments recorded against it. This cannot be undone.',
+          { number: confirmDialog.invoiceNumber }
         )}
         confirmText={t('common.delete', 'Delete')}
         cancelText={t('common.cancel', 'Cancel')}

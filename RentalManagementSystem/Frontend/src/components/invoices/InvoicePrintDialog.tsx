@@ -2,6 +2,7 @@ import { Button } from '../ui';
 import { formatCurrency, formatDate } from '../../utils';
 import { Printer, Download, ArrowLeft, X } from 'lucide-react';
 import type { Invoice } from '../../types';
+import { useTranslation } from '../../hooks/useTranslation';
 
 interface InvoicePrintDialogProps {
   open: boolean;
@@ -11,6 +12,7 @@ interface InvoicePrintDialogProps {
 }
 
 export function InvoicePrintDialog({ open, onOpenChange, invoice, onExportPdf }: InvoicePrintDialogProps) {
+  const { t } = useTranslation();
   const handlePrint = () => {
     window.print();
   };
@@ -127,10 +129,10 @@ export function InvoicePrintDialog({ open, onOpenChange, invoice, onExportPdf }:
                   className="flex items-center gap-2"
                 >
                   <ArrowLeft className="h-4 w-4" />
-                  Back
+                  {t('common.back', 'Back')}
                 </Button>
                 <div className="h-6 w-px bg-gray-300"></div>
-                <h1 className="text-2xl font-bold text-gray-900">Invoice Preview</h1>
+                <h1 className="text-2xl font-bold text-gray-900">{t('invoices.preview', 'Invoice Preview')}</h1>
               </div>
               <div className="flex items-center gap-3">
                 <Button
@@ -139,14 +141,14 @@ export function InvoicePrintDialog({ open, onOpenChange, invoice, onExportPdf }:
                   className="flex items-center gap-2"
                 >
                   <Download className="h-4 w-4" />
-                  Export PDF
+                  {t('invoices.exportPdf', 'Export PDF')}
                 </Button>
                 <Button
                   onClick={handlePrint}
                   className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700"
                 >
                   <Printer className="h-4 w-4" />
-                  Print Invoice
+                  {t('invoices.print', 'Print Invoice')}
                 </Button>
                 <Button
                   variant="outline"
@@ -167,11 +169,11 @@ export function InvoicePrintDialog({ open, onOpenChange, invoice, onExportPdf }:
               {/* Invoice Header */}
               <div className="flex items-start justify-between mb-4 pb-3 border-b-2 border-blue-600 no-break print:mb-3 print:pb-2">
                 <div>
-                  <h1 className="text-3xl font-bold text-blue-600 mb-1 print:text-2xl">INVOICE</h1>
-                  <p className="text-xs text-gray-600 print:text-[9px] print:leading-tight">Rental Management System</p>
+                  <h1 className="text-3xl font-bold text-blue-600 mb-1 print:text-2xl">{t('invoices.invoice', 'Invoice')}</h1>
+                  <p className="text-xs text-gray-600 print:text-[9px] print:leading-tight">{t('dashboard.welcomeMessage', 'Welcome to the Rental Management System')}</p>
                   <p className="text-xs text-gray-600 print:text-[9px] print:leading-tight">2/47 Phạm Văn Bạch, Phường Tân Sơn, TP. Hồ Chí Minh</p>
-                  <p className="text-xs text-gray-600 print:text-[9px] print:leading-tight">Phone: (555) 123-4567</p>
-                  <p className="text-xs text-gray-600 print:text-[9px] print:leading-tight">Email: info@rental.com</p>
+                  <p className="text-xs text-gray-600 print:text-[9px] print:leading-tight">{t('auth.phoneNumber', 'Phone number')}: (+84) 966332942</p>
+                  <p className="text-xs text-gray-600 print:text-[9px] print:leading-tight">{t('auth.email', 'Email Address')}: info@rental.com</p>
                 </div>
                 <div className="text-right">
                   <div className="text-2xl font-bold text-gray-900 mb-2 print:text-xl print:mb-1">
@@ -191,42 +193,44 @@ export function InvoicePrintDialog({ open, onOpenChange, invoice, onExportPdf }:
               {/* Bill To & Invoice Details */}
               <div className="grid grid-cols-2 gap-6 mb-4 no-break print:gap-4 print:mb-3">
                 <div>
-                  <h3 className="text-xs font-bold text-gray-700 mb-2 uppercase print:text-[9px] print:mb-1">Bill To</h3>
+                  <h3 className="text-xs font-bold text-gray-700 mb-2 uppercase print:text-[9px] print:mb-1">{t('invoices.billTo', 'Bill To')}</h3>
                   <div className="text-gray-900">
                     <p className="font-semibold text-base print:text-sm print:leading-tight">
-                      {invoiceData.tenant?.fullName || `${invoice.tenant?.firstName} ${invoice.tenant?.lastName}`}
+                      {invoiceData.customer?.fullName || `${invoice.customer?.firstName} ${invoice.customer?.lastName}`}
                     </p>
                     <p className="text-xs text-gray-600 mt-1 print:text-[9px] print:mt-0.5 print:leading-tight">
-                      Room: {invoiceData.room?.roomNumber || invoice.room?.roomNumber}
+                      {t('contracts.room', 'Room')}: {invoiceData.room?.roomNumber || invoice.room?.roomNumber}
                     </p>
                     <p className="text-xs text-gray-600 print:text-[9px] print:leading-tight">
-                      Email: {invoiceData.tenant?.email || invoice.tenant?.email}
+                      {t('auth.email', 'Email Address')}: {invoiceData.customer?.email || invoice.customer?.email}
                     </p>
                     <p className="text-xs text-gray-600 print:text-[9px] print:leading-tight">
-                      Phone: {invoiceData.tenant?.phoneNumber || invoice.tenant?.phoneNumber}
+                      {t('auth.phoneNumber', 'Phone number')}: {invoiceData.customer?.phoneNumber || invoice.customer?.phoneNumber}
                     </p>
                   </div>
                 </div>
                 <div>
-                  <h3 className="text-xs font-bold text-gray-700 mb-2 uppercase print:text-[9px] print:mb-1">Invoice Details</h3>
+                  <h3 className="text-xs font-bold text-gray-700 mb-2 uppercase print:text-[9px] print:mb-1">{t('invoices.invoiceDetails', 'Invoice Details')}</h3>
                   <div className="space-y-1 text-xs print:text-[9px] print:space-y-0.5">
                     <div className="flex justify-between print:leading-tight">
-                      <span className="text-gray-600">Issue Date:</span>
+                      <span className="text-gray-600">{t('invoices.issueDate', 'Issue Date')}</span>
                       <span className="font-medium">{formatDate(invoiceData.issueDate || invoice.issueDate)}</span>
                     </div>
                     <div className="flex justify-between print:leading-tight">
-                      <span className="text-gray-600">Due Date:</span>
+                      <span className="text-gray-600">{t('invoices.dueDate', 'Due Date')}</span>
                       <span className="font-medium text-red-600">{formatDate(invoice.dueDate)}</span>
                     </div>
                     <div className="flex justify-between print:leading-tight">
-                      <span className="text-gray-600">Billing Period:</span>
+                      <span className="text-gray-600">{t('invoices.billingPeriod', 'Billing Period')}</span>
                       <span className="font-medium">
-                        {invoiceData.billingPeriod ? new Date(invoiceData.billingPeriod).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : 'N/A'}
+                        {invoiceData.billingPeriod
+                          ? formatDate(invoiceData.billingPeriod, { month: 'long', year: 'numeric', day: undefined })
+                          : '—'}
                       </span>
                     </div>
                     {invoiceData.paidDate && (
                       <div className="flex justify-between print:leading-tight">
-                        <span className="text-gray-600">Paid Date:</span>
+                        <span className="text-gray-600">{t('invoices.paidDate', 'Paid Date')}</span>
                         <span className="font-medium text-green-600">{formatDate(invoiceData.paidDate)}</span>
                       </div>
                     )}
@@ -239,18 +243,18 @@ export function InvoicePrintDialog({ open, onOpenChange, invoice, onExportPdf }:
                 <table className="w-full border border-gray-300">
                   <thead>
                     <tr className="bg-blue-600 text-white">
-                      <th className="px-2 py-2 text-left text-xs font-semibold border-r border-blue-500 print:px-1.5 print:py-1 print:text-[9px]">Description</th>
-                      <th className="px-2 py-2 text-center text-xs font-semibold border-r border-blue-500 print:px-1.5 print:py-1 print:text-[9px]">Qty</th>
-                      <th className="px-2 py-2 text-center text-xs font-semibold border-r border-blue-500 print:px-1.5 print:py-1 print:text-[9px]">Unit</th>
-                      <th className="px-2 py-2 text-right text-xs font-semibold border-r border-blue-500 print:px-1.5 print:py-1 print:text-[9px]">Unit Price</th>
-                      <th className="px-2 py-2 text-right text-xs font-semibold print:px-1.5 print:py-1 print:text-[9px]">Amount</th>
+                      <th className="px-2 py-2 text-left text-xs font-semibold border-r border-blue-500 print:px-1.5 print:py-1 print:text-[9px]">{t('items.description', 'Description')}</th>
+                      <th className="px-2 py-2 text-center text-xs font-semibold border-r border-blue-500 print:px-1.5 print:py-1 print:text-[9px]">{t('invoices.quantityShort', 'Qty')}</th>
+                      <th className="px-2 py-2 text-center text-xs font-semibold border-r border-blue-500 print:px-1.5 print:py-1 print:text-[9px]">{t('invoices.unitShort', 'Unit')}</th>
+                      <th className="px-2 py-2 text-right text-xs font-semibold border-r border-blue-500 print:px-1.5 print:py-1 print:text-[9px]">{t('items.unitPrice', 'Unit Price')}</th>
+                      <th className="px-2 py-2 text-right text-xs font-semibold print:px-1.5 print:py-1 print:text-[9px]">{t('invoices.amount', 'Amount')}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
                     {invoiceData.additionalCharges > 0 && (
                       <tr className="no-break hover:bg-gray-50">
                         <td className="px-2 py-2 text-xs text-gray-900 border-r border-gray-200 print:px-1.5 print:py-1 print:text-[9px]">
-                          <div className="font-medium">Additional Charges</div>
+                          <div className="font-medium">{t('invoices.additionalCharges', 'Additional Charges')}</div>
                           {invoiceData.additionalChargesDescription && (
                             <div className="text-[10px] text-gray-500 italic mt-0.5 print:text-[8px]">
                               {invoiceData.additionalChargesDescription}
@@ -301,7 +305,7 @@ export function InvoicePrintDialog({ open, onOpenChange, invoice, onExportPdf }:
                     {invoiceData.discount > 0 && (
                       <tr className="no-break bg-green-50">
                         <td colSpan={4} className="px-2 py-2 text-xs text-green-600 text-right font-medium border-r border-gray-200 print:px-1.5 print:py-1 print:text-[9px]">
-                          Discount
+                          {t('invoices.discount', 'Discount')}
                         </td>
                         <td className="px-2 py-2 text-xs text-green-600 text-right font-medium print:px-1.5 print:py-1 print:text-[9px]">
                           -{formatCurrency(invoiceData.discount)}
@@ -312,7 +316,7 @@ export function InvoicePrintDialog({ open, onOpenChange, invoice, onExportPdf }:
                   <tfoot>
                     <tr className="bg-gray-50 no-break">
                       <td colSpan={4} className="px-2 py-2 text-xs font-semibold text-gray-900 text-right border-r border-gray-200 print:px-1.5 print:py-1 print:text-[9px]">
-                        Subtotal:
+                        {t('invoices.subtotal', 'Subtotal')}
                       </td>
                       <td className="px-2 py-2 text-xs font-bold text-gray-900 text-right print:px-1.5 print:py-1 print:text-[9px]">
                         {formatCurrency(totalAmount)}
@@ -320,7 +324,7 @@ export function InvoicePrintDialog({ open, onOpenChange, invoice, onExportPdf }:
                     </tr>
                     <tr className="bg-blue-50 no-break">
                       <td colSpan={4} className="px-2 py-2 text-sm font-bold text-gray-900 text-right border-r border-gray-200 print:px-1.5 print:py-1.5 print:text-[10px]">
-                        TOTAL AMOUNT DUE:
+                        {t('invoices.totalAmountDue', 'Total amount due')}
                       </td>
                       <td className="px-2 py-2 text-lg font-bold text-blue-600 text-right print:px-1.5 print:py-1.5 print:text-sm">
                         {formatCurrency(totalAmount)}
@@ -330,7 +334,7 @@ export function InvoicePrintDialog({ open, onOpenChange, invoice, onExportPdf }:
                       <>
                         <tr className="bg-green-50 no-break">
                           <td colSpan={4} className="px-2 py-2 text-xs font-semibold text-green-700 text-right border-r border-gray-200 print:px-1.5 print:py-1 print:text-[9px]">
-                            Amount Paid:
+                            {t('invoices.paidAmount', 'Paid Amount')}
                           </td>
                           <td className="px-2 py-2 text-xs font-bold text-green-700 text-right print:px-1.5 print:py-1 print:text-[9px]">
                             {formatCurrency(paidAmount)}
@@ -338,7 +342,7 @@ export function InvoicePrintDialog({ open, onOpenChange, invoice, onExportPdf }:
                         </tr>
                         <tr className="bg-gray-100 no-break">
                           <td colSpan={4} className="px-2 py-2 text-sm font-bold text-gray-900 text-right border-r border-gray-200 print:px-1.5 print:py-1.5 print:text-[10px]">
-                            REMAINING BALANCE:
+                            {t('payments.remaining', 'Remaining Balance')}
                           </td>
                           <td className="px-2 py-2 text-lg font-bold text-right print:px-1.5 print:py-1.5 print:text-sm" style={{ color: remainingBalance > 0 ? '#dc2626' : '#16a34a' }}>
                             {formatCurrency(remainingBalance)}
@@ -353,14 +357,14 @@ export function InvoicePrintDialog({ open, onOpenChange, invoice, onExportPdf }:
               {/* Payment History */}
               {invoiceData.payments && invoiceData.payments.length > 0 && (
                 <div className="mb-4 no-break print:mb-3">
-                  <h3 className="text-xs font-bold text-gray-700 mb-2 uppercase print:text-[9px] print:mb-1">Payment History</h3>
+                  <h3 className="text-xs font-bold text-gray-700 mb-2 uppercase print:text-[9px] print:mb-1">{t('invoices.paymentHistory', 'Payment History')}</h3>
                   <table className="w-full border border-gray-300">
                     <thead>
                       <tr className="bg-gray-100">
-                        <th className="px-2 py-1.5 text-left text-[10px] font-semibold text-gray-700 border-r border-gray-300 print:px-1.5 print:py-1 print:text-[8px]">Date</th>
-                        <th className="px-2 py-1.5 text-left text-[10px] font-semibold text-gray-700 border-r border-gray-300 print:px-1.5 print:py-1 print:text-[8px]">Method</th>
-                        <th className="px-2 py-1.5 text-left text-[10px] font-semibold text-gray-700 border-r border-gray-300 print:px-1.5 print:py-1 print:text-[8px]">Reference</th>
-                        <th className="px-2 py-1.5 text-right text-[10px] font-semibold text-gray-700 print:px-1.5 print:py-1 print:text-[8px]">Amount</th>
+                        <th className="px-2 py-1.5 text-left text-[10px] font-semibold text-gray-700 border-r border-gray-300 print:px-1.5 print:py-1 print:text-[8px]">{t('payments.date', 'Date')}</th>
+                        <th className="px-2 py-1.5 text-left text-[10px] font-semibold text-gray-700 border-r border-gray-300 print:px-1.5 print:py-1 print:text-[8px]">{t('payments.method', 'Method')}</th>
+                        <th className="px-2 py-1.5 text-left text-[10px] font-semibold text-gray-700 border-r border-gray-300 print:px-1.5 print:py-1 print:text-[8px]">{t('payments.reference', 'Reference')}</th>
+                        <th className="px-2 py-1.5 text-right text-[10px] font-semibold text-gray-700 print:px-1.5 print:py-1 print:text-[8px]">{t('invoices.amount', 'Amount')}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200">
@@ -388,21 +392,21 @@ export function InvoicePrintDialog({ open, onOpenChange, invoice, onExportPdf }:
               {/* Notes */}
               {invoiceData.notes && (
                 <div className="mb-4 no-break print:mb-3">
-                  <h3 className="text-xs font-bold text-gray-700 mb-1.5 uppercase print:text-[9px] print:mb-1">Notes</h3>
+                  <h3 className="text-xs font-bold text-gray-700 mb-1.5 uppercase print:text-[9px] print:mb-1">{t('common.notes', 'Notes')}</h3>
                   <p className="text-xs text-gray-600 whitespace-pre-wrap print:text-[9px] print:leading-tight">{invoiceData.notes}</p>
                 </div>
               )}
 
               {/* Payment Instructions */}
               <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-3 no-break print:p-2 print:mb-2">
-                <h3 className="text-xs font-bold text-gray-700 mb-1.5 uppercase print:text-[9px] print:mb-1">Payment Instructions</h3>
-                <p className="text-xs text-gray-600 mb-1 print:text-[9px] print:leading-tight print:mb-0.5">Please make payment by the due date to avoid late fees.</p>
-                <p className="text-xs text-gray-600 mb-1 print:text-[9px] print:leading-tight print:mb-0.5">Accepted payment methods: Cash, Bank Transfer, Credit/Debit Card, Check</p>
+                <h3 className="text-xs font-bold text-gray-700 mb-1.5 uppercase print:text-[9px] print:mb-1">{t('invoices.paymentInstructions', 'Payment Instructions')}</h3>
+                <p className="text-xs text-gray-600 mb-1 print:text-[9px] print:leading-tight print:mb-0.5">{t('invoices.payBeforeDue', 'Please pay before the due date to avoid a late fee.')}</p>
+                <p className="text-xs text-gray-600 mb-1 print:text-[9px] print:leading-tight print:mb-0.5">{t('invoices.acceptedMethods', 'Accepted: cash, bank transfer, credit/debit card, cheque.')}</p>
                 <div className="mt-2 bg-blue-50 border border-blue-200 rounded p-2 print:mt-1 print:p-1.5">
-                  <p className="text-[10px] font-bold text-blue-900 mb-1 print:text-[8px] print:mb-0.5">Bank Details:</p>
+                  <p className="text-[10px] font-bold text-blue-900 mb-1 print:text-[8px] print:mb-0.5">{t('invoices.bankDetails', 'Bank details')}</p>
                   <p className="text-[11px] font-semibold text-blue-800 print:text-[9px] print:leading-tight">
-                    Bank Name: <span className="text-gray-900">Vo Thai Dung</span> | 
-                    Account: <span className="text-gray-900">50966332942 TPBank</span> | 
+                    {t('invoices.accountHolder', 'Account holder')}: <span className="text-gray-900">Vo Thai Dung</span> |{' '}
+                    {t('invoices.accountNumber', 'Account number')}: <span className="text-gray-900">50966332942 TPBank</span> |{' '}
                     Momo: <span className="text-gray-900">0966332942</span>
                   </p>
                 </div>
@@ -410,8 +414,8 @@ export function InvoicePrintDialog({ open, onOpenChange, invoice, onExportPdf }:
 
               {/* Footer */}
               <div className="border-t pt-3 text-center text-[10px] text-gray-500 no-break print:pt-2 print:text-[8px]">
-                <p>Thank you for your business!</p>
-                <p className="mt-0.5">Generated on {new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</p>
+                <p>{t('invoices.thankYou', 'Thank you!')}</p>
+                <p className="mt-0.5">{t('invoices.generatedOn', 'Generated on {date}', { date: formatDate(new Date()) })}</p>
               </div>
             </div>
           </div>

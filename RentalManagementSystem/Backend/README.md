@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-A comprehensive .NET 8 Web API for managing rental room operations, including room management, tenant tracking, invoice generation, payment processing, and reporting.
+A comprehensive .NET 8 Web API for managing rental room operations, including room management, customer tracking, invoice generation, payment processing, and reporting.
 
 ## Architecture
 
@@ -24,7 +24,7 @@ RentalManagement.Api/
 ├── Controllers/              # API endpoints
 │   ├── AuthController.cs     # Authentication operations
 │   ├── RoomsController.cs    # Room management
-│   ├── TenantsController.cs  # Tenant management
+│   ├── CustomersController.cs  # Customer management
 │   ├── InvoicesController.cs # Invoice operations
 │   ├── PaymentsController.cs # Payment processing
 │   └── ReportsController.cs  # Analytics and reporting
@@ -34,13 +34,13 @@ RentalManagement.Api/
 │   ├── Entities/            # Database entities
 │   │   ├── User.cs          # User management
 │   │   ├── Room.cs          # Room information
-│   │   ├── Tenant.cs        # Tenant details
+│   │   ├── Customer.cs        # Customer details
 │   │   ├── Invoice.cs       # Invoice tracking
 │   │   └── Payment.cs       # Payment records
 │   └── DTOs/                # Data Transfer Objects
 │       ├── AuthDtos.cs      # Authentication DTOs
 │       ├── RoomDtos.cs      # Room operation DTOs
-│       ├── TenantDtos.cs    # Tenant operation DTOs
+│       ├── CustomerDtos.cs    # Customer operation DTOs
 │       ├── InvoiceDtos.cs   # Invoice operation DTOs
 │       ├── PaymentDtos.cs   # Payment operation DTOs
 │       └── CommonDtos.cs    # Shared response models
@@ -69,15 +69,15 @@ RentalManagement.Api/
 - **Room statistics** and occupancy reporting
 - **Status management** with proper validation
 
-### 3. Tenant Management
-- **Complete tenant lifecycle** management
+### 3. Customer Management
+- **Complete customer lifecycle** management
 - **Room assignment** and unassignment functionality
 - **Contract tracking** with active status monitoring
-- **Tenant search and filtering** capabilities
-- **Tenant statistics** and reporting
+- **Customer search and filtering** capabilities
+- **Customer statistics** and reporting
 
 ### 4. Invoice Management
-- **Automated monthly invoice generation** for active tenants
+- **Automated monthly invoice generation** for active customers
 - **Invoice status tracking**: Draft, Sent, Paid, Overdue, Cancelled
 - **Due date calculations** and overdue detection
 - **Invoice search and filtering** by various criteria
@@ -95,7 +95,7 @@ RentalManagement.Api/
 - **Revenue analysis** and monthly breakdown
 - **Outstanding payments tracking**
 - **Financial summaries** for specified periods
-- **Tenant statistics** and demographics
+- **Customer statistics** and demographics
 - **Room utilization reports**
 - **Payment method distribution analysis**
 - **Dashboard summary** with key metrics
@@ -123,7 +123,7 @@ RentalManagement.Api/
 - Audit fields
 ```
 
-#### Tenant Entity
+#### Customer Entity
 ```csharp
 - Id (Primary Key)
 - Personal Information (Name, Email, Phone, etc.)
@@ -139,7 +139,7 @@ RentalManagement.Api/
 - Invoice Details (Number, Date, Due Date)
 - Amount calculations (Subtotal, Tax, Total)
 - Status tracking
-- Tenant and Room relationships
+- Customer and Room relationships
 - Audit fields
 ```
 
@@ -155,8 +155,8 @@ RentalManagement.Api/
 
 ### Relationships
 - **User → Many Roles** (ASP.NET Identity)
-- **Room → Many Tenants** (One-to-Many)
-- **Tenant → Many Invoices** (One-to-Many)
+- **Room → Many Customers** (One-to-Many)
+- **Customer → Many Invoices** (One-to-Many)
 - **Room → Many Invoices** (One-to-Many)
 - **Invoice → Many Payments** (One-to-Many)
 
@@ -182,18 +182,18 @@ RentalManagement.Api/
 - `PATCH /{id}/status/{status}` - Change room status
 - `GET /statistics` - Room occupancy statistics
 
-### Tenants (`/api/tenants`)
-- `GET /` - Get tenants with search/filter
-- `GET /{id}` - Get tenant by ID
-- `POST /` - Create tenant
-- `PUT /{id}` - Update tenant
-- `DELETE /{id}` - Delete tenant (Admin)
-- `POST /{tenantId}/assign-room` - Assign to room
-- `POST /{tenantId}/unassign-room` - Unassign from room
-- `GET /active` - Get active tenants
-- `GET /unassigned` - Get unassigned tenants
-- `GET /room/{roomId}` - Get tenants by room
-- `GET /statistics` - Tenant statistics
+### Customers (`/api/customers`)
+- `GET /` - Get customers with search/filter
+- `GET /{id}` - Get customer by ID
+- `POST /` - Create customer
+- `PUT /{id}` - Update customer
+- `DELETE /{id}` - Delete customer (Admin)
+- `POST /{customerId}/assign-room` - Assign to room
+- `POST /{customerId}/unassign-room` - Unassign from room
+- `GET /active` - Get active customers
+- `GET /unassigned` - Get unassigned customers
+- `GET /room/{roomId}` - Get customers by room
+- `GET /statistics` - Customer statistics
 
 ### Invoices (`/api/invoices`)
 - `GET /` - Get invoices with search/filter
@@ -202,7 +202,7 @@ RentalManagement.Api/
 - `PUT /{id}` - Update invoice
 - `DELETE /{id}` - Delete invoice (Admin)
 - `POST /generate-monthly` - Generate monthly invoices
-- `GET /tenant/{tenantId}` - Get invoices by tenant
+- `GET /customer/{customerId}` - Get invoices by customer
 - `GET /overdue` - Get overdue invoices
 - `POST /{id}/mark-paid` - Mark invoice as paid
 - `POST /send-reminders` - Send invoice reminders
@@ -224,7 +224,7 @@ RentalManagement.Api/
 - `GET /monthly-revenue/{year}` - Monthly revenue report
 - `GET /outstanding-payments` - Outstanding payments report
 - `GET /financial-summary` - Financial summary
-- `GET /tenant-statistics` - Tenant statistics
+- `GET /customer-statistics` - Customer statistics
 - `GET /room-utilization` - Room utilization report
 - `GET /payment-method-distribution` - Payment method distribution
 - `GET /dashboard-summary` - Dashboard summary
@@ -243,7 +243,7 @@ RentalManagement.Api/
 |---------|-------|---------|-------|
 | User Management | Full | View | View |
 | Room Management | Full | Full | Read/Update Status |
-| Tenant Management | Full | Full | Full |
+| Customer Management | Full | Full | Full |
 | Invoice Management | Full | Full | Full |
 | Payment Management | Full | Full | Create/Read |
 | Reports | Full | Full | - |
@@ -363,7 +363,7 @@ The project structure supports:
 ## Future Enhancements
 
 - **Email notifications** for invoice reminders
-- **File upload** for tenant documents
+- **File upload** for customer documents
 - **Advanced reporting** with charts and graphs
 - **Mobile API** optimizations
 - **Multi-tenancy** support

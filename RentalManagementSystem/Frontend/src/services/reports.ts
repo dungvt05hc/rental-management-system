@@ -4,7 +4,7 @@ import type {
   RevenueReport,
   OutstandingPaymentsReport,
   FinancialSummaryReport,
-  TenantStatisticsReport,
+  CustomerStatisticsReport,
   RoomUtilizationReport,
   PaymentMethodDistributionReport,
   DashboardSummaryReport,
@@ -38,9 +38,9 @@ export const reportService = {
     });
   },
 
-  // Get tenant statistics
-  async getTenantStatistics(): Promise<ApiResponse<TenantStatisticsReport>> {
-    return apiService.get<TenantStatisticsReport>('/reports/tenant-statistics');
+  // Get customer statistics
+  async getCustomerStatistics(): Promise<ApiResponse<CustomerStatisticsReport>> {
+    return apiService.get<CustomerStatisticsReport>('/reports/customer-statistics');
   },
 
   // Get room utilization report

@@ -21,7 +21,7 @@ public class InvoiceTotalTests : IAsyncLifetime
     private readonly PostgresFixture _fixture;
     private readonly IMapper _mapper;
 
-    private int _tenantId;
+    private int _customerId;
     private int _roomId;
 
     public InvoiceTotalTests(PostgresFixture fixture)
@@ -33,7 +33,7 @@ public class InvoiceTotalTests : IAsyncLifetime
     public async Task InitializeAsync()
     {
         await using var context = _fixture.CreateContext();
-        (_tenantId, _roomId) = await RentalTestData.ResetAndSeedTenantAsync(context, monthlyRent: 1_000m);
+        (_customerId, _roomId, _) = await RentalTestData.ResetAndSeedCustomerAsync(context, monthlyRent: 1_000m);
     }
 
     public Task DisposeAsync() => Task.CompletedTask;
@@ -46,7 +46,7 @@ public class InvoiceTotalTests : IAsyncLifetime
         decimal additionalCharges = 0,
         decimal discount = 0) => new()
         {
-            TenantId = _tenantId,
+            CustomerId = _customerId,
             RoomId = _roomId,
             AdditionalCharges = additionalCharges,
             Discount = discount,
@@ -247,7 +247,7 @@ public class InvoiceTotalTests : IAsyncLifetime
         await using var verify = _fixture.CreateContext();
         var invoice = await verify.Invoices.Include(i => i.InvoiceItems).SingleAsync();
 
-        // The invariant that matters to a tenant reading the invoice: the total is
+        // The invariant that matters to a customer reading the invoice: the total is
         // what the printed lines add up to.
         Assert.All(invoice.InvoiceItems, i => Assert.Equal(10.01m, i.LineTotalWithTax));
         Assert.Equal(30.03m, invoice.TotalAmount);

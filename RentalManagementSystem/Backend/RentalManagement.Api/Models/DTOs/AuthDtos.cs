@@ -22,8 +22,14 @@ public class LoginRequestDto
 }
 
 /// <summary>
-/// DTO for user registration requests
+/// DTO carrying the editable fields of a user profile
 /// </summary>
+/// <remarks>
+/// Không còn trường Role: đăng ký lấy role từ mã mời, còn việc gán role cho tài
+/// khoản có sẵn nằm ở <c>UsersController</c> dưới quyền Admin. Để lại một trường
+/// Role ở đây là mời gọi ai đó nối nó vào một luồng cho phép người dùng tự nâng
+/// quyền cho chính mình.
+/// </remarks>
 public class RegisterRequestDto
 {
     /// <summary>
@@ -66,11 +72,6 @@ public class RegisterRequestDto
     /// </summary>
     [Phone]
     public string? PhoneNumber { get; set; }
-
-    /// <summary>
-    /// Role to assign to the user
-    /// </summary>
-    public string Role { get; set; } = "Staff";
 }
 
 /// <summary>
@@ -153,10 +154,135 @@ public class LoginDto : LoginRequestDto
 }
 
 /// <summary>
-/// DTO for registration requests - alias for RegisterRequestDto
+/// DTO for self-registration with an invitation code
 /// </summary>
-public class RegisterDto : RegisterRequestDto
+/// <remarks>
+/// Cố tình KHÔNG có trường Role. Role của tài khoản do mã mời quy định, và cách
+/// duy nhất chắc chắn để server bỏ qua role trong request body là không có chỗ
+/// nào để bind nó vào — thêm một trường rồi nhớ xoá giá trị của nó là một dòng
+/// code có thể bị xoá nhầm về sau.
+/// </remarks>
+public class SelfRegisterDto
 {
+    /// <summary>
+    /// User's first name
+    /// </summary>
+    [Required]
+    [StringLength(100)]
+    public string FirstName { get; set; } = string.Empty;
+
+    /// <summary>
+    /// User's last name
+    /// </summary>
+    [Required]
+    [StringLength(100)]
+    public string LastName { get; set; } = string.Empty;
+
+    /// <summary>
+    /// User's email address
+    /// </summary>
+    [Required]
+    [EmailAddress]
+    [StringLength(256)]
+    public string Email { get; set; } = string.Empty;
+
+    /// <summary>
+    /// User's phone number, Vietnamese format
+    /// </summary>
+    [Required]
+    [RegularExpression(VietnamesePhonePattern,
+        ErrorMessage = "Phone number must have 10 digits and start with 03, 05, 07, 08 or 09")]
+    public string PhoneNumber { get; set; } = string.Empty;
+
+    /// <summary>
+    /// User's password. Must satisfy the Identity password policy.
+    /// </summary>
+    [Required]
+    [StringLength(100, MinimumLength = 10)]
+    public string Password { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Password confirmation
+    /// </summary>
+    [Required]
+    [Compare(nameof(Password))]
+    public string ConfirmPassword { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Invitation code issued by an administrator
+    /// </summary>
+    [Required]
+    [StringLength(64)]
+    public string InvitationCode { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Số điện thoại VN: 10 chữ số, đầu 03/05/07/08/09.
+    /// Frontend kiểm tra cùng luật này, nhưng kiểm tra ở client chỉ là tiện lợi —
+    /// request nào cũng có thể gửi thẳng tới API mà không đi qua form.
+    /// </summary>
+    private const string VietnamesePhonePattern = @"^0(3|5|7|8|9)\d{8}$";
+}
+
+/// <summary>
+/// DTO for the result of a self-registration
+/// </summary>
+/// <remarks>
+/// Không có JWT: tài khoản vừa tạo chưa xác nhận email nên chưa đăng nhập được.
+/// </remarks>
+public class SelfRegisterResultDto
+{
+    /// <summary>
+    /// Address the confirmation email was sent to
+    /// </summary>
+    public string Email { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Whether a confirmation email still has to be acted on before signing in
+    /// </summary>
+    public bool RequiresEmailConfirmation { get; set; } = true;
+}
+
+/// <summary>
+/// DTO for confirming an email address with the token from the emailed link
+/// </summary>
+public class ConfirmEmailDto
+{
+    /// <summary>
+    /// Email address the confirmation link was issued for
+    /// </summary>
+    [Required]
+    [EmailAddress]
+    public string Email { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Confirmation token from the emailed link
+    /// </summary>
+    [Required]
+    public string Token { get; set; } = string.Empty;
+}
+
+/// <summary>
+/// DTO for asking for another email confirmation link
+/// </summary>
+public class ResendConfirmationDto
+{
+    /// <summary>
+    /// Address of the account waiting for confirmation
+    /// </summary>
+    [Required]
+    [EmailAddress]
+    public string Email { get; set; } = string.Empty;
+}
+
+/// <summary>
+/// DTO telling the registration form whether an address is still free
+/// </summary>
+public class CheckEmailResultDto
+{
+    /// <summary>
+    /// True when no account uses this address yet
+    /// </summary>
+    public bool Available { get; set; }
 }
 
 /// <summary>
