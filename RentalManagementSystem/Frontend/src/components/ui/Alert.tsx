@@ -1,5 +1,8 @@
-import { ReactNode } from 'react';
-import * as React from 'react';
+import { forwardRef } from 'react';
+import type { HTMLAttributes, ReactNode } from 'react';
+import { AlertTriangle, CheckCircle2, Info, X, XCircle } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+import { cn } from '../../utils';
 import { useTranslation } from '../../hooks/useTranslation';
 
 export type AlertVariant = 'success' | 'error' | 'warning' | 'info';
@@ -12,123 +15,83 @@ export interface AlertProps {
   className?: string;
 }
 
-const variantStyles: Record<AlertVariant, { container: string; icon: string; closeButton: string }> = {
+/*
+ * Dùng đúng bảng màu trạng thái nghiệp vụ thay vì pastel -50/-200/-800 của
+ * Tailwind: người dùng học màu một lần rồi gặp lại cùng ý nghĩa ở cả chip
+ * trạng thái lẫn thông báo. Chữ trên nền tint đạt 4.68:1 trở lên.
+ */
+const variantStyles: Record<AlertVariant, { container: string; icon: string; Icon: LucideIcon }> = {
   success: {
-    container: 'bg-green-50 border-green-200 text-green-800',
-    icon: 'text-green-500',
-    closeButton: 'text-green-500 hover:text-green-700 focus:ring-green-600',
+    container: 'border-status-paid/30 bg-status-paid-tint text-status-paid',
+    icon: 'text-status-paid',
+    Icon: CheckCircle2,
   },
   error: {
-    container: 'bg-red-50 border-red-200 text-red-800',
-    icon: 'text-red-500',
-    closeButton: 'text-red-500 hover:text-red-700 focus:ring-red-600',
+    container: 'border-status-overdue/30 bg-status-overdue-tint text-status-overdue',
+    icon: 'text-status-overdue',
+    Icon: XCircle,
   },
   warning: {
-    container: 'bg-yellow-50 border-yellow-200 text-yellow-800',
-    icon: 'text-yellow-500',
-    closeButton: 'text-yellow-500 hover:text-yellow-700 focus:ring-yellow-600',
+    container: 'border-status-maintenance/30 bg-status-maintenance-tint text-status-maintenance',
+    icon: 'text-status-maintenance',
+    Icon: AlertTriangle,
   },
   info: {
-    container: 'bg-blue-50 border-blue-200 text-blue-800',
-    icon: 'text-blue-500',
-    closeButton: 'text-blue-500 hover:text-blue-700 focus:ring-blue-600',
+    container: 'border-primary/30 bg-primary-tint text-primary',
+    icon: 'text-primary',
+    Icon: Info,
   },
 };
 
-const icons: Record<AlertVariant, ReactNode> = {
-  success: (
-    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-    </svg>
-  ),
-  error: (
-    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-    </svg>
-  ),
-  warning: (
-    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-      <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-    </svg>
-  ),
-  info: (
-    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-    </svg>
-  ),
-};
-
-export function Alert({ variant = 'info', title, children, onClose, className = '' }: AlertProps) {
+export function Alert({ variant = 'info', title, children, onClose, className }: AlertProps) {
   const { t } = useTranslation();
   const styles = variantStyles[variant];
+  const Icon = styles.Icon;
 
   return (
     <div
-      className={`rounded-lg border p-4 ${styles.container} ${className}`}
-      role="alert"
+      className={cn('flex gap-3 rounded-lg border p-3 sm:p-4', styles.container, className)}
+      // Lỗi và cảnh báo cắt ngang việc người dùng đang làm; thành công và thông
+      // tin thì đọc sau khi đọc xong câu hiện tại.
+      role={variant === 'error' || variant === 'warning' ? 'alert' : 'status'}
     >
-      <div className="flex">
-        <div className={`flex-shrink-0 ${styles.icon}`}>
-          {icons[variant]}
-        </div>
-        <div className="ml-3 flex-1">
-          {title && (
-            <h3 className="text-sm font-medium mb-1">
-              {title}
-            </h3>
-          )}
-          <div className="text-sm">
-            {children}
-          </div>
-        </div>
-        {onClose && (
-          <div className="ml-auto pl-3">
-            <div className="-mx-1.5 -my-1.5">
-              <button
-                type="button"
-                onClick={onClose}
-                className={`inline-flex rounded-md p-1.5 focus:outline-none focus:ring-2 focus:ring-offset-2 ${styles.closeButton}`}
-                aria-label={t('common.close', 'Close')}
-              >
-                <span className="sr-only">{t('common.close', 'Close')}</span>
-                <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                </svg>
-              </button>
-            </div>
-          </div>
-        )}
+      <Icon className={cn('mt-0.5 h-5 w-5 shrink-0', styles.icon)} aria-hidden="true" />
+
+      <div className="min-w-0 flex-1">
+        {title && <h3 className="mb-0.5 text-sm font-semibold">{title}</h3>}
+        <div className="text-sm">{children}</div>
       </div>
+
+      {onClose && (
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label={t('common.close', 'Đóng')}
+          className={cn(
+            '-m-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-md',
+            'transition-colors duration-100 hover:bg-ink/10',
+            'focus-ring',
+            'max-sm:h-touch max-sm:w-touch'
+          )}
+        >
+          <X className="h-4 w-4" aria-hidden="true" />
+        </button>
+      )}
     </div>
   );
 }
 
-/**
- * Alert Title Component
- */
-export const AlertTitle = React.forwardRef<
-  HTMLParagraphElement,
-  React.HTMLAttributes<HTMLHeadingElement>
->(({ className, ...props }, ref) => (
-  <h5
-    ref={ref}
-    className={`mb-1 font-medium leading-none tracking-tight ${className || ''}`}
-    {...props}
-  />
-));
+export const AlertTitle = forwardRef<HTMLHeadingElement, HTMLAttributes<HTMLHeadingElement>>(
+  ({ className, ...props }, ref) => (
+    // `leading-none` cũ cắt cụt dấu trên chữ hoa tiếng Việt.
+    <h5 ref={ref} className={cn('mb-0.5 text-sm font-semibold', className)} {...props} />
+  )
+);
 AlertTitle.displayName = 'AlertTitle';
 
-/**
- * Alert Description Component
- */
-export const AlertDescription = React.forwardRef<
-  HTMLParagraphElement,
-  React.HTMLAttributes<HTMLParagraphElement>
->(({ className, ...props }, ref) => (
-  <div
-    ref={ref}
-    className={`text-sm [&_p]:leading-relaxed ${className || ''}`}
-    {...props}
-  />
-));
+export const AlertDescription = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>(
+  ({ className, ...props }, ref) => (
+    <div ref={ref} className={cn('text-sm', className)} {...props} />
+  )
+);
 AlertDescription.displayName = 'AlertDescription';

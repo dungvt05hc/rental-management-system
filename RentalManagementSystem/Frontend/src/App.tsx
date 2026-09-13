@@ -26,6 +26,7 @@ import { ItemsPage } from './components/items/ItemsPage';
 import SystemManagement from './components/SystemManagement/SystemManagement';
 import { LanguageManagement } from './components/admin/LanguageManagement';
 import { UserManagementPage } from './components/user-management/UserManagementPage';
+import { DesignSystemPage } from './components/design-system/DesignSystemPage';
 import { CreateUserPage } from './components/user-management/CreateUserPage';
 import type { ReactNode } from 'react';
 import './index.css'
@@ -235,6 +236,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute feature="invitations">
             <InvitationsPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/design-system"
+        element={
+          <ProtectedRoute feature="designSystem">
+            <DesignSystemPage />
           </ProtectedRoute>
         }
       />

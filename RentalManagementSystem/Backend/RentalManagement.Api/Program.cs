@@ -20,6 +20,7 @@ using RentalManagement.Api.Security;
 using RentalManagement.Api.Services.Implementations;
 using RentalManagement.Api.Services.Interfaces;
 using Serilog;
+using RentalManagement.Api.Infrastructure;
 
 static string NormalizePostgresConnectionString(string input)
 {
@@ -421,7 +422,13 @@ else
 }
 
 // Add controllers
-builder.Services.AddControllers();
+builder.Services.AddControllers(options =>
+{
+    // Chèn vào ĐẦU danh sách để giành quyền bind DateTime trước binder mặc định.
+    // Không có nó, ngày gửi lên dạng "2026-09-01" mang Kind=Unspecified và
+    // Npgsql từ chối ghi vào cột timestamptz — xem Infrastructure/UtcDateTimeModelBinder.cs.
+    options.ModelBinderProviders.Insert(0, new UtcDateTimeModelBinderProvider());
+});
 
 // Add API documentation
 builder.Services.AddEndpointsApiExplorer();

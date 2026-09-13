@@ -1,21 +1,33 @@
-import * as React from 'react';
-import { Check } from 'lucide-react';
+import { forwardRef } from 'react';
+import { Check, Minus } from 'lucide-react';
+import { cn } from '../../utils';
 
 interface CheckboxProps {
   checked?: boolean;
+  /** Đã chọn một phần — dùng cho ô "chọn tất cả" ở đầu bảng. */
+  indeterminate?: boolean;
   onCheckedChange?: (checked: boolean) => void;
   disabled?: boolean;
   className?: string;
   id?: string;
+  'aria-label'?: string;
+  'aria-labelledby'?: string;
 }
 
-export const Checkbox = React.forwardRef<HTMLButtonElement, CheckboxProps>(
-  ({ checked = false, onCheckedChange, disabled = false, className = '', id }, ref) => {
-    const handleClick = () => {
-      if (!disabled && onCheckedChange) {
-        onCheckedChange(!checked);
-      }
-    };
+export const Checkbox = forwardRef<HTMLButtonElement, CheckboxProps>(
+  (
+    {
+      checked = false,
+      indeterminate = false,
+      onCheckedChange,
+      disabled = false,
+      className,
+      id,
+      ...aria
+    },
+    ref
+  ) => {
+    const isOn = checked || indeterminate;
 
     return (
       <button
@@ -23,19 +35,30 @@ export const Checkbox = React.forwardRef<HTMLButtonElement, CheckboxProps>(
         id={id}
         type="button"
         role="checkbox"
-        aria-checked={checked}
+        aria-checked={indeterminate ? 'mixed' : checked}
         disabled={disabled}
-        onClick={handleClick}
-        className={`
-          h-4 w-4 rounded border border-gray-300 flex items-center justify-center
-          transition-colors focus-visible:outline-none focus-visible:ring-2
-          focus-visible:ring-offset-2 focus-visible:ring-primary
-          disabled:cursor-not-allowed disabled:opacity-50
-          ${checked ? 'bg-primary border-primary' : 'bg-white'}
-          ${className}
-        `}
+        onClick={() => !disabled && onCheckedChange?.(!checked)}
+        className={cn(
+          'relative flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border',
+          'transition-colors duration-100',
+          'focus-ring',
+          // Ô vuông vẫn 16px cho đúng mật độ bảng, nhưng vùng bấm nở ra 44px
+          // bằng pseudo-element nên không đẩy layout. Người đi thu tiền bấm
+          // bằng ngón cái, không bấm bằng con trỏ chuột.
+          "after:absolute after:content-[''] after:-inset-2.5 max-sm:after:-inset-3.5",
+          isOn
+            ? 'border-primary bg-primary text-primary-foreground'
+            : 'border-input bg-surface hover:border-ink-muted',
+          'disabled:cursor-not-allowed disabled:opacity-60',
+          className
+        )}
+        {...aria}
       >
-        {checked && <Check className="h-3 w-3 text-white" />}
+        {indeterminate ? (
+          <Minus className="h-3 w-3" strokeWidth={3} aria-hidden="true" />
+        ) : (
+          checked && <Check className="h-3 w-3" strokeWidth={3} aria-hidden="true" />
+        )}
       </button>
     );
   }

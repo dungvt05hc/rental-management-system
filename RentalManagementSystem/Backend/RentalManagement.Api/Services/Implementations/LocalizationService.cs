@@ -5,6 +5,7 @@ using RentalManagement.Api.Data;
 using RentalManagement.Api.Models.DTOs;
 using RentalManagement.Api.Models.Entities;
 using RentalManagement.Api.Services.Interfaces;
+using RentalManagement.Api.Models.Exceptions;
 
 namespace RentalManagement.Api.Services.Implementations;
 
@@ -67,7 +68,7 @@ public class LocalizationService : ILocalizationService
         // Check if language code already exists
         if (await _context.Languages.AnyAsync(l => l.Code == createLanguageDto.Code))
         {
-            throw new InvalidOperationException($"Language with code '{createLanguageDto.Code}' already exists");
+            throw new DomainConflictException($"Language with code '{createLanguageDto.Code}' already exists");
         }
 
         // If this is the first language or set as default, ensure it's the only default
@@ -98,7 +99,7 @@ public class LocalizationService : ILocalizationService
 
         if (language is null)
         {
-            throw new InvalidOperationException($"Language with code '{code}' not found");
+            throw new DomainNotFoundException($"Language with code '{code}' not found");
         }
 
         // If setting as default, unset other defaults
@@ -138,7 +139,7 @@ public class LocalizationService : ILocalizationService
         // Prevent deleting the default language
         if (language.IsDefault)
         {
-            throw new InvalidOperationException("Cannot delete the default language. Please set another language as default first.");
+            throw new DomainConflictException("Cannot delete the default language. Please set another language as default first.");
         }
 
         // Soft delete by setting IsActive to false
@@ -158,7 +159,7 @@ public class LocalizationService : ILocalizationService
 
         if (language is null)
         {
-            throw new InvalidOperationException($"Language with code '{code}' not found or inactive");
+            throw new DomainNotFoundException($"Language with code '{code}' not found or inactive");
         }
 
         // Unset current default
@@ -186,7 +187,7 @@ public class LocalizationService : ILocalizationService
 
         if (language is null)
         {
-            throw new InvalidOperationException($"Language with code '{languageCode}' not found");
+            throw new DomainNotFoundException($"Language with code '{languageCode}' not found");
         }
 
         var translations = await _context.Translations
@@ -205,7 +206,7 @@ public class LocalizationService : ILocalizationService
 
         if (language is null)
         {
-            throw new InvalidOperationException($"Language with code '{languageCode}' not found");
+            throw new DomainNotFoundException($"Language with code '{languageCode}' not found");
         }
 
         var translations = await _context.Translations
@@ -250,7 +251,7 @@ public class LocalizationService : ILocalizationService
 
         if (language is null)
         {
-            throw new InvalidOperationException($"Language with code '{languageCode}' not found");
+            throw new DomainNotFoundException($"Language with code '{languageCode}' not found");
         }
 
         var existingTranslation = await _context.Translations
@@ -300,7 +301,7 @@ public class LocalizationService : ILocalizationService
 
         if (language is null)
         {
-            throw new InvalidOperationException($"Language with code '{bulkTranslationDto.LanguageCode}' not found");
+            throw new DomainNotFoundException($"Language with code '{bulkTranslationDto.LanguageCode}' not found");
         }
 
         var existingTranslations = await _context.Translations

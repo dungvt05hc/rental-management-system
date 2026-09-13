@@ -91,15 +91,8 @@ public class LocalizationController : ControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<LanguageDto>> CreateLanguage([FromBody] CreateLanguageDto createLanguageDto)
     {
-        try
-        {
-            var language = await _localizationService.CreateLanguageAsync(createLanguageDto);
-            return CreatedAtAction(nameof(GetLanguageByCode), new { code = language.Code }, language);
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new { message = ex.Message });
-        }
+        var language = await _localizationService.CreateLanguageAsync(createLanguageDto);
+        return CreatedAtAction(nameof(GetLanguageByCode), new { code = language.Code }, language);
     }
 
     /// <summary>
@@ -114,15 +107,8 @@ public class LocalizationController : ControllerBase
         string code,
         [FromBody] UpdateLanguageDto updateLanguageDto)
     {
-        try
-        {
-            var language = await _localizationService.UpdateLanguageAsync(code, updateLanguageDto);
-            return Ok(language);
-        }
-        catch (InvalidOperationException ex)
-        {
-            return NotFound(new { message = ex.Message });
-        }
+        var language = await _localizationService.UpdateLanguageAsync(code, updateLanguageDto);
+        return Ok(language);
     }
 
     /// <summary>
@@ -135,21 +121,14 @@ public class LocalizationController : ControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> DeleteLanguage(string code)
     {
-        try
+        var result = await _localizationService.DeleteLanguageAsync(code);
+        
+        if (!result)
         {
-            var result = await _localizationService.DeleteLanguageAsync(code);
-            
-            if (!result)
-            {
-                return NotFound(new { message = $"Language with code '{code}' not found" });
-            }
+            return NotFound(new { message = $"Language with code '{code}' not found" });
+        }
 
-            return NoContent();
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new { message = ex.Message });
-        }
+        return NoContent();
     }
 
     /// <summary>
@@ -162,15 +141,8 @@ public class LocalizationController : ControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<LanguageDto>> SetDefaultLanguage(string code)
     {
-        try
-        {
-            var language = await _localizationService.SetDefaultLanguageAsync(code);
-            return Ok(language);
-        }
-        catch (InvalidOperationException ex)
-        {
-            return NotFound(new { message = ex.Message });
-        }
+        var language = await _localizationService.SetDefaultLanguageAsync(code);
+        return Ok(language);
     }
 
     /// <summary>
@@ -181,15 +153,8 @@ public class LocalizationController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<IEnumerable<TranslationDto>>> GetTranslations(string languageCode)
     {
-        try
-        {
-            var translations = await _localizationService.GetTranslationsAsync(languageCode);
-            return Ok(translations);
-        }
-        catch (InvalidOperationException ex)
-        {
-            return NotFound(new { message = ex.Message });
-        }
+        var translations = await _localizationService.GetTranslationsAsync(languageCode);
+        return Ok(translations);
     }
 
     /// <summary>
@@ -200,15 +165,8 @@ public class LocalizationController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<TranslationResourceDto>> GetTranslationResources(string languageCode)
     {
-        try
-        {
-            var resources = await _localizationService.GetTranslationResourcesAsync(languageCode);
-            return Ok(resources);
-        }
-        catch (InvalidOperationException ex)
-        {
-            return NotFound(new { message = ex.Message });
-        }
+        var resources = await _localizationService.GetTranslationResourcesAsync(languageCode);
+        return Ok(resources);
     }
 
     /// <summary>
@@ -240,15 +198,8 @@ public class LocalizationController : ControllerBase
         string languageCode,
         [FromBody] UpsertTranslationDto upsertTranslationDto)
     {
-        try
-        {
-            var translation = await _localizationService.UpsertTranslationAsync(languageCode, upsertTranslationDto);
-            return Ok(translation);
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new { message = ex.Message });
-        }
+        var translation = await _localizationService.UpsertTranslationAsync(languageCode, upsertTranslationDto);
+        return Ok(translation);
     }
 
     /// <summary>
@@ -260,15 +211,8 @@ public class LocalizationController : ControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> BulkUpsertTranslations([FromBody] BulkTranslationDto bulkTranslationDto)
     {
-        try
-        {
-            await _localizationService.BulkUpsertTranslationsAsync(bulkTranslationDto);
-            return Ok(new { message = $"Successfully upserted {bulkTranslationDto.Translations.Count} translations" });
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new { message = ex.Message });
-        }
+        await _localizationService.BulkUpsertTranslationsAsync(bulkTranslationDto);
+        return Ok(new { message = $"Successfully upserted {bulkTranslationDto.Translations.Count} translations" });
     }
 
     /// <summary>

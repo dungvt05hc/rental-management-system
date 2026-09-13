@@ -5,6 +5,7 @@ using RentalManagement.Api.Models.DTOs;
 using RentalManagement.Api.Models.Entities;
 using RentalManagement.Api.Services.Interfaces;
 using System.Text.Json;
+using RentalManagement.Api.Models.Exceptions;
 
 namespace RentalManagement.Api.Services.Implementations;
 
@@ -87,7 +88,7 @@ public class SystemManagementService : ISystemManagementService
 
         if (existingSetting is not null)
         {
-            throw new InvalidOperationException($"Setting with key '{createDto.Key}' already exists");
+            throw new DomainConflictException($"Setting with key '{createDto.Key}' already exists");
         }
 
         var setting = _mapper.Map<SystemSetting>(createDto);
@@ -110,12 +111,12 @@ public class SystemManagementService : ISystemManagementService
 
         if (setting is null)
         {
-            throw new InvalidOperationException($"Setting with key '{key}' not found");
+            throw new DomainNotFoundException($"Setting with key '{key}' not found");
         }
 
         if (!setting.IsEditable)
         {
-            throw new InvalidOperationException($"Setting '{key}' is not editable");
+            throw new DomainConflictException($"Setting '{key}' is not editable");
         }
 
         setting.Value = updateDto.Value;
@@ -173,7 +174,7 @@ public class SystemManagementService : ISystemManagementService
 
         if (!setting.IsEditable)
         {
-            throw new InvalidOperationException($"Setting '{key}' cannot be deleted");
+            throw new DomainConflictException($"Setting '{key}' cannot be deleted");
         }
 
         _context.SystemSettings.Remove(setting);
@@ -427,7 +428,7 @@ public class SystemManagementService : ISystemManagementService
 
         if (settings is null || settings.Count == 0)
         {
-            throw new InvalidOperationException("Invalid or empty settings data");
+            throw new DomainException("Invalid or empty settings data");
         }
 
         var importedCount = 0;

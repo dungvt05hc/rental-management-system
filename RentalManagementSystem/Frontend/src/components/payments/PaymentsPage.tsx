@@ -1,70 +1,141 @@
-import { useState, useEffect } from 'react';
-import { Plus, Search, Edit, Trash2, DollarSign } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card, CardContent, CardHeader, CardTitle, Badge, AlertDialog } from '../ui';
+import { Pencil, Plus, Search, Trash2, Wallet } from 'lucide-react';
+import {
+  Alert,
+  AlertDialog,
+  Badge,
+  Button,
+  DataTable,
+  EmptyState,
+  FilterBar,
+  Input,
+  PageHeader,
+  Pagination,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../ui';
+import type { DataTableColumn } from '../ui';
 import { paymentService } from '../../services';
-import { formatCurrency, formatDate } from '../../utils';
+import { enumLabel, formatCurrency, formatDate, PAYMENT_METHOD_LABELS } from '../../utils';
 import type { Payment } from '../../types';
 import { useTranslation } from '../../hooks/useTranslation';
 import { useToast } from '../../contexts/ToastContext';
+import { useDebounce } from '../../hooks';
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * Danh sách khoản thu.
+ *
+ * Đây là SỔ CÁI, không phải danh sách việc phải làm: mọi dòng ở đây đều là
+ * việc đã xong. Nên nó cố tình trầm hơn ba màn hình kia — không có màu trạng
+ * thái chạy dọc mép thẻ, không có gì đòi chú ý.
+ *
+ * Bản cũ có cột "Trạng thái" mà MỌI dòng đều ghi "Hoàn tất" bằng chip xanh —
+ * một cột không mang tin, lại còn tô cùng màu với "Đã thanh toán" ở bảng hoá
+ * đơn nên nó ăn mất sức nặng của màu đó. Đã bỏ.
+ *
+ * Bỏ luôn cột "Hoá đơn" riêng: mã hoá đơn và hạn của nó đã nằm ngay dưới tên
+ * khách ở cột đầu, in ra lần nữa ở cột hai là chép lại chính nó.
+ *
+ * LỖI CÓ THẬT ĐÃ SỬA: bản cũ lọc và phân trang TRÊN MỘT TRANG DỮ LIỆU. Nó xin
+ * server trang 1 gồm 10 dòng, rồi lọc trong 10 dòng đó, rồi lại cắt tiếp thành
+ * các trang 10 dòng — nên ô tìm kiếm chỉ thấy được 10 khoản thu mới nhất, và
+ * bấm sang trang 2 luôn ra trang trắng. Nay tìm kiếm và phân trang đều do
+ * server làm, giống ba màn hình kia.
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+const ALL = 'all';
+const PAGE_SIZE = 10;
+
+/* Khoá ở đây là tên enum đã bỏ hoa thường và dấu ngăn, khớp với normalizeMethod
+   bên dưới và với bảng nhãn ở utils/enumLabels.ts. */
+const METHOD_OPTIONS = [
+  { value: 'cash', key: 'payments.cash', fallback: 'Cash' },
+  { value: 'banktransfer', key: 'payments.bankTransfer', fallback: 'Bank Transfer' },
+  { value: 'creditcard', key: 'payments.creditCard', fallback: 'Credit Card' },
+  { value: 'debitcard', key: 'payments.debitCard', fallback: 'Debit Card' },
+  { value: 'digitalwallet', key: 'payments.digitalWallet', fallback: 'Digital Wallet' },
+  { value: 'check', key: 'payments.check', fallback: 'Check' },
+  { value: 'moneyorder', key: 'payments.moneyOrder', fallback: 'Money Order' },
+  { value: 'other', key: 'payments.other', fallback: 'Other' },
+] as const;
+
+function normalizeMethod(value: string | null | undefined): string {
+  return (value ?? '').toLowerCase().replace(/[\s_-]/g, '');
+}
 
 export function PaymentsPage() {
   const { t } = useTranslation();
   const { showSuccess, showError } = useToast();
   const navigate = useNavigate();
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [currentPage, setCurrentPage] = useState(1);
+
   const [payments, setPayments] = useState<Payment[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [searchInput, setSearchInput] = useState('');
+  const [methodFilter, setMethodFilter] = useState<string>(ALL);
+  const [page, setPage] = useState(1);
+  const [pagination, setPagination] = useState({ totalItems: 0, totalPages: 0 });
   const [confirmDialog, setConfirmDialog] = useState<{
     open: boolean;
     paymentId: string | null;
     paymentReference: string;
-  }>({
-    open: false,
-    paymentId: null,
-    paymentReference: '',
-  });
+  }>({ open: false, paymentId: null, paymentReference: '' });
 
-  const pageSize = 10;
+  const searchQuery = useDebounce(searchInput, 300);
+  const isFiltered = searchQuery.trim() !== '' || methodFilter !== ALL;
 
-  const loadPayments = async () => {
+  const loadPayments = useCallback(async () => {
     try {
+      setIsLoading(true);
+      setError(null);
+
       const response = await paymentService.getPayments({
-        search: searchTerm || undefined,
-        page: currentPage,
-        pageSize: pageSize,
+        search: searchQuery || undefined,
+        page,
+        pageSize: PAGE_SIZE,
       });
-      if (response.data) {
-        setPayments(response.data.items || []);
+
+      if (!response.success || !response.data) {
+        throw new Error(response.message || 'Failed to load payments');
       }
-    } catch (error) {
-      showError(
-        t('common.error', 'Error'),
-        error instanceof Error ? error.message : t('common.unknownError', 'An unknown error occurred')
-      );
+
+      setPayments(response.data.items || []);
+      setPagination({
+        totalItems: response.data.totalItems || 0,
+        totalPages: response.data.totalPages || 1,
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
+    } finally {
+      setIsLoading(false);
     }
-  };
+  }, [page, searchQuery]);
 
   useEffect(() => {
     loadPayments();
-  }, [searchTerm, currentPage, statusFilter]);
+  }, [loadPayments]);
 
-  const handleAddPayment = () => {
-    navigate('/payments/new');
-  };
+  useEffect(() => {
+    setPage(1);
+  }, [searchQuery, methodFilter]);
 
-  const handleEditPayment = (payment: Payment) => {
-    navigate(`/payments/${payment.id}/edit`);
-  };
-
-  const handleDeletePayment = (paymentId: string, paymentReference: string) => {
-    setConfirmDialog({
-      open: true,
-      paymentId,
-      paymentReference,
-    });
-  };
+  /*
+   * Lọc theo hình thức thanh toán vẫn làm ở client: PaymentSearchRequest của
+   * backend chưa có tham số này, và thêm vào là đổi API — ngoài phạm vi lần
+   * này. Nên số dòng hiện ra có thể ít hơn kích thước trang, và điều đó được
+   * nói thẳng ra bằng dòng chữ dưới bảng thay vì giả vờ như không có.
+   */
+  const visiblePayments = useMemo(
+    () =>
+      methodFilter === ALL
+        ? payments
+        : payments.filter((payment) => normalizeMethod(payment.methodName) === methodFilter),
+    [payments, methodFilter]
+  );
 
   const confirmDeletePayment = async () => {
     if (!confirmDialog.paymentId) return;
@@ -72,10 +143,16 @@ export function PaymentsPage() {
     try {
       const response = await paymentService.deletePayment(confirmDialog.paymentId);
       if (response.success) {
-        showSuccess(t('common.success', 'Success'), t('payments.deleteSuccess', 'Payment deleted successfully'));
+        showSuccess(
+          t('common.success', 'Success'),
+          t('payments.deleteSuccess', 'Payment deleted successfully')
+        );
         await loadPayments();
       } else {
-        showError(t('common.error', 'Error'), response.message || t('payments.deleteError', 'Failed to delete payment'));
+        showError(
+          t('common.error', 'Error'),
+          response.message || t('payments.deleteError', 'Failed to delete payment')
+        );
       }
     } catch (err) {
       showError(
@@ -87,252 +164,244 @@ export function PaymentsPage() {
     }
   };
 
-  const filteredPayments = payments.filter((payment: Payment) => {
-    const term = searchTerm.toLowerCase();
-    const matchesSearch =
-      (payment.invoice?.customerName || '').toLowerCase().includes(term) ||
-      (payment.invoice?.invoiceNumber || '').toLowerCase().includes(term) ||
-      (payment.invoice?.roomNumber || '').toLowerCase().includes(term) ||
-      (payment.methodName || '').toLowerCase().includes(term) ||
-      (payment.referenceNumber || '').toLowerCase().includes(term);
-
-    const matchesStatus =
-      statusFilter === 'all' || (payment.methodName || '').toLowerCase() === statusFilter.toLowerCase();
-
-    return matchesSearch && matchesStatus;
-  });
-
-  const totalPages = Math.ceil(filteredPayments.length / pageSize);
-  const paginatedPayments = filteredPayments.slice(
-    (currentPage - 1) * pageSize,
-    currentPage * pageSize
+  const columns: DataTableColumn<Payment>[] = useMemo(
+    () => [
+      {
+        key: 'customer',
+        header: t('payments.customer', 'Customer'),
+        cell: (payment) => (
+          <div className="min-w-0">
+            <span className="block truncate font-medium text-ink">
+              {payment.invoice?.customerName || '—'}
+            </span>
+            <span className="numeric block truncate text-xs text-ink-muted">
+              {payment.invoice?.invoiceNumber || '—'}
+              {payment.invoice?.roomNumber
+                ? ` · ${t('rooms.roomLabel', 'Room {number}', {
+                    number: payment.invoice.roomNumber,
+                  })}`
+                : ''}
+            </span>
+          </div>
+        ),
+        mobile: 'title',
+      },
+      {
+        key: 'amount',
+        header: t('invoices.amount', 'Amount'),
+        cell: (payment) => (
+          <span className="font-semibold text-ink">{formatCurrency(payment.amount)}</span>
+        ),
+        numeric: true,
+        mobile: 'primary',
+      },
+      {
+        key: 'method',
+        header: t('payments.method', 'Method'),
+        // Hình thức thanh toán là PHÂN LOẠI, không phải trạng thái. Chip trung
+        // tính hết — trước đây mỗi loại một màu, bốn màu không mang thông tin
+        // gì mà tranh chú ý với cột trạng thái thật ở bảng bên cạnh.
+        cell: (payment) => (
+          <Badge status={normalizeMethod(payment.methodName)} size="sm">
+            {enumLabel(t, PAYMENT_METHOD_LABELS, payment.methodName)}
+          </Badge>
+        ),
+        mobile: 'status',
+        width: 'w-40',
+      },
+      {
+        key: 'date',
+        header: t('payments.paymentDate', 'Payment Date'),
+        cell: (payment) => formatDate(payment.paymentDate),
+        numeric: true,
+        width: 'w-32',
+      },
+      {
+        key: 'reference',
+        header: t('payments.reference', 'Reference'),
+        cell: (payment) =>
+          payment.referenceNumber ? (
+            <span className="numeric">{payment.referenceNumber}</span>
+          ) : (
+            <span className="text-ink-muted">—</span>
+          ),
+      },
+      {
+        key: 'actions',
+        header: <span className="sr-only">{t('common.actions', 'Actions')}</span>,
+        align: 'right',
+        width: 'w-24',
+        mobile: 'hidden',
+        cell: (payment) => (
+          <div className="flex justify-end gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => navigate(`/payments/${payment.id}/edit`)}
+              aria-label={t('payments.editPayment', 'Edit Payment')}
+            >
+              <Pencil className="h-4 w-4" aria-hidden="true" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-destructive hover:bg-destructive-tint"
+              onClick={() =>
+                setConfirmDialog({
+                  open: true,
+                  paymentId: String(payment.id),
+                  paymentReference: payment.referenceNumber || '',
+                })
+              }
+              aria-label={t('payments.deletePayment', 'Delete Payment')}
+            >
+              <Trash2 className="h-4 w-4" aria-hidden="true" />
+            </Button>
+          </div>
+        ),
+      },
+    ],
+    [t, navigate]
   );
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">{t('payments.pageTitle', 'Payments Management')}</h1>
-          <p className="text-sm text-gray-500 mt-1">{t('payments.manageTrack', 'Manage and track all payment transactions')}</p>
-        </div>
-        <button
-          onClick={handleAddPayment}
-          className="px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all transform hover:scale-105 flex items-center space-x-2 shadow-lg"
-        >
-          <Plus className="h-5 w-5" />
-          <span className="font-medium">{t('payments.recordPayment', 'Record Payment')}</span>
-        </button>
-      </div>
+    <div className="flex flex-col gap-4 pb-8">
+      <PageHeader
+        title={t('payments.pageTitle', 'Payments Management')}
+        count={
+          pagination.totalItems > 0
+            ? t('payments.totalCount', '{count} total', { count: pagination.totalItems })
+            : undefined
+        }
+        actions={
+          <Button
+            onClick={() => navigate('/payments/new')}
+            leadingIcon={<Plus className="h-4 w-4" aria-hidden="true" />}
+          >
+            {t('payments.recordPayment', 'Record Payment')}
+          </Button>
+        }
+      />
 
-      {/* Filters and Search */}
-      <Card className="border-0 shadow-lg">
-        <CardContent className="p-6">
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="flex-1">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
-                <input
-                  type="text"
-                  placeholder={t('payments.searchPlaceholder', 'Search by customer name, email, method, or reference...')}
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                />
-              </div>
-            </div>
-            <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-2">
-                <select
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                  className="border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white min-w-[180px]"
-                >
-                  <option value="all">{t('payments.allMethods', 'All Methods')}</option>
-                  <option value="cash">{t('payments.cash', 'Cash')}</option>
-                  <option value="banktransfer">{t('payments.bankTransfer', 'Bank Transfer')}</option>
-                  <option value="check">{t('payments.check', 'Check')}</option>
-                  <option value="creditcard">{t('payments.creditCard', 'Credit Card')}</option>
-                </select>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Payments Table */}
-      <Card className="border-0 shadow-lg">
-        <CardHeader className="border-b bg-gray-50">
-          <CardTitle className="text-xl font-bold flex items-center justify-between">
-            <span>{t('payments.paymentTransactions', 'Payment Transactions')}</span>
-            <span className="text-sm font-medium px-3 py-1 bg-blue-100 text-blue-800 rounded-full">
-              {t('payments.totalCount', '{count} total', { count: filteredPayments.length })}
-            </span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          {paginatedPayments.length > 0 ? (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50 border-b-2 border-gray-200">
-                  <tr>
-                    <th className="text-left py-4 px-6 font-semibold text-gray-700 uppercase tracking-wider text-xs">{t('payments.customer', 'Customer')}</th>
-                    <th className="text-left py-4 px-6 font-semibold text-gray-700 uppercase tracking-wider text-xs">{t('invoices.invoice', 'Invoice')}</th>
-                    <th className="text-left py-4 px-6 font-semibold text-gray-700 uppercase tracking-wider text-xs">{t('invoices.amount', 'Amount')}</th>
-                    <th className="text-left py-4 px-6 font-semibold text-gray-700 uppercase tracking-wider text-xs">{t('payments.method', 'Method')}</th>
-                    <th className="text-left py-4 px-6 font-semibold text-gray-700 uppercase tracking-wider text-xs">{t('payments.date', 'Date')}</th>
-                    <th className="text-left py-4 px-6 font-semibold text-gray-700 uppercase tracking-wider text-xs">{t('rooms.status', 'Status')}</th>
-                    <th className="text-left py-4 px-6 font-semibold text-gray-700 uppercase tracking-wider text-xs">{t('payments.reference', 'Reference')}</th>
-                    <th className="text-left py-4 px-6 font-semibold text-gray-700 uppercase tracking-wider text-xs">{t('common.actions', 'Actions')}</th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-100">
-                  {paginatedPayments.map((payment: Payment) => (
-                    <tr key={payment.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="py-4 px-6">
-                        <div className="flex items-center space-x-3">
-                          <div className="w-10 h-10 bg-gradient-to-br from-blue-100 to-blue-200 rounded-full flex items-center justify-center shadow-inner">
-                            <DollarSign className="h-5 w-5 text-blue-600" />
-                          </div>
-                          <div>
-                            <p className="font-medium text-gray-900">
-                              {payment.invoice?.customerName || '—'}
-                            </p>
-                            <p className="text-sm text-gray-500">
-                              {payment.invoice?.invoiceNumber}
-                              {payment.invoice?.roomNumber && ` • ${t('customers.room', 'Room')} ${payment.invoice.roomNumber}`}
-                            </p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="py-4 px-6">
-                        <div>
-                          <p className="font-semibold text-gray-900">#{payment.invoice?.invoiceNumber}</p>
-                          <p className="text-sm text-gray-500">
-                            Due: {payment.invoice?.dueDate ? formatDate(payment.invoice.dueDate) : 'N/A'}
-                          </p>
-                        </div>
-                      </td>
-                      <td className="py-4 px-6">
-                        <span className="font-bold text-lg text-gray-900">
-                          {formatCurrency(payment.amount)}
-                        </span>
-                      </td>
-                      <td className="py-4 px-6">
-                        <div className="flex items-center space-x-2 px-3 py-2 bg-gray-50 rounded-lg w-fit">
-                          <DollarSign className="h-4 w-4 text-green-500" />
-                          <span className="text-gray-900 font-medium">{payment.methodName}</span>
-                        </div>
-                      </td>
-                      <td className="py-4 px-6">
-                        <div>
-                          <p className="text-gray-900 font-medium">{formatDate(payment.paymentDate)}</p>
-                          <p className="text-sm text-gray-500">
-                            {new Date(payment.paymentDate).toLocaleTimeString('en-US', {
-                              hour: '2-digit',
-                              minute: '2-digit',
-                            })}
-                          </p>
-                        </div>
-                      </td>
-                      <td className="py-4 px-6">
-                        <Badge variant="default" className="bg-green-100 text-green-800">
-                          {t('payments.completed', 'Completed')}
-                        </Badge>
-                      </td>
-                      <td className="py-4 px-6">
-                        <span className="text-gray-600 font-mono text-sm bg-gray-100 px-2 py-1 rounded">
-                          {payment.referenceNumber || 'N/A'}
-                        </span>
-                      </td>
-                      <td className="py-4 px-6">
-                        <div className="flex items-center space-x-2">
-                          <button
-                            onClick={() => handleEditPayment(payment)}
-                            className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                            title={t('payments.editPayment', 'Edit Payment')}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </button>
-                          <button
-                            onClick={() => handleDeletePayment(payment.id, payment.referenceNumber || '')}
-                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                            title={t('payments.deletePayment', 'Delete Payment')}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <div className="text-center py-16">
-              <DollarSign className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">{t('payments.noPaymentsFound', 'No payments found')}</h3>
-              <p className="text-gray-500 mb-6">{t('payments.noPaymentsMatch', 'No payments match your current search criteria.')}</p>
-              <button
-                onClick={handleAddPayment}
-                className="px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all inline-flex items-center space-x-2"
-              >
-                <Plus className="h-5 w-5" />
-                <span>{t('payments.recordFirstPayment', 'Record First Payment')}</span>
-              </button>
-            </div>
+      <FilterBar>
+        <Input
+          value={searchInput}
+          onChange={(event) => setSearchInput(event.target.value)}
+          placeholder={t(
+            'payments.searchPlaceholder',
+            'Search by customer name, email, method, or reference...'
           )}
-        </CardContent>
-      </Card>
-
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between bg-white p-6 rounded-lg shadow-lg border-0">
-          <p className="text-sm text-gray-700 font-medium">
-            {t('payments.showingRange', 'Showing {from} to {to} of {total} payments', {
-              from: ((currentPage - 1) * pageSize) + 1,
-              to: Math.min(currentPage * pageSize, filteredPayments.length),
-              total: filteredPayments.length,
-            })}
-          </p>
-          <div className="flex items-center space-x-2">
-            <button
-              onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-              disabled={currentPage === 1}
-              className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 transition-colors"
-            >
-              {t('common.previous', 'Previous')}
-            </button>
-            {[...Array(totalPages)].map((_, i) => (
-              <button
-                key={i + 1}
-                onClick={() => setCurrentPage(i + 1)}
-                className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-                  currentPage === i + 1
-                    ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-md'
-                    : 'border border-gray-300 hover:bg-gray-50'
-                }`}
-              >
-                {i + 1}
-              </button>
+          prefix={<Search className="h-4 w-4" aria-hidden="true" />}
+          aria-label={t('payments.searchPlaceholder', 'Search payments')}
+          containerClassName="sm:flex-1"
+        />
+        <Select value={methodFilter} onValueChange={setMethodFilter}>
+          <SelectTrigger className="sm:w-52" aria-label={t('payments.method', 'Method')}>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={ALL}>{t('payments.allMethods', 'All Methods')}</SelectItem>
+            {METHOD_OPTIONS.map((option) => (
+              <SelectItem key={option.value} value={option.value}>
+                {t(option.key, option.fallback)}
+              </SelectItem>
             ))}
-            <button
-              onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-              disabled={currentPage === totalPages}
-              className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 transition-colors"
-            >
-              {t('common.next', 'Next')}
-            </button>
+          </SelectContent>
+        </Select>
+      </FilterBar>
+
+      {error ? (
+        <Alert variant="error" title={t('payments.loadError', 'Could not load payments')}>
+          <div className="flex flex-wrap items-center gap-3">
+            <span>{t('common.unexpectedError', 'An error occurred')}</span>
+            <Button size="sm" variant="outline" onClick={loadPayments}>
+              {t('common.tryAgain', 'Try Again')}
+            </Button>
           </div>
-        </div>
+        </Alert>
+      ) : !isLoading && visiblePayments.length === 0 ? (
+        isFiltered ? (
+          <EmptyState
+            icon={<Search className="h-8 w-8" />}
+            title={t('payments.noMatchTitle', 'No payment matches this filter')}
+            description={t(
+              'payments.noPaymentsMatch',
+              'No payments match your current search criteria.'
+            )}
+            action={
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setSearchInput('');
+                  setMethodFilter(ALL);
+                }}
+              >
+                {t('common.clearFilters', 'Clear filters')}
+              </Button>
+            }
+          />
+        ) : (
+          <EmptyState
+            icon={<Wallet className="h-8 w-8" />}
+            title={t('payments.noPaymentsTitle', 'No payments recorded yet')}
+            description={t(
+              'payments.noPaymentsBody',
+              'Every amount you collect gets recorded here and lowers the balance on its invoice.'
+            )}
+            action={
+              <Button
+                onClick={() => navigate('/payments/new')}
+                leadingIcon={<Plus className="h-4 w-4" aria-hidden="true" />}
+              >
+                {t('payments.recordFirstPayment', 'Record First Payment')}
+              </Button>
+            }
+          />
+        )
+      ) : (
+        <>
+          <DataTable
+            columns={columns}
+            rows={visiblePayments}
+            rowKey={(payment) => payment.id}
+            caption={t('payments.paymentTransactions', 'Payment Transactions')}
+            isLoading={isLoading}
+            skeletonRows={PAGE_SIZE}
+            mobileActions={(payment) => (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => navigate(`/payments/${payment.id}/edit`)}
+                leadingIcon={<Pencil className="h-4 w-4" aria-hidden="true" />}
+              >
+                {t('common.edit', 'Edit')}
+              </Button>
+            )}
+          />
+
+          {/* Nói thẳng khi bộ lọc hình thức đang giấu bớt dòng của trang này. */}
+          {methodFilter !== ALL && visiblePayments.length < payments.length && (
+            <p className="text-xs text-ink-muted">
+              {t('payments.methodFilterNote', 'Showing {shown} of {onPage} payments on this page.', {
+                shown: visiblePayments.length,
+                onPage: payments.length,
+              })}
+            </p>
+          )}
+
+          <Pagination
+            page={page}
+            pageSize={PAGE_SIZE}
+            totalItems={pagination.totalItems}
+            totalPages={pagination.totalPages}
+            onPageChange={setPage}
+          />
+        </>
       )}
 
-      {/* Confirmation Dialog */}
       <AlertDialog
         open={confirmDialog.open}
-        onOpenChange={(open) =>
-          setConfirmDialog({ open, paymentId: null, paymentReference: '' })
-        }
+        onOpenChange={(open) => setConfirmDialog({ open, paymentId: null, paymentReference: '' })}
         title={t('payments.deleteConfirmTitle', 'Delete Payment')}
         description={t(
           'payments.deleteConfirmMessage',

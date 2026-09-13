@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { AlertCircle, CheckCircle, Info, XCircle, X } from 'lucide-react';
+import { AlertCircle, CheckCircle, Info, XCircle } from 'lucide-react';
 import * as AlertDialogPrimitive from '@radix-ui/react-alert-dialog';
 import { useTranslation } from '../../hooks/useTranslation';
 
@@ -16,6 +16,18 @@ interface AlertDialogProps {
   variant?: AlertType;
 }
 
+/*
+ * Hộp xác nhận.
+ *
+ * Dựng trên Radix AlertDialog thay vì hai thẻ <div> fixed như trước. Bản cũ
+ * thiếu bốn thứ mà một hộp xác nhận bắt buộc phải có: bẫy tiêu điểm (Tab đi
+ * thẳng ra trang phía sau), đóng bằng Escape, role="alertdialog" cho trình đọc
+ * màn hình, và khoá cuộn nền. Ngoài ra nút X cũ đặt `absolute` trong một thẻ
+ * không `relative` nên nó bay về góc màn hình chứ không nằm ở góc hộp.
+ *
+ * Radix trả tiêu điểm về đúng phần tử đã mở hộp khi đóng — quan trọng với bàn
+ * phím, và nó là lý do không tự viết lại bằng tay.
+ */
 export function AlertDialog({
   open,
   onOpenChange,
@@ -29,8 +41,6 @@ export function AlertDialog({
   const { t } = useTranslation();
   const [isLoading, setIsLoading] = React.useState(false);
 
-  if (!open) return null;
-
   const handleConfirm = async () => {
     setIsLoading(true);
     try {
@@ -41,113 +51,64 @@ export function AlertDialog({
     }
   };
 
-  const getIcon = () => {
-    switch (variant) {
-      case 'destructive':
-        return <XCircle className="h-6 w-6 text-red-600" />;
-      case 'warning':
-        return <AlertCircle className="h-6 w-6 text-yellow-600" />;
-      case 'success':
-        return <CheckCircle className="h-6 w-6 text-green-600" />;
-      case 'info':
-        return <Info className="h-6 w-6 text-blue-600" />;
-      default:
-        return <AlertCircle className="h-6 w-6 text-gray-600" />;
-    }
+  const visuals: Record<AlertType, { Icon: typeof AlertCircle; icon: string; confirm: string }> = {
+    destructive: { Icon: XCircle, icon: 'text-status-overdue', confirm: 'bg-destructive hover:bg-destructive-hover' },
+    warning: { Icon: AlertCircle, icon: 'text-status-maintenance', confirm: 'bg-status-maintenance hover:bg-status-maintenance/90' },
+    success: { Icon: CheckCircle, icon: 'text-status-paid', confirm: 'bg-status-paid hover:bg-status-paid/90' },
+    info: { Icon: Info, icon: 'text-primary', confirm: 'bg-primary hover:bg-primary-hover' },
+    default: { Icon: AlertCircle, icon: 'text-ink-muted', confirm: 'bg-primary hover:bg-primary-hover' },
   };
-
-  const getButtonColor = () => {
-    switch (variant) {
-      case 'destructive':
-        return 'bg-red-600 hover:bg-red-700 focus:ring-red-500';
-      case 'warning':
-        return 'bg-yellow-600 hover:bg-yellow-700 focus:ring-yellow-500';
-      case 'success':
-        return 'bg-green-600 hover:bg-green-700 focus:ring-green-500';
-      case 'info':
-        return 'bg-blue-600 hover:bg-blue-700 focus:ring-blue-500';
-      default:
-        return 'bg-gray-600 hover:bg-gray-700 focus:ring-gray-500';
-    }
-  };
+  const { Icon, icon, confirm } = visuals[variant];
 
   return (
-    <>
-      {/* Backdrop */}
-      <div
-        className="fixed inset-0 bg-black bg-opacity-50 transition-opacity z-40"
-        onClick={() => onOpenChange(false)}
-      />
-
-      {/* Dialog */}
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-lg shadow-xl max-w-md w-full animate-in fade-in-0 zoom-in-95 duration-200">
-          {/* Header with Icon */}
-          <div className="flex items-start p-6 pb-4">
-            <div className="flex-shrink-0">{getIcon()}</div>
-            <div className="ml-4 flex-1">
-              <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
-              <button
-                onClick={() => onOpenChange(false)}
-                className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
-                disabled={isLoading}
-              >
-                <X className="h-5 w-5" />
-              </button>
+    <AlertDialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
+      <AlertDialogPrimitive.Portal>
+        <AlertDialogPrimitive.Overlay className="fixed inset-0 z-50 bg-ink/50" />
+        <AlertDialogPrimitive.Content
+          className="fixed left-1/2 top-1/2 z-50 w-[calc(100vw-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-lg border border-line bg-surface shadow-dialog"
+          onEscapeKeyDown={isLoading ? (event) => event.preventDefault() : undefined}
+        >
+          <div className="flex gap-3 p-4 sm:p-5">
+            <Icon className={`mt-0.5 h-6 w-6 shrink-0 ${icon}`} aria-hidden="true" />
+            <div className="min-w-0 flex-1">
+              <AlertDialogPrimitive.Title className="text-lg font-semibold text-ink">
+                {title}
+              </AlertDialogPrimitive.Title>
+              <AlertDialogPrimitive.Description className="mt-1 text-sm text-ink-muted">
+                {description}
+              </AlertDialogPrimitive.Description>
             </div>
           </div>
 
-          {/* Content */}
-          <div className="px-6 pb-4">
-            <p className="text-sm text-gray-600 leading-relaxed">{description}</p>
-          </div>
-
-          {/* Footer with Actions */}
-          <div className="flex items-center justify-end gap-3 px-6 py-4 bg-gray-50 rounded-b-lg">
+          <div className="flex flex-col-reverse gap-2 border-t border-line p-4 sm:flex-row sm:justify-end sm:p-5">
+            <AlertDialogPrimitive.Cancel asChild>
+              <button
+                type="button"
+                disabled={isLoading}
+                className="focus-ring inline-flex h-10 min-h-touch items-center justify-center rounded-md border border-input bg-surface px-4 text-sm font-medium text-ink transition-colors duration-100 hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-60 sm:min-h-0"
+              >
+                {cancelText ?? t('common.cancel', 'Huỷ')}
+              </button>
+            </AlertDialogPrimitive.Cancel>
             <button
-              onClick={() => onOpenChange(false)}
-              disabled={isLoading}
-              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {cancelText ?? t('common.cancel', 'Cancel')}
-            </button>
-            <button
+              type="button"
               onClick={handleConfirm}
               disabled={isLoading}
-              className={`px-4 py-2 text-sm font-medium text-white rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${getButtonColor()}`}
+              aria-busy={isLoading || undefined}
+              className={`focus-ring inline-flex h-10 min-h-touch items-center justify-center gap-2 rounded-md px-4 text-sm font-medium text-white transition-colors duration-100 disabled:cursor-not-allowed disabled:opacity-60 sm:min-h-0 ${confirm}`}
             >
-              {isLoading ? (
-                <span className="flex items-center">
-                  <svg
-                    className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                  >
-                    <circle
-                      className="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="4"
-                    />
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                    />
-                  </svg>
-                  {t('common.loading', 'Loading...')}
-                </span>
-              ) : (
-                confirmText ?? t('common.confirm', 'OK')
+              {isLoading && (
+                <svg data-allow-motion className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
               )}
+              {isLoading ? t('common.loading', 'Đang xử lý…') : (confirmText ?? t('common.confirm', 'Xác nhận'))}
             </button>
           </div>
-        </div>
-      </div>
-    </>
+        </AlertDialogPrimitive.Content>
+      </AlertDialogPrimitive.Portal>
+    </AlertDialogPrimitive.Root>
   );
 }
 
@@ -174,7 +135,7 @@ const AlertDialogOverlay = React.forwardRef<
   React.ComponentPropsWithoutRef<typeof AlertDialogPrimitive.Overlay>
 >(({ className, ...props }, ref) => (
   <AlertDialogPrimitive.Overlay
-    className={`fixed inset-0 z-50 bg-black/50 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 ${
+    className={`fixed inset-0 z-50 bg-ink/50 ${
       className || ''
     }`}
     {...props}
@@ -194,7 +155,7 @@ const AlertDialogContent = React.forwardRef<
     <AlertDialogOverlay />
     <AlertDialogPrimitive.Content
       ref={ref}
-      className={`fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border border-gray-200 bg-white p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] rounded-lg ${
+      className={`fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border border-line bg-surface p-6 shadow-dialog rounded-lg ${
         className || ''
       }`}
       {...props}
@@ -257,7 +218,7 @@ const AlertDialogDescription = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <AlertDialogPrimitive.Description
     ref={ref}
-    className={`text-sm text-gray-500 ${className || ''}`}
+    className={`text-sm text-ink-muted ${className || ''}`}
     {...props}
   />
 ));
@@ -272,7 +233,7 @@ const AlertDialogAction = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <AlertDialogPrimitive.Action
     ref={ref}
-    className={`inline-flex h-10 items-center justify-center rounded-md bg-gray-900 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${
+    className={`inline-flex h-10 items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary-hover focus-ring disabled:cursor-not-allowed disabled:opacity-50 ${
       className || ''
     }`}
     {...props}
@@ -289,7 +250,7 @@ const AlertDialogCancel = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <AlertDialogPrimitive.Cancel
     ref={ref}
-    className={`mt-2 inline-flex h-10 items-center justify-center rounded-md border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-900 transition-colors hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 sm:mt-0 ${
+    className={`mt-2 inline-flex h-10 items-center justify-center rounded-md border border-line bg-surface px-4 py-2 text-sm font-semibold text-ink transition-colors hover:bg-secondary focus-ring disabled:cursor-not-allowed disabled:opacity-50 sm:mt-0 ${
       className || ''
     }`}
     {...props}

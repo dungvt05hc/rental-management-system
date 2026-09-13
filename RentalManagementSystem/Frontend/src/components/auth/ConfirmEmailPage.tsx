@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
-import { CheckCircle2, Loader2 } from 'lucide-react';
-import { Button, Card, CardContent } from '../ui';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Loader2 } from 'lucide-react';
+import { Alert, Button } from '../ui';
 import { authService } from '../../services/auth';
 import { isValidEmail } from '../../utils';
 import { useTranslation } from '../../hooks/useTranslation';
+import { AuthLink, AuthShell } from './AuthShell';
 
 // Cùng kiểm tra hình dạng token như ResetPasswordPage: token của Identity là
 // base64 của một khối đã ký, nên link bị mail client bẻ dòng hay cắt ngắn lộ ra
@@ -18,6 +19,7 @@ type ConfirmState =
 
 export function ConfirmEmailPage() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
   const email = searchParams.get('email') ?? '';
@@ -95,68 +97,63 @@ export function ConfirmEmailPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        <div className="text-center">
-          <h2 className="mt-6 text-3xl font-extrabold text-gray-900">
-            {t('auth.confirmEmailTitle', 'Confirm your email address')}
-          </h2>
-        </div>
+    <AuthShell
+      title={t('auth.confirmEmailTitle', 'Confirm your email address')}
+      footer={<AuthLink to="/login">{t('auth.backToLogin', 'Back to sign in')}</AuthLink>}
+    >
+      <div className="flex flex-col gap-4">
+        {state.status === 'confirming' && (
+          <p
+            className="flex items-center justify-center gap-2 text-sm text-ink-muted"
+            role="status"
+          >
+            <Loader2 data-allow-motion className="h-4 w-4 animate-spin" aria-hidden="true" />
+            {t('auth.confirmingEmail', 'Confirming your email address…')}
+          </p>
+        )}
 
-        <Card>
-          <CardContent className="space-y-4 pt-6">
-            {state.status === 'confirming' && (
-              <p className="flex items-center justify-center gap-2 text-sm text-gray-600">
-                <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-                {t('auth.confirmingEmail', 'Confirming your email address…')}
-              </p>
-            )}
+        {state.status === 'confirmed' && (
+          <>
+            <Alert variant="success" title={t('auth.emailConfirmedTitle', 'Address confirmed')}>
+              {state.message}
+            </Alert>
+            <Button type="button" fullWidth onClick={() => navigate('/login')}>
+              {t('auth.signIn', 'Sign In')}
+            </Button>
+          </>
+        )}
 
-            {state.status === 'confirmed' && (
-              <div className="flex items-start gap-3 rounded-md bg-green-50 p-4">
-                <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-green-600" aria-hidden="true" />
-                <p className="text-sm text-green-800">{state.message}</p>
-              </div>
-            )}
+        {state.status === 'failed' && (
+          <>
+            <Alert variant="error" title={t('auth.confirmEmailFailedTitle', 'Link not usable')}>
+              {state.message}
+            </Alert>
 
-            {state.status === 'failed' && (
+            {/* Không có đường này thì một token hết hạn là ngõ cụt vĩnh viễn:
+                tài khoản đã tồn tại nên không đăng ký lại được, mã mời thì đã
+                tiêu, mà chưa xác nhận email thì không đăng nhập được. */}
+            {isValidEmail(email) && (
               <>
-                <div className="rounded-md bg-red-50 p-4">
-                  <p className="text-sm text-red-800">{state.message}</p>
-                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  fullWidth
+                  onClick={handleResend}
+                  isLoading={isResending}
+                >
+                  {t('auth.resendConfirmation', 'Send a new confirmation link')}
+                </Button>
 
-                {/* Không có đường này thì một token hết hạn là ngõ cụt vĩnh viễn:
-                    tài khoản đã tồn tại nên không đăng ký lại được, mã mời thì đã
-                    tiêu, mà chưa xác nhận email thì không đăng nhập được. */}
-                {isValidEmail(email) && (
-                  <div className="space-y-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="w-full"
-                      onClick={handleResend}
-                      isLoading={isResending}
-                      disabled={isResending}
-                    >
-                      {t('auth.resendConfirmation', 'Send a new confirmation link')}
-                    </Button>
-
-                    {resendMessage && (
-                      <p className="text-sm text-gray-600">{resendMessage}</p>
-                    )}
-                  </div>
+                {resendMessage && (
+                  <p className="text-sm text-ink-muted" role="status">
+                    {resendMessage}
+                  </p>
                 )}
               </>
             )}
-
-            <div className="text-center">
-              <Link to="/login" className="text-sm font-medium text-primary hover:text-primary/80">
-                {t('auth.backToLogin', 'Back to sign in')}
-              </Link>
-            </div>
-          </CardContent>
-        </Card>
+          </>
+        )}
       </div>
-    </div>
+    </AuthShell>
   );
 }

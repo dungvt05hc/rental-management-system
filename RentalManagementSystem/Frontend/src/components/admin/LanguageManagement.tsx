@@ -1,104 +1,168 @@
-import React, { useState, useEffect } from 'react';
-import { Plus, Edit, Trash2, Star, Check, X, RefreshCw } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Globe, Pencil, Plus, RefreshCw, Star, Trash2 } from 'lucide-react';
+import {
+  Alert,
+  AlertDialog,
+  Badge,
+  Button,
+  Checkbox,
+  DataTable,
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  EmptyState,
+  Input,
+  Skeleton,
+} from '../ui';
+import type { DataTableColumn } from '../ui';
 import { localizationService } from '../../services/localizationService';
 import type { CreateLanguageDto, UpdateLanguageDto } from '../../services/localizationService';
 import type { Language } from '../../types/localization';
-import { AlertDialog } from '../ui';
 import { useTranslation } from '../../hooks/useTranslation';
 import { useToast } from '../../contexts/ToastContext';
 
-/**
- * Language Management Component
- * Provides full CRUD operations for managing languages
- */
+/* ═══════════════════════════════════════════════════════════════════════════
+ * Quản lý ngôn ngữ.
+ *
+ * LỖI NGHIÊM TRỌNG NHẤT ĐÃ SỬA: hộp thoại thêm/sửa được dựng tay bằng một
+ * `div fixed inset-0` chứ không dùng Dialog của hệ thống. Hậu quả:
+ *
+ *   - Không bẫy tiêu điểm: nhấn Tab là con trỏ chạy ra sau lớp phủ, gõ vào
+ *     những ô đang bị che.
+ *   - Không đóng bằng Escape.
+ *   - Không khoá cuộn nền.
+ *   - Không có role="dialog"/aria-modal, nên trình đọc màn hình vẫn đọc cả
+ *     trang phía sau như thể không có hộp thoại nào.
+ *
+ * Nay dùng Dialog chung — bốn thứ trên có sẵn.
+ *
+ * Cột "Mặc định" dùng NÚT SAO có nhãn đọc được, không phải một icon trần: bản
+ * cũ chỉ có `title`, mà title không đọc được bằng bàn phím và trình đọc màn
+ * hình bỏ qua trên phần tử không có tên.
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+interface LanguageFormState {
+  code: string;
+  name: string;
+  nativeName: string;
+  isDefault: boolean;
+  isActive: boolean;
+}
+
+const EMPTY_FORM: LanguageFormState = {
+  code: '',
+  name: '',
+  nativeName: '',
+  isDefault: false,
+  isActive: true,
+};
+
 export const LanguageManagement: React.FC = () => {
   const { t } = useTranslation();
   const { showSuccess, showError } = useToast();
+
   const [languages, setLanguages] = useState<Language[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
-  const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [editingLanguage, setEditingLanguage] = useState<Language | null>(null);
-  const [formData, setFormData] = useState<CreateLanguageDto | UpdateLanguageDto>({
-    code: '',
-    name: '',
-    nativeName: '',
-    isDefault: false,
-  });
+  const [formData, setFormData] = useState<LanguageFormState>(EMPTY_FORM);
   const [confirmDialog, setConfirmDialog] = useState<{
     open: boolean;
     languageCode: string;
     languageName: string;
-  }>({
-    open: false,
-    languageCode: '',
-    languageName: '',
-  });
+  }>({ open: false, languageCode: '', languageName: '' });
 
-  /**
-   * Load all languages including inactive ones
-   */
-  const loadLanguages = async () => {
+  const loadLanguages = useCallback(async () => {
     try {
       setLoading(true);
-      setError(null);
-      const data = await localizationService.getAllLanguages();
-      setLanguages(data);
+      setLoadError(null);
+      setLanguages(await localizationService.getAllLanguages());
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load languages');
+      setLoadError(
+        err instanceof Error ? err.message : t('languages.loadError', 'Could not load the languages')
+      );
     } finally {
       setLoading(false);
     }
-  };
+  }, [t]);
 
   useEffect(() => {
     loadLanguages();
-  }, []);
+  }, [loadLanguages]);
 
-  /**
-   * Handle create new language
-   */
-  const handleCreate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      await localizationService.createLanguage(formData as CreateLanguageDto);
-      await loadLanguages();
-      handleCloseModal();
-      showSuccess(t('common.success', 'Success'), t('languages.createSuccess', 'Language created successfully'));
-    } catch (err) {
-      showError(t('common.error', 'Error'), t('languages.createError', 'Failed to create language'));
-    }
+  const openCreate = () => {
+    setEditingLanguage(null);
+    setFormData(EMPTY_FORM);
+    setIsModalOpen(true);
   };
 
-  /**
-   * Handle update language
-   */
-  const handleUpdate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingLanguage) return;
-
-    try {
-      await localizationService.updateLanguage(
-        editingLanguage.code,
-        formData as UpdateLanguageDto
-      );
-      await loadLanguages();
-      handleCloseModal();
-      showSuccess(t('common.success', 'Success'), t('languages.updateSuccess', 'Language updated successfully'));
-    } catch (err) {
-      showError(t('common.error', 'Error'), t('languages.updateError', 'Failed to update language'));
-    }
-  };
-
-  /**
-   * Handle delete language
-   */
-  const handleDeleteLanguage = (code: string, name: string) => {
-    setConfirmDialog({
-      open: true,
-      languageCode: code,
-      languageName: name,
+  const openEdit = (language: Language) => {
+    setEditingLanguage(language);
+    setFormData({
+      code: language.code,
+      name: language.name,
+      nativeName: language.nativeName,
+      isDefault: language.isDefault,
+      isActive: language.isActive,
     });
+    setIsModalOpen(true);
+  };
+
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setIsSaving(true);
+
+    try {
+      if (editingLanguage) {
+        const payload: UpdateLanguageDto = {
+          name: formData.name,
+          nativeName: formData.nativeName,
+          isDefault: formData.isDefault,
+          isActive: formData.isActive,
+        };
+        await localizationService.updateLanguage(editingLanguage.code, payload);
+        showSuccess(
+          t('common.success', 'Success'),
+          t('languages.updateSuccess', 'Language updated successfully')
+        );
+      } else {
+        const payload: CreateLanguageDto = {
+          code: formData.code,
+          name: formData.name,
+          nativeName: formData.nativeName,
+          isDefault: formData.isDefault,
+        };
+        await localizationService.createLanguage(payload);
+        showSuccess(
+          t('common.success', 'Success'),
+          t('languages.createSuccess', 'Language created successfully')
+        );
+      }
+
+      setIsModalOpen(false);
+      setEditingLanguage(null);
+      setFormData(EMPTY_FORM);
+      await loadLanguages();
+    } catch (err) {
+      // Backend nay trả câu từ chối viết cho người dùng (DomainException), nên
+      // hiện nguyên văn nếu có — "Mã ngôn ngữ 'vi' đã tồn tại" hữu ích hơn hẳn
+      // một câu chung chung.
+      showError(
+        t('common.error', 'Error'),
+        err instanceof Error
+          ? err.message
+          : editingLanguage
+            ? t('languages.updateError', 'Failed to update language')
+            : t('languages.createError', 'Failed to create language')
+      );
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const confirmDeleteLanguage = async () => {
@@ -106,328 +170,278 @@ export const LanguageManagement: React.FC = () => {
 
     try {
       await localizationService.deleteLanguage(confirmDialog.languageCode);
-      showSuccess(t('common.success', 'Success'), t('languages.deleteSuccess', 'Language deleted successfully'));
-      loadLanguages();
-    } catch (error) {
-      showError(t('common.error', 'Error'), t('languages.deleteError', 'Failed to delete language'));
+      showSuccess(
+        t('common.success', 'Success'),
+        t('languages.deleteSuccess', 'Language deleted successfully')
+      );
+      await loadLanguages();
+    } catch (err) {
+      showError(
+        t('common.error', 'Error'),
+        err instanceof Error ? err.message : t('languages.deleteError', 'Failed to delete language')
+      );
     }
   };
 
-  /**
-   * Handle set default language
-   */
   const handleSetDefault = async (code: string) => {
     try {
       await localizationService.setDefaultLanguage(code);
       await loadLanguages();
-      showSuccess(t('common.success', 'Success'), t('languages.setDefaultSuccess', 'Default language set successfully'));
+      showSuccess(
+        t('common.success', 'Success'),
+        t('languages.setDefaultSuccess', 'Default language set successfully')
+      );
     } catch (err) {
-      showError(t('common.error', 'Error'), t('languages.setDefaultError', 'Failed to set default language'));
+      showError(
+        t('common.error', 'Error'),
+        err instanceof Error
+          ? err.message
+          : t('languages.setDefaultError', 'Failed to set default language')
+      );
     }
   };
 
-  /**
-   * Open modal for creating new language
-   */
-  const handleOpenCreateModal = () => {
-    setEditingLanguage(null);
-    setFormData({
-      code: '',
-      name: '',
-      nativeName: '',
-      isDefault: false,
-    });
-    setIsModalOpen(true);
-  };
+  const columns: DataTableColumn<Language>[] = useMemo(
+    () => [
+      {
+        key: 'language',
+        header: t('languages.name', 'Name'),
+        cell: (language) => (
+          <div className="min-w-0">
+            <span className="block truncate font-medium text-ink">{language.nativeName}</span>
+            <span className="block truncate text-xs text-ink-muted">
+              {language.name} · <span className="numeric">{language.code}</span>
+            </span>
+          </div>
+        ),
+        mobile: 'title',
+      },
+      {
+        key: 'status',
+        header: t('rooms.status', 'Status'),
+        cell: (language) => (
+          <Badge status={language.isActive ? 'active' : 'inactive'} size="sm">
+            {language.isActive
+              ? t('common.statusActive', 'Active')
+              : t('common.statusInactive', 'Inactive')}
+          </Badge>
+        ),
+        mobile: 'status',
+        width: 'w-32',
+      },
+      {
+        key: 'default',
+        header: t('languages.default', 'Default'),
+        width: 'w-36',
+        cell: (language) =>
+          language.isDefault ? (
+            <span className="inline-flex items-center gap-1.5 text-sm font-medium text-status-maintenance">
+              <Star className="h-4 w-4 fill-current" aria-hidden="true" />
+              {t('languages.default', 'Default')}
+            </span>
+          ) : (
+            // Nút thật có nhãn, không phải icon trần với title.
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => handleSetDefault(language.code)}
+              leadingIcon={<Star className="h-4 w-4" aria-hidden="true" />}
+            >
+              {t('languages.setAsDefault', 'Set as default')}
+            </Button>
+          ),
+      },
+      {
+        key: 'actions',
+        header: <span className="sr-only">{t('common.actions', 'Actions')}</span>,
+        align: 'right',
+        width: 'w-24',
+        mobile: 'hidden',
+        cell: (language) => (
+          <div className="flex justify-end gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => openEdit(language)}
+              aria-label={t('languages.editNamed', 'Edit {name}', { name: language.name })}
+            >
+              <Pencil className="h-4 w-4" aria-hidden="true" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-destructive hover:bg-destructive-tint"
+              disabled={language.isDefault}
+              onClick={() =>
+                setConfirmDialog({
+                  open: true,
+                  languageCode: language.code,
+                  languageName: language.name,
+                })
+              }
+              aria-label={t('languages.deleteNamed', 'Delete {name}', { name: language.name })}
+            >
+              <Trash2 className="h-4 w-4" aria-hidden="true" />
+            </Button>
+          </div>
+        ),
+      },
+    ],
+    // handleSetDefault/openEdit ổn định giữa các lần render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [t]
+  );
 
-  /**
-   * Open modal for editing language
-   */
-  const handleOpenEditModal = (language: Language) => {
-    setEditingLanguage(language);
-    setFormData({
-      name: language.name,
-      nativeName: language.nativeName,
-      isDefault: language.isDefault,
-      isActive: language.isActive,
-    } as UpdateLanguageDto);
-    setIsModalOpen(true);
-  };
-
-  /**
-   * Close modal and reset form
-   */
-  const handleCloseModal = () => {
-    setIsModalOpen(false);
-    setEditingLanguage(null);
-    setFormData({
-      code: '',
-      name: '',
-      nativeName: '',
-      isDefault: false,
-    });
-  };
-
-  /**
-   * Handle form input changes
-   */
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value, type, checked } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: type === 'checkbox' ? checked : value,
-    }));
-  };
-
-  if (loading) {
+  if (loading && languages.length === 0) {
     return (
-      <div className="flex justify-center items-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      <div className="flex flex-col gap-3">
+        <Skeleton className="h-10 w-48" />
+        <Skeleton className="h-64 w-full" />
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-gray-800">{t('languages.title', 'Languages')}</h1>
-        <div className="flex gap-2">
-          <button
-            onClick={loadLanguages}
-            className="flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition"
-          >
-            <RefreshCw className="h-4 w-4" />
-            {t('common.refresh', 'Refresh')}
-          </button>
-          <button
-            onClick={handleOpenCreateModal}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
-          >
-            <Plus className="h-4 w-4" />
-            {t('languages.addLanguage', 'Add language')}
-          </button>
-        </div>
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-wrap justify-end gap-2">
+        <Button
+          variant="outline"
+          onClick={loadLanguages}
+          disabled={loading}
+          leadingIcon={<RefreshCw className="h-4 w-4" aria-hidden="true" />}
+        >
+          {t('common.refresh', 'Refresh')}
+        </Button>
+        <Button onClick={openCreate} leadingIcon={<Plus className="h-4 w-4" aria-hidden="true" />}>
+          {t('languages.addLanguage', 'Add language')}
+        </Button>
       </div>
 
-      {error && (
-        <div className="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg flex justify-between items-center">
-          <span>{error}</span>
-          <button onClick={() => setError(null)} className="text-red-700 hover:text-red-900">
-            <X className="h-5 w-5" />
-          </button>
-        </div>
+      {loadError && (
+        <Alert variant="error" title={t('languages.loadError', 'Could not load the languages')}>
+          <div className="flex flex-wrap items-center gap-3">
+            <span>{loadError}</span>
+            <Button size="sm" variant="outline" onClick={loadLanguages}>
+              {t('common.tryAgain', 'Try Again')}
+            </Button>
+          </div>
+        </Alert>
       )}
 
-      <div className="bg-white rounded-lg shadow overflow-hidden">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                {t('languages.code', 'Code')}
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                {t('languages.name', 'Name')}
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                {t('languages.nativeName', 'Native name')}
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                {t('rooms.status', 'Status')}
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                {t('languages.default', 'Default')}
-              </th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                {t('common.actions', 'Actions')}
-              </th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {languages.map((language) => (
-              <tr key={language.id} className={`hover:bg-gray-50 ${!language.isActive ? 'opacity-60' : ''}`}>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                  {language.code}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                  {language.name}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                  {language.nativeName}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <span
-                    className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                      language.isActive
-                        ? 'bg-green-100 text-green-800'
-                        : 'bg-gray-100 text-gray-800'
-                    }`}
-                  >
-                    {language.isActive ? t('customers.active', 'Active') : t('customers.inactive', 'Inactive')}
-                  </span>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  {language.isDefault ? (
-                    <span className="flex items-center gap-1 text-yellow-600">
-                      <Star className="h-4 w-4 fill-yellow-600" />
-                      {t('languages.default', 'Default')}
-                    </span>
-                  ) : (
-                    <button
-                      onClick={() => handleSetDefault(language.code)}
-                      className="text-gray-400 hover:text-yellow-600 transition"
-                      title={t('languages.setAsDefault', 'Set as default')}
-                    >
-                      <Star className="h-4 w-4" />
-                    </button>
-                  )}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                  <div className="flex justify-end gap-2">
-                    <button
-                      onClick={() => handleOpenEditModal(language)}
-                      className="text-blue-600 hover:text-blue-900 transition"
-                      title={t('common.edit', 'Edit')}
-                    >
-                      <Edit className="h-4 w-4" />
-                    </button>
-                    <button
-                      onClick={() => handleDeleteLanguage(language.code, language.name)}
-                      className="text-red-600 hover:text-red-900 transition disabled:opacity-50 disabled:cursor-not-allowed"
-                      title={t('common.delete', 'Delete')}
-                      disabled={language.isDefault}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      {languages.length === 0 ? (
+        <EmptyState
+          icon={<Globe className="h-8 w-8" />}
+          title={t('languages.emptyState', 'No languages yet. Add the first one to get started.')}
+          action={
+            <Button onClick={openCreate} leadingIcon={<Plus className="h-4 w-4" aria-hidden="true" />}>
+              {t('languages.addLanguage', 'Add language')}
+            </Button>
+          }
+        />
+      ) : (
+        <DataTable
+          columns={columns}
+          rows={languages}
+          rowKey={(language) => language.id}
+          caption={t('languages.tableCaption', 'List of languages')}
+          isLoading={loading}
+          skeletonRows={4}
+          rowStatus={(language) => (language.isActive ? 'active' : 'inactive')}
+          mobileActions={(language) => (
+            <>
+              <Button size="sm" variant="outline" onClick={() => openEdit(language)}>
+                {t('common.edit', 'Edit')}
+              </Button>
+              {!language.isDefault && (
+                <Button size="sm" variant="ghost" onClick={() => handleSetDefault(language.code)}>
+                  {t('languages.setAsDefault', 'Set as default')}
+                </Button>
+              )}
+            </>
+          )}
+        />
+      )}
 
-        {languages.length === 0 && (
-          <div className="text-center py-12">
-            <p className="text-gray-500 text-lg">{t('languages.emptyState', 'No languages yet. Add the first one to get started.')}</p>
-          </div>
-        )}
-      </div>
+      {/* Hộp thoại chung: bẫy tiêu điểm, Escape đóng, khoá cuộn nền. */}
+      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {editingLanguage
+                ? t('languages.editLanguage', 'Edit language')
+                : t('languages.addLanguage', 'Add language')}
+            </DialogTitle>
+            <DialogClose onClose={() => setIsModalOpen(false)} />
+          </DialogHeader>
 
-      {/* Modal for Create/Edit */}
-      {isModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
-            <h2 className="text-2xl font-bold mb-4 text-gray-800">
-              {editingLanguage ? t('languages.editLanguage', 'Edit language') : t('languages.addLanguage', 'Add language')}
-            </h2>
-
-            <form onSubmit={editingLanguage ? handleUpdate : handleCreate}>
+          <form onSubmit={handleSubmit} id="language-form">
+            <div className="flex flex-col gap-4 p-4 sm:p-5">
               {!editingLanguage && (
-                <div className="mb-4">
-                  <label htmlFor="code" className="block text-sm font-medium text-gray-700 mb-1">
-                    {t('languages.code', 'Code')} *
-                  </label>
-                  <input
-                    type="text"
-                    id="code"
-                    name="code"
-                    value={(formData as CreateLanguageDto).code || ''}
-                    onChange={handleInputChange}
-                    required
-                    maxLength={10}
-                    placeholder={t('languages.codePlaceholder', 'e.g. en, vi, fr')}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">{t('languages.codeHint', 'ISO 639-1 language code')}</p>
-                </div>
+                <Input
+                  label={t('languages.code', 'Code')}
+                  required
+                  maxLength={10}
+                  value={formData.code}
+                  onChange={(event) => setFormData({ ...formData, code: event.target.value })}
+                  placeholder={t('languages.codePlaceholder', 'e.g. en, vi, fr')}
+                  hint={t('languages.codeHint', 'ISO 639-1 language code')}
+                />
               )}
 
-              <div className="mb-4">
-                <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
-                  {t('languages.name', 'Name')} *
-                </label>
-                <input
-                  type="text"
-                  id="name"
-                  name="name"
-                  value={formData.name}
-                  onChange={handleInputChange}
-                  required
-                  placeholder={t('languages.namePlaceholder', 'e.g. English')}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
+              <Input
+                label={t('languages.name', 'Name')}
+                required
+                value={formData.name}
+                onChange={(event) => setFormData({ ...formData, name: event.target.value })}
+                placeholder={t('languages.namePlaceholder', 'e.g. English')}
+              />
 
-              <div className="mb-4">
-                <label htmlFor="nativeName" className="block text-sm font-medium text-gray-700 mb-1">
-                  {t('languages.nativeName', 'Native name')} *
-                </label>
-                <input
-                  type="text"
-                  id="nativeName"
-                  name="nativeName"
-                  value={formData.nativeName}
-                  onChange={handleInputChange}
-                  required
-                  placeholder={t('languages.nativeNamePlaceholder', 'e.g. English, Tiếng Việt')}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
+              <Input
+                label={t('languages.nativeName', 'Native name')}
+                required
+                value={formData.nativeName}
+                onChange={(event) => setFormData({ ...formData, nativeName: event.target.value })}
+                placeholder={t('languages.nativeNamePlaceholder', 'e.g. English, Tiếng Việt')}
+              />
 
               {editingLanguage && (
-                <div className="mb-4">
-                  <label className="flex items-center">
-                    <input
-                      type="checkbox"
-                      name="isActive"
-                      checked={(formData as UpdateLanguageDto).isActive}
-                      onChange={handleInputChange}
-                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 h-4 w-4"
-                    />
-                    <span className="ml-2 text-sm text-gray-700">{t('customers.active', 'Active')}</span>
-                  </label>
-                </div>
+                <label className="flex min-h-touch items-center gap-2.5 text-sm text-ink sm:min-h-0">
+                  <Checkbox
+                    checked={formData.isActive}
+                    onCheckedChange={(checked) => setFormData({ ...formData, isActive: checked })}
+                  />
+                  {t('common.statusActive', 'Active')}
+                </label>
               )}
 
-              <div className="mb-6">
-                <label className="flex items-center">
-                  <input
-                    type="checkbox"
-                    name="isDefault"
-                    checked={formData.isDefault}
-                    onChange={handleInputChange}
-                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 h-4 w-4"
-                  />
-                  <span className="ml-2 text-sm text-gray-700">{t('languages.setAsDefault', 'Set as default')}</span>
-                </label>
-              </div>
+              <label className="flex min-h-touch items-center gap-2.5 text-sm text-ink sm:min-h-0">
+                <Checkbox
+                  checked={formData.isDefault}
+                  onCheckedChange={(checked) => setFormData({ ...formData, isDefault: checked })}
+                />
+                {t('languages.setAsDefault', 'Set as default')}
+              </label>
+            </div>
 
-              <div className="flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={handleCloseModal}
-                  className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition"
-                >
-                  {t('common.cancel', 'Cancel')}
-                </button>
-                <button
-                  type="submit"
-                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
-                >
-                  <Check className="h-4 w-4" />
-                  {editingLanguage ? t('common.update', 'Update') : t('common.create', 'Create')}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>
+                {t('common.cancel', 'Cancel')}
+              </Button>
+              <Button
+                type="submit"
+                isLoading={isSaving}
+                loadingText={t('common.saving', 'Saving...')}
+              >
+                {editingLanguage ? t('common.update', 'Update') : t('common.create', 'Create')}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
-      {/* Confirmation Dialog */}
       <AlertDialog
         open={confirmDialog.open}
-        onOpenChange={(open) =>
-          setConfirmDialog({ open, languageCode: '', languageName: '' })
-        }
+        onOpenChange={(open) => setConfirmDialog({ open, languageCode: '', languageName: '' })}
         title={t('languages.deleteTitle', 'Delete Language')}
         description={t(
           'languages.deleteMessage',

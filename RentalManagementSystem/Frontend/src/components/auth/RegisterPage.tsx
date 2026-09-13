@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, Navigate } from 'react-router-dom';
+import { Navigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { CheckCircle2, Loader2, MailCheck } from 'lucide-react';
-import { Button, Input, Card, CardHeader, CardTitle, CardContent } from '../ui';
+import { CheckCircle2, Loader2 } from 'lucide-react';
+import { Alert, Button, Input } from '../ui';
 import { PasswordRuleList } from './PasswordRuleList';
 import { meetsPasswordPolicy } from './passwordPolicy';
 import { useAuth } from '../../contexts/AuthContext';
@@ -12,6 +12,7 @@ import { authService } from '../../services/auth';
 import { useTranslation } from '../../hooks/useTranslation';
 import { getDefaultRoute } from '../../utils/accessControl';
 import { translate } from '../../utils/i18n';
+import { AuthLink, AuthShell } from './AuthShell';
 
 // Số điện thoại VN: 10 chữ số, đầu 03/05/07/08/09. Cùng luật với
 // SelfRegisterDto.VietnamesePhonePattern phía backend — sửa một bên thì phải
@@ -175,36 +176,25 @@ export function RegisterPage() {
 
   if (registeredEmail) {
     return (
-      <AuthShell title={t('auth.checkYourInbox', 'Check your inbox')}>
-        <Card>
-          <CardContent className="space-y-4 pt-6">
-            <div className="flex items-start gap-3">
-              <MailCheck className="mt-0.5 h-5 w-5 shrink-0 text-green-600" aria-hidden="true" />
-              <div className="space-y-2">
-                <p className="text-sm text-gray-700">
-                  {t(
-                    'auth.confirmationEmailSent',
-                    'Your account has been created. We sent a confirmation link to'
-                  )}{' '}
-                  <span className="font-medium text-gray-900">{registeredEmail}</span>.
-                </p>
-                <p className="text-sm text-gray-600">
-                  {t(
-                    'auth.confirmBeforeSignIn',
-                    'Open that link to confirm your address. You cannot sign in until you do.'
-                  )}
-                </p>
-              </div>
-            </div>
-
-            <Link
-              to="/login"
-              className="block text-center text-sm font-medium text-primary hover:text-primary/80"
-            >
-              {t('auth.backToLogin', 'Back to sign in')}
-            </Link>
-          </CardContent>
-        </Card>
+      <AuthShell
+        title={t('auth.checkYourInbox', 'Check your inbox')}
+        footer={<AuthLink to="/login">{t('auth.backToLogin', 'Back to sign in')}</AuthLink>}
+      >
+        <Alert variant="success" title={t('auth.accountCreated', 'Account created')}>
+          <p>
+            {t(
+              'auth.confirmationEmailSent',
+              'Your account has been created. We sent a confirmation link to'
+            )}{' '}
+            <span className="font-medium">{registeredEmail}</span>.
+          </p>
+          <p className="mt-1.5">
+            {t(
+              'auth.confirmBeforeSignIn',
+              'Open that link to confirm your address. You cannot sign in until you do.'
+            )}
+          </p>
+        </Alert>
       </AuthShell>
     );
   }
@@ -213,162 +203,128 @@ export function RegisterPage() {
     <AuthShell
       title={t('auth.createYourAccount', 'Create your account')}
       subtitle={t('auth.registerNeedsInvite', 'Registration requires an invitation code from an administrator')}
+      footer={
+        <>
+          {t('auth.alreadyHaveAccount', 'Already have an account?')}{' '}
+          <AuthLink to="/login">{t('auth.signIn', 'Sign In')}</AuthLink>
+        </>
+      }
     >
-      <Card>
-        <CardHeader>
-          <CardTitle>{t('auth.register', 'Register')}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4" noValidate>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <Input
-                label={t('auth.firstName', 'First name')}
-                error={errors.firstName?.message}
-                autoComplete="given-name"
-                autoFocus
-                {...form.register('firstName')}
-              />
+      <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-4" noValidate>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Input
+            label={t('auth.firstName', 'First name')}
+            error={errors.firstName?.message}
+            autoComplete="given-name"
+            autoFocus
+            {...form.register('firstName')}
+          />
 
-              <Input
-                label={t('auth.lastName', 'Last name')}
-                error={errors.lastName?.message}
-                autoComplete="family-name"
-                {...form.register('lastName')}
-              />
-            </div>
-
-            <div>
-              <Input
-                label={t('auth.email', 'Email Address')}
-                type="email"
-                error={errors.email?.message}
-                autoComplete="email"
-                {...form.register('email', { onBlur: handleEmailBlur })}
-              />
-
-              {!errors.email && isCheckingEmail && (
-                <p className="mt-1 flex items-center gap-1.5 text-sm text-gray-500">
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
-                  {t('auth.checkingEmail', 'Checking availability…')}
-                </p>
-              )}
-
-              {!errors.email && !isCheckingEmail && isEmailTaken && (
-                <p className="mt-1 text-sm text-red-600">
-                  {t('auth.emailAlreadyRegistered', 'This email address already has an account')}
-                </p>
-              )}
-
-              {!errors.email && !isCheckingEmail && isEmailFree && (
-                <p className="mt-1 flex items-center gap-1.5 text-sm text-green-700">
-                  <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
-                  {t('auth.emailAvailable', 'This email address is available')}
-                </p>
-              )}
-            </div>
-
-            <Input
-              label={t('auth.phoneNumber', 'Phone number')}
-              type="tel"
-              inputMode="numeric"
-              placeholder={t('users.phonePlaceholder', '09xxxxxxxx')}
-              error={errors.phoneNumber?.message}
-              autoComplete="tel"
-              {...form.register('phoneNumber')}
-            />
-
-            <div>
-              <Input
-                label={t('auth.password', 'Password')}
-                type="password"
-                error={errors.password?.message}
-                autoComplete="new-password"
-                {...form.register('password')}
-              />
-
-              <PasswordRuleList password={passwordValue} />
-            </div>
-
-            <Input
-              label={t('auth.confirmPassword', 'Confirm password')}
-              type="password"
-              error={errors.confirmPassword?.message}
-              autoComplete="new-password"
-              {...form.register('confirmPassword')}
-            />
-
-            <div>
-              <Input
-                label={t('auth.invitationCode', 'Invitation code')}
-                placeholder={t('auth.invitationCodePlaceholder', 'ABCDE-FGHJK-LMNPQ-RSTUV')}
-                error={errors.invitationCode?.message}
-                autoComplete="off"
-                className="font-mono uppercase"
-                {...form.register('invitationCode')}
-              />
-              <p className="mt-1 text-sm text-gray-500">
-                {t('auth.invitationCodeHint', 'The code an administrator sent you. It decides what you can access.')}
-              </p>
-            </div>
-
-            {submitError && (
-              <div className="rounded-md bg-red-50 p-4">
-                <p className="text-sm text-red-800">{submitError}</p>
-                {serverErrors.length > 0 && (
-                  <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-red-700">
-                    {serverErrors.map((error) => (
-                      <li key={error}>{error}</li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            )}
-
-            <Button
-              type="submit"
-              className="w-full"
-              isLoading={form.formState.isSubmitting}
-              disabled={form.formState.isSubmitting || isEmailTaken}
-            >
-              {t('auth.createAccount', 'Create account')}
-            </Button>
-          </form>
-
-          <div className="mt-4 text-center">
-            <p className="text-sm text-gray-600">
-              {t('auth.alreadyHaveAccount', 'Already have an account?')}{' '}
-              <Link to="/login" className="font-medium text-primary hover:text-primary/80">
-                {t('auth.signIn', 'Sign In')}
-              </Link>
-            </p>
-          </div>
-        </CardContent>
-      </Card>
-    </AuthShell>
-  );
-}
-
-interface AuthShellProps {
-  title: string;
-  subtitle?: string;
-  children: React.ReactNode;
-}
-
-/**
- * Khung trang cho các màn hình ngoài vùng đăng nhập, giống LoginPage và
- * ResetPasswordPage.
- */
-function AuthShell({ title, subtitle, children }: AuthShellProps) {
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        <div className="text-center">
-          <h2 className="mt-6 text-3xl font-extrabold text-gray-900">{title}</h2>
-          {subtitle && <p className="mt-2 text-sm text-gray-600">{subtitle}</p>}
+          <Input
+            label={t('auth.lastName', 'Last name')}
+            error={errors.lastName?.message}
+            autoComplete="family-name"
+            {...form.register('lastName')}
+          />
         </div>
 
-        {children}
-      </div>
-    </div>
+        <div>
+          <Input
+            label={t('auth.email', 'Email Address')}
+            type="email"
+            error={errors.email?.message}
+            autoComplete="email"
+            {...form.register('email', { onBlur: handleEmailBlur })}
+          />
+
+          {!errors.email && isCheckingEmail && (
+            <p className="mt-1 flex items-center gap-1.5 text-sm text-ink-muted">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+              {t('auth.checkingEmail', 'Checking availability…')}
+            </p>
+          )}
+
+          {!errors.email && !isCheckingEmail && isEmailTaken && (
+            <p className="mt-1 text-sm text-destructive">
+              {t('auth.emailAlreadyRegistered', 'This email address already has an account')}
+            </p>
+          )}
+
+          {!errors.email && !isCheckingEmail && isEmailFree && (
+            <p className="mt-1 flex items-center gap-1.5 text-sm text-status-paid">
+              <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
+              {t('auth.emailAvailable', 'This email address is available')}
+            </p>
+          )}
+        </div>
+
+        <Input
+          label={t('auth.phoneNumber', 'Phone number')}
+          type="tel"
+          inputMode="numeric"
+          placeholder={t('users.phonePlaceholder', '09xxxxxxxx')}
+          error={errors.phoneNumber?.message}
+          autoComplete="tel"
+          {...form.register('phoneNumber')}
+        />
+
+        <div>
+          <Input
+            label={t('auth.password', 'Password')}
+            type="password"
+            error={errors.password?.message}
+            autoComplete="new-password"
+            {...form.register('password')}
+          />
+
+          <PasswordRuleList password={passwordValue} />
+        </div>
+
+        <Input
+          label={t('auth.confirmPassword', 'Confirm password')}
+          type="password"
+          error={errors.confirmPassword?.message}
+          autoComplete="new-password"
+          {...form.register('confirmPassword')}
+        />
+
+        <div>
+          <Input
+            label={t('auth.invitationCode', 'Invitation code')}
+            placeholder={t('auth.invitationCodePlaceholder', 'ABCDE-FGHJK-LMNPQ-RSTUV')}
+            error={errors.invitationCode?.message}
+            autoComplete="off"
+            className="font-mono uppercase"
+            {...form.register('invitationCode')}
+          />
+          <p className="mt-1 text-sm text-ink-muted">
+            {t('auth.invitationCodeHint', 'The code an administrator sent you. It decides what you can access.')}
+          </p>
+        </div>
+
+        {submitError && (
+          <Alert variant="error" title={t('auth.registerFailed', 'Registration could not be completed')}>
+            <p>{submitError}</p>
+            {serverErrors.length > 0 && (
+              <ul className="mt-1.5 list-disc space-y-0.5 pl-5">
+                {serverErrors.map((error) => (
+                  <li key={error}>{error}</li>
+                ))}
+              </ul>
+            )}
+          </Alert>
+        )}
+
+        <Button
+          type="submit"
+          fullWidth
+          size="lg"
+          isLoading={form.formState.isSubmitting}
+          disabled={form.formState.isSubmitting || isEmailTaken}
+        >
+          {t('auth.createAccount', 'Create account')}
+        </Button>
+      </form>
+    </AuthShell>
   );
 }

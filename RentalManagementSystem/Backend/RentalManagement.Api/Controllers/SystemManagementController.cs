@@ -93,17 +93,8 @@ public class SystemManagementController : ControllerBase
     {
         var userId = User.FindFirst("id")?.Value ?? "Unknown";
 
-        try
-        {
-            var setting = await _systemManagementService.CreateSettingAsync(createDto, userId);
-            return CreatedAtAction(nameof(GetSettingByKey), new { key = setting.Key }, setting);
-        }
-        catch (InvalidOperationException ex)
-        {
-            // Domain rule violation (duplicate key, read-only setting, …) — the service
-            // message is written for the caller, so it is safe to surface.
-            return BadRequest(new { message = ex.Message });
-        }
+        var setting = await _systemManagementService.CreateSettingAsync(createDto, userId);
+        return CreatedAtAction(nameof(GetSettingByKey), new { key = setting.Key }, setting);
     }
 
     /// <summary>
@@ -117,15 +108,8 @@ public class SystemManagementController : ControllerBase
     {
         var userId = User.FindFirst("id")?.Value ?? "Unknown";
 
-        try
-        {
-            var setting = await _systemManagementService.UpdateSettingAsync(key, updateDto, userId);
-            return Ok(setting);
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new { message = ex.Message });
-        }
+        var setting = await _systemManagementService.UpdateSettingAsync(key, updateDto, userId);
+        return Ok(setting);
     }
 
     /// <summary>
@@ -151,21 +135,14 @@ public class SystemManagementController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> DeleteSetting(string key)
     {
-        try
-        {
-            var result = await _systemManagementService.DeleteSettingAsync(key);
+        var result = await _systemManagementService.DeleteSettingAsync(key);
 
-            if (!result)
-            {
-                return NotFound(new { message = $"Setting with key '{key}' not found" });
-            }
-
-            return NoContent();
-        }
-        catch (InvalidOperationException ex)
+        if (!result)
         {
-            return BadRequest(new { message = ex.Message });
+            return NotFound(new { message = $"Setting with key '{key}' not found" });
         }
+
+        return NoContent();
     }
 
     /// <summary>
@@ -204,14 +181,7 @@ public class SystemManagementController : ControllerBase
     {
         var userId = User.FindFirst("id")?.Value ?? "Unknown";
 
-        try
-        {
-            var importedCount = await _systemManagementService.ImportSettingsAsync(jsonData, userId);
-            return Ok(new { message = $"Successfully imported {importedCount} settings", count = importedCount });
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new { message = ex.Message });
-        }
+        var importedCount = await _systemManagementService.ImportSettingsAsync(jsonData, userId);
+        return Ok(new { message = $"Successfully imported {importedCount} settings", count = importedCount });
     }
 }

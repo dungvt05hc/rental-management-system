@@ -575,12 +575,30 @@ export type PaymentSearchRequest = {
 }
 
 // Report Types
+/**
+ * GET /reports/occupancy-rate
+ *
+ * SHAPE NÀY ĐÃ ĐƯỢC ĐO LẠI TỪ RESPONSE THẬT, không phải chép từ tên endpoint.
+ * Bản khai báo cũ ghi { totalRooms, occupiedRooms, availableRooms,
+ * maintenanceRooms, occupancyRate } — chỉ `totalRooms` là có thật. Bốn trường
+ * còn lại luôn undefined ở runtime, nên mọi chỗ đọc chúng đều im lặng ra
+ * undefined rồi rơi xuống nhánh fallback hoặc in ra ô trống.
+ *
+ * Xem ReportingService.GetOccupancyRateReportAsync để đối chiếu.
+ */
 export interface OccupancyReport {
+  reportPeriod: ReportPeriod;
   totalRooms: number;
-  occupiedRooms: number;
-  availableRooms: number;
-  maintenanceRooms: number;
-  occupancyRate: number;
+  /** Số phòng đang có khách tại thời điểm chạy báo cáo. */
+  currentOccupancy: number;
+  currentOccupancyRate: number;
+  /** Tỉ lệ lấp đầy theo từng tháng trong khoảng đã chọn. */
+  monthlyOccupancy: Array<{
+    period: string;
+    occupiedRooms: number;
+    occupancyRate: number;
+  }>;
+  averageOccupancyRate: number;
 }
 
 export interface RevenueReport {

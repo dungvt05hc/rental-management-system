@@ -1,10 +1,23 @@
 <!doctype html>
-<html lang="en">
+<html lang="vi">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Rental Managment System</title>
+
+    <!--
+      Preload đúng hai file cần cho lần vẽ đầu tiên: weight 400 của Be Vietnam
+      Pro, cả hai subset. Màn hình nào cũng có chữ tiếng Việt nên subset
+      vietnamese luôn được dùng — preload nó không phí.
+
+      Không preload Inter: số chỉ xuất hiện sau khi dữ liệu từ API về, lúc đó
+      font đã kịp tải. Preload thêm 58KB sẽ tranh băng thông với chính lần gọi
+      API đó trên mạng 4G yếu.
+    -->
+    <link rel="preload" href="/fonts/bvp-400-vi.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/fonts/bvp-400-latin.woff2" as="font" type="font/woff2" crossorigin />
+
+    <title>Quản lý nhà trọ</title>
   </head>
   <body>
     <div id="root"></div>

@@ -1,8 +1,10 @@
 import { Navigate, useNavigate } from 'react-router-dom';
+import { ShieldOff } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import { Button, Card, CardContent, CardHeader, CardTitle } from '../ui';
+import { Button, Skeleton } from '../ui';
 import { getDefaultRoute } from '../../utils/accessControl';
 import { useTranslation } from '../../hooks/useTranslation';
+import { AuthShell } from './AuthShell';
 
 export function NoAccessPage() {
   const { t } = useTranslation();
@@ -12,9 +14,9 @@ export function NoAccessPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
-      </div>
+      <AuthShell title={t('auth.accessDenied', 'Access denied')}>
+        <Skeleton className="h-20 w-full" />
+      </AuthShell>
     );
   }
 
@@ -23,21 +25,35 @@ export function NoAccessPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-      <Card className="max-w-md w-full">
-        <CardHeader>
-          <CardTitle>{t('auth.accessDenied', 'Access denied')}</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <p className="text-sm text-gray-600">
-            {t('auth.accessDeniedBody', 'This account does not have permission to open this page. If that looks wrong,')}
-            contact an administrator.
+    <AuthShell title={t('auth.accessDenied', 'Access denied')}>
+      <div className="flex flex-col items-center gap-4 text-center">
+        <ShieldOff className="h-8 w-8 text-ink-muted" aria-hidden="true" />
+
+        {/*
+         * Câu này trước đây bị ghép một mẩu tiếng Anh viết cứng
+         * ("contact an administrator.") vào sau chuỗi đã dịch, nên bật tiếng
+         * Việt vẫn lòi ra nửa câu tiếng Anh. Nay là một chuỗi trọn vẹn.
+         */}
+        <p className="text-sm text-ink-muted">
+          {t(
+            'auth.accessDeniedBody',
+            'This account does not have permission to open this page. If that looks wrong, contact an administrator.'
+          )}
+        </p>
+
+        {/* Nói rõ tài khoản đang dùng là ai — "không có quyền" mà không biết
+            đang đăng nhập bằng tài khoản nào thì không tự xử lý được. */}
+        {user?.email && (
+          <p className="text-sm text-ink">
+            {t('auth.signedInAs', 'Signed in as')}{' '}
+            <span className="font-medium">{user.email}</span>
           </p>
-          <div className="flex justify-end">
-            <Button onClick={() => navigate(fallbackRoute)}>{t('common.back', 'Back')}</Button>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
+        )}
+
+        <Button fullWidth onClick={() => navigate(fallbackRoute)}>
+          {t('auth.backToSafety', 'Go to a page you can open')}
+        </Button>
+      </div>
+    </AuthShell>
   );
 }

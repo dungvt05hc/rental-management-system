@@ -1,14 +1,53 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { Plus, Edit, Trash2, Search, Download, Upload, RefreshCw, X, Check, Filter, FileJson } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Download, Languages as LanguagesIcon, Pencil, Plus, RefreshCw, Search, Trash2, Upload } from 'lucide-react';
+import {
+  Alert,
+  AlertDialog,
+  Badge,
+  Button,
+  DataTable,
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  EmptyState,
+  FilterBar,
+  Input,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  Skeleton,
+} from '../ui';
+import type { DataTableColumn } from '../ui';
 import { localizationService } from '../../services/localizationService';
 import type { UpsertTranslationDto } from '../../services/localizationService';
 import type { Language, Translation } from '../../types/localization';
-import { AlertDialog } from '../ui';
 import { useToast } from '../../contexts/ToastContext';
 import { useTranslation } from '../../hooks/useTranslation';
+import { useDebounce } from '../../hooks';
 
-// Một dòng trong file JSON import. Không dùng lại type Translation vì file
-// bên ngoài chỉ cần đúng hai field này.
+/* ═══════════════════════════════════════════════════════════════════════════
+ * Quản lý bản dịch.
+ *
+ * Trang này sửa chính những chuỗi đang hiện trên toàn bộ ứng dụng, nên thứ tự
+ * thao tác bắt buộc là: CHỌN NGÔN NGỮ trước, rồi mới tới mọi thứ khác. Giao
+ * diện nói thẳng điều đó — chưa chọn ngôn ngữ thì chỉ có đúng ô chọn ngôn ngữ,
+ * không phải một loạt nút bị làm mờ như bản cũ. Nút mờ không giải thích được
+ * vì sao nó mờ.
+ *
+ * NĂM CHUỖI TIẾNG ANH VIẾT CỨNG đã sửa: "-- Choose a language --",
+ * "All Categories", "Showing X of Y translations",
+ * "Please select a language first", "Invalid translation file format".
+ *
+ * Hộp thoại thêm/sửa chuyển từ div dựng tay sang Dialog chung — cùng lý do đã
+ * ghi ở LanguageManagement: bẫy tiêu điểm, Escape, khoá cuộn nền, aria-modal.
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+/** Một dòng trong file JSON import. File ngoài chỉ cần đúng hai field này. */
 type ImportedTranslation = { key: string; value: string };
 
 const isImportedTranslation = (entry: unknown): entry is ImportedTranslation =>
@@ -17,144 +56,129 @@ const isImportedTranslation = (entry: unknown): entry is ImportedTranslation =>
   typeof (entry as ImportedTranslation).key === 'string' &&
   typeof (entry as ImportedTranslation).value === 'string';
 
-/**
- * Translation Management Component
- * Provides full CRUD operations for managing translations across languages
- */
+const ALL = 'all';
+
+const EMPTY_FORM: UpsertTranslationDto = {
+  key: '',
+  value: '',
+  category: 'common',
+  description: '',
+};
+
 export const TranslationManagement: React.FC = () => {
   const { t } = useTranslation();
   const { showSuccess, showError } = useToast();
+
   const [languages, setLanguages] = useState<Language[]>([]);
-  const [selectedLanguage, setSelectedLanguage] = useState<string>('');
+  const [selectedLanguage, setSelectedLanguage] = useState('');
   const [translations, setTranslations] = useState<Translation[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
-  const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [editingTranslation, setEditingTranslation] = useState<Translation | null>(null);
-  const [searchTerm, setSearchTerm] = useState<string>('');
-  const [selectedCategory, setSelectedCategory] = useState<string>('all');
-  const [formData, setFormData] = useState<UpsertTranslationDto>({
-    key: '',
-    value: '',
-    category: 'common',
-    description: '',
-  });
-  const [confirmDialog, setConfirmDialog] = useState<{
-    open: boolean;
-    translationKey: string;
-  }>({
+  const [searchInput, setSearchInput] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string>(ALL);
+  const [formData, setFormData] = useState<UpsertTranslationDto>(EMPTY_FORM);
+  const [confirmDialog, setConfirmDialog] = useState<{ open: boolean; translationKey: string }>({
     open: false,
     translationKey: '',
   });
 
-  /**
-   * Load all languages on component mount
-   */
-  useEffect(() => {
-    loadLanguages();
-  }, []);
+  const searchTerm = useDebounce(searchInput, 250);
 
-  /**
-   * Load translations when language selection changes
-   */
-  useEffect(() => {
-    if (selectedLanguage) {
-      loadTranslations(selectedLanguage);
-    }
-  }, [selectedLanguage]);
-
-  /**
-   * Load all active languages
-   */
-  const loadLanguages = async () => {
+  const loadLanguages = useCallback(async () => {
     try {
       setLoading(true);
-      setError(null);
+      setLoadError(null);
       const data = await localizationService.getLanguages();
       setLanguages(data);
-      
-      // Auto-select default language if available
-      const defaultLang = data.find(lang => lang.isDefault);
-      if (defaultLang && !selectedLanguage) {
-        setSelectedLanguage(defaultLang.code);
+
+      // Tự chọn ngôn ngữ mặc định để trang không mở ra ở trạng thái rỗng.
+      const defaultLanguage = data.find((language) => language.isDefault);
+      if (defaultLanguage) {
+        setSelectedLanguage((current) => current || defaultLanguage.code);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load languages');
+      setLoadError(
+        err instanceof Error ? err.message : t('languages.loadError', 'Could not load the languages')
+      );
     } finally {
       setLoading(false);
     }
-  };
+  }, [t]);
 
-  /**
-   * Load translations for a specific language
-   */
-  const loadTranslations = async (languageCode: string) => {
-    try {
-      setLoading(true);
-      setError(null);
-      const data = await localizationService.getTranslations(languageCode);
-      setTranslations(data);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load translations');
-      setTranslations([]);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const loadTranslations = useCallback(
+    async (languageCode: string) => {
+      try {
+        setLoading(true);
+        setLoadError(null);
+        setTranslations(await localizationService.getTranslations(languageCode));
+      } catch (err) {
+        setLoadError(
+          err instanceof Error
+            ? err.message
+            : t('translations.loadError', 'Could not load the translations')
+        );
+        setTranslations([]);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [t]
+  );
 
-  /**
-   * Get unique categories from translations
-   */
+  useEffect(() => {
+    loadLanguages();
+  }, [loadLanguages]);
+
+  useEffect(() => {
+    if (selectedLanguage) loadTranslations(selectedLanguage);
+  }, [selectedLanguage, loadTranslations]);
+
   const categories = useMemo(() => {
-    const cats = new Set(translations.map(t => t.category));
-    return ['all', ...Array.from(cats).sort()];
+    const unique = new Set(translations.map((translation) => translation.category));
+    return [ALL, ...[...unique].sort()];
   }, [translations]);
 
-  /**
-   * Filter translations based on search term and category
-   */
   const filteredTranslations = useMemo(() => {
-    return translations.filter(translation => {
-      const matchesSearch = 
-        translation.key.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        translation.value.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (translation.description?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false);
-      
-      const matchesCategory = selectedCategory === 'all' || translation.category === selectedCategory;
-      
+    const needle = searchTerm.toLowerCase();
+    return translations.filter((translation) => {
+      const matchesSearch =
+        translation.key.toLowerCase().includes(needle) ||
+        translation.value.toLowerCase().includes(needle) ||
+        (translation.description?.toLowerCase().includes(needle) ?? false);
+      const matchesCategory =
+        selectedCategory === ALL || translation.category === selectedCategory;
       return matchesSearch && matchesCategory;
     });
   }, [translations, searchTerm, selectedCategory]);
 
-  /**
-   * Handle create or update translation
-   */
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!selectedLanguage) {
-      setError('Please select a language first');
-      return;
-    }
+  const isFiltered = searchTerm.trim() !== '' || selectedCategory !== ALL;
 
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!selectedLanguage) return;
+
+    setIsSaving(true);
     try {
       await localizationService.upsertTranslation(selectedLanguage, formData);
       await loadTranslations(selectedLanguage);
-      handleCloseModal();
-      showSuccess(t('common.success', 'Success'), t('translations.saveSuccess', 'Translation saved successfully'));
+      setIsModalOpen(false);
+      setEditingTranslation(null);
+      setFormData(EMPTY_FORM);
+      showSuccess(
+        t('common.success', 'Success'),
+        t('translations.saveSuccess', 'Translation saved successfully')
+      );
     } catch (err) {
-      showError(t('common.error', 'Error'), t('translations.saveError', 'Failed to save translation'));
+      showError(
+        t('common.error', 'Error'),
+        err instanceof Error ? err.message : t('translations.saveError', 'Failed to save translation')
+      );
+    } finally {
+      setIsSaving(false);
     }
-  };
-
-  /**
-   * Handle delete translation
-   */
-  const handleDeleteTranslation = (key: string) => {
-    setConfirmDialog({
-      open: true,
-      translationKey: key,
-    });
   };
 
   const confirmDeleteTranslation = async () => {
@@ -163,32 +187,23 @@ export const TranslationManagement: React.FC = () => {
     try {
       await localizationService.deleteTranslation(selectedLanguage, confirmDialog.translationKey);
       await loadTranslations(selectedLanguage);
-      showSuccess(t('common.success', 'Success'), t('translations.deleteSuccess', 'Translation deleted successfully'));
+      showSuccess(
+        t('common.success', 'Success'),
+        t('translations.deleteSuccess', 'Translation deleted successfully')
+      );
     } catch (err) {
-      showError(t('common.error', 'Error'), t('translations.deleteError', 'Failed to delete translation'));
+      showError(
+        t('common.error', 'Error'),
+        err instanceof Error
+          ? err.message
+          : t('translations.deleteError', 'Failed to delete translation')
+      );
     } finally {
       setConfirmDialog({ open: false, translationKey: '' });
     }
   };
 
-  /**
-   * Open modal for creating new translation
-   */
-  const handleOpenCreateModal = () => {
-    setEditingTranslation(null);
-    setFormData({
-      key: '',
-      value: '',
-      category: 'common',
-      description: '',
-    });
-    setIsModalOpen(true);
-  };
-
-  /**
-   * Open modal for editing translation
-   */
-  const handleOpenEditModal = (translation: Translation) => {
+  const openEdit = (translation: Translation) => {
     setEditingTranslation(translation);
     setFormData({
       key: translation.key,
@@ -199,420 +214,398 @@ export const TranslationManagement: React.FC = () => {
     setIsModalOpen(true);
   };
 
-  /**
-   * Close modal and reset form
-   */
-  const handleCloseModal = () => {
-    setIsModalOpen(false);
+  const openCreate = () => {
     setEditingTranslation(null);
-    setFormData({
-      key: '',
-      value: '',
-      category: 'common',
-      description: '',
-    });
+    setFormData(EMPTY_FORM);
+    setIsModalOpen(true);
   };
 
-  /**
-   * Handle form input changes
-   */
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value,
-    }));
-  };
-
-  /**
-   * Export translations to JSON
-   */
-  const handleExportTranslations = () => {
+  const handleExport = () => {
     if (!selectedLanguage || translations.length === 0) return;
 
     const exportData = {
       languageCode: selectedLanguage,
       exportDate: new Date().toISOString(),
-      translations: translations.map(t => ({
-        key: t.key,
-        value: t.value,
-        category: t.category,
-        description: t.description,
+      translations: translations.map((translation) => ({
+        key: translation.key,
+        value: translation.value,
+        category: translation.category,
+        description: translation.description,
       })),
     };
 
     const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `translations-${selectedLanguage}-${new Date().toISOString().split('T')[0]}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `translations-${selectedLanguage}-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
     URL.revokeObjectURL(url);
   };
 
-  /**
-   * Handle import translations from JSON
-   */
-  const handleImportTranslations = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  const handleImport = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = async (event) => {
+    reader.onload = async (loaded) => {
       try {
-        const content = event.target?.result as string;
-        const data: unknown = JSON.parse(content);
+        const data: unknown = JSON.parse(loaded.target?.result as string);
 
         // File do người dùng tải lên nên không tin được shape — phải kiểm tra
         // từng phần tử, không chỉ kiểm tra là mảng. Trước đây một phần tử
         // thiếu key/value sẽ lọt vào và tạo ra entry "undefined".
-        const translations = (data as { translations?: unknown } | null)?.translations;
-        if (!Array.isArray(translations) || !translations.every(isImportedTranslation)) {
-          throw new Error('Invalid translation file format');
+        const entries = (data as { translations?: unknown } | null)?.translations;
+        if (!Array.isArray(entries) || !entries.every(isImportedTranslation)) {
+          throw new Error(t('translations.invalidFile', 'That file is not a translation export'));
         }
 
-        // Convert to bulk format
-        const bulkData = {
+        await localizationService.bulkUpsertTranslations({
           languageCode: selectedLanguage,
-          translations: translations.reduce<Record<string, string>>((acc, entry) => {
-            acc[entry.key] = entry.value;
-            return acc;
+          translations: entries.reduce<Record<string, string>>((accumulator, entry) => {
+            accumulator[entry.key] = entry.value;
+            return accumulator;
           }, {}),
-        };
-
-        await localizationService.bulkUpsertTranslations(bulkData);
+        });
         await loadTranslations(selectedLanguage);
-        showSuccess(t('common.success', 'Success'), t('translations.importSuccess', 'Translations imported successfully'));
+        showSuccess(
+          t('common.success', 'Success'),
+          t('translations.importSuccess', 'Translations imported successfully')
+        );
       } catch (err) {
-        showError(t('common.error', 'Error'), t('translations.importError', 'Failed to import translations'));
+        showError(
+          t('common.error', 'Error'),
+          err instanceof Error
+            ? err.message
+            : t('translations.importError', 'Failed to import translations')
+        );
       }
     };
     reader.readAsText(file);
-    e.target.value = ''; // Reset input
+    event.target.value = '';
   };
+
+  const columns: DataTableColumn<Translation>[] = useMemo(
+    () => [
+      {
+        key: 'key',
+        header: t('translations.key', 'Key'),
+        cell: (translation) => (
+          <div className="min-w-0">
+            <span className="block truncate font-mono text-sm font-medium text-ink">
+              {translation.key}
+            </span>
+            {translation.description && (
+              <span className="block truncate text-xs text-ink-muted">
+                {translation.description}
+              </span>
+            )}
+          </div>
+        ),
+        mobile: 'title',
+      },
+      {
+        key: 'value',
+        header: t('translations.value', 'Text'),
+        cell: (translation) => <span className="block">{translation.value}</span>,
+      },
+      {
+        key: 'category',
+        header: t('items.category', 'Category'),
+        cell: (translation) => (
+          <Badge variant="secondary" size="sm">
+            {translation.category}
+          </Badge>
+        ),
+        mobile: 'status',
+        width: 'w-36',
+      },
+      {
+        key: 'actions',
+        header: <span className="sr-only">{t('common.actions', 'Actions')}</span>,
+        align: 'right',
+        width: 'w-24',
+        mobile: 'hidden',
+        cell: (translation) => (
+          <div className="flex justify-end gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => openEdit(translation)}
+              aria-label={t('translations.editNamed', 'Edit {key}', { key: translation.key })}
+            >
+              <Pencil className="h-4 w-4" aria-hidden="true" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-destructive hover:bg-destructive-tint"
+              onClick={() => setConfirmDialog({ open: true, translationKey: translation.key })}
+              aria-label={t('translations.deleteNamed', 'Delete {key}', { key: translation.key })}
+            >
+              <Trash2 className="h-4 w-4" aria-hidden="true" />
+            </Button>
+          </div>
+        ),
+      },
+    ],
+    [t]
+  );
 
   if (loading && languages.length === 0) {
     return (
-      <div className="flex justify-center items-center min-h-[400px]">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      <div className="flex flex-col gap-3">
+        <Skeleton className="h-10 w-64" />
+        <Skeleton className="h-64 w-full" />
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex justify-between items-center">
+    <div className="flex flex-col gap-4">
+      {/* Chọn ngôn ngữ là bước BẮT BUỘC ĐẦU TIÊN, nên nó đứng một mình. */}
+      <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h2 className="text-2xl font-bold text-gray-800">{t('translations.title', 'Translations')}</h2>
-          <p className="text-gray-600 mt-1">{t('translations.subtitle', 'Manage the wording shown in each language')}</p>
-        </div>
-        <div className="flex gap-2">
-          <button
-            onClick={() => selectedLanguage && loadTranslations(selectedLanguage)}
-            disabled={!selectedLanguage}
-            className="flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+          <label
+            htmlFor="translation-language"
+            className="mb-1.5 block text-sm font-medium text-ink"
           >
-            <RefreshCw className="h-4 w-4" />
-            {t('common.refresh', 'Refresh')}
-          </button>
-          <button
-            onClick={handleExportTranslations}
-            disabled={!selectedLanguage || translations.length === 0}
-            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <Download className="h-4 w-4" />
-            {t('system.export', 'Export')}
-          </button>
-          <label className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition cursor-pointer disabled:opacity-50">
-            <Upload className="h-4 w-4" />
-            {t('translations.import', 'Import')}
-            <input
-              type="file"
-              accept=".json"
-              onChange={handleImportTranslations}
-              disabled={!selectedLanguage}
-              className="hidden"
-            />
+            {t('translations.selectLanguage', 'Language')}
           </label>
-          <button
-            onClick={handleOpenCreateModal}
-            disabled={!selectedLanguage}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <Plus className="h-4 w-4" />
-            {t('translations.addTranslation', 'Add translation')}
-          </button>
+          <Select value={selectedLanguage} onValueChange={setSelectedLanguage}>
+            <SelectTrigger id="translation-language" className="w-64">
+              <SelectValue placeholder={t('translations.chooseLanguage', 'Choose a language')} />
+            </SelectTrigger>
+            <SelectContent>
+              {languages.map((language) => (
+                <SelectItem key={language.id} value={language.code}>
+                  {language.nativeName} ({language.code})
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
-      </div>
 
-      {/* Language Selector */}
-      <div className="bg-white rounded-lg shadow p-4">
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          {t('translations.selectLanguage', 'Language')}
-        </label>
-        <select
-          value={selectedLanguage}
-          onChange={(e) => setSelectedLanguage(e.target.value)}
-          className="w-full md:w-64 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-        >
-          <option value="">-- Choose a language --</option>
-          {languages.map(lang => (
-            <option key={lang.id} value={lang.code}>
-              {lang.nativeName} ({lang.code})
-            </option>
-          ))}
-        </select>
-      </div>
-
-      {error && (
-        <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg flex justify-between items-center">
-          <span>{error}</span>
-          <button onClick={() => setError(null)} className="text-red-600 hover:text-red-800">
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-      )}
-
-      {selectedLanguage && (
-        <>
-          {/* Search and Filter Bar */}
-          <div className="bg-white rounded-lg shadow p-4">
-            <div className="flex flex-col md:flex-row gap-4">
-              <div className="flex-1">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-                  <input
-                    type="text"
-                    placeholder={t('translations.searchPlaceholder', 'Search by key, text or description...')}
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <Filter className="h-5 w-5 text-gray-400" />
-                <select
-                  value={selectedCategory}
-                  onChange={(e) => setSelectedCategory(e.target.value)}
-                  className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  {categories.map(cat => (
-                    <option key={cat} value={cat}>
-                      {cat === 'all' ? 'All Categories' : cat}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-            <div className="mt-2 text-sm text-gray-600">
-              Showing {filteredTranslations.length} of {translations.length} translations
-            </div>
+        {/* Các nút chỉ xuất hiện khi đã chọn ngôn ngữ — không bày ra rồi làm mờ. */}
+        {selectedLanguage && (
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              onClick={() => loadTranslations(selectedLanguage)}
+              disabled={loading}
+              leadingIcon={<RefreshCw className="h-4 w-4" aria-hidden="true" />}
+            >
+              {t('common.refresh', 'Refresh')}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={handleExport}
+              disabled={translations.length === 0}
+              leadingIcon={<Download className="h-4 w-4" aria-hidden="true" />}
+            >
+              {t('system.export', 'Export')}
+            </Button>
+            {/* <label> bọc input file: giữ được kiểu nút mà vẫn là control thật. */}
+            <label className="focus-within:outline-ring inline-flex min-h-touch cursor-pointer items-center justify-center gap-2 rounded-md border border-input bg-surface px-4 text-sm font-medium text-ink transition-colors duration-100 hover:bg-secondary sm:min-h-10">
+              <Upload className="h-4 w-4" aria-hidden="true" />
+              {t('translations.import', 'Import')}
+              <input type="file" accept=".json" onChange={handleImport} className="sr-only" />
+            </label>
+            <Button onClick={openCreate} leadingIcon={<Plus className="h-4 w-4" aria-hidden="true" />}>
+              {t('translations.addTranslation', 'Add translation')}
+            </Button>
           </div>
+        )}
+      </div>
 
-          {/* Translations Table */}
-          <div className="bg-white rounded-lg shadow overflow-hidden">
-            {loading ? (
-              <div className="flex justify-center items-center py-12">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        {t('translations.key', 'Key')}
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        {t('translations.value', 'Text')}
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        {t('items.category', 'Category')}
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        {t('items.description', 'Description')}
-                      </th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        {t('common.actions', 'Actions')}
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {filteredTranslations.map((translation) => (
-                      <tr key={translation.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 text-sm font-mono text-gray-900 max-w-xs truncate">
-                          {translation.key}
-                        </td>
-                        <td className="px-6 py-4 text-sm text-gray-700 max-w-md">
-                          <div className="line-clamp-2">{translation.value}</div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
-                            {translation.category}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 text-sm text-gray-500 max-w-xs truncate">
-                          {translation.description || '—'}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                          <div className="flex justify-end gap-2">
-                            <button
-                              onClick={() => handleOpenEditModal(translation)}
-                              className="text-blue-600 hover:text-blue-900 transition"
-                              title={t('common.edit', 'Edit')}
-                            >
-                              <Edit className="h-4 w-4" />
-                            </button>
-                            <button
-                              onClick={() => handleDeleteTranslation(translation.key)}
-                              className="text-red-600 hover:text-red-900 transition"
-                              title={t('common.delete', 'Delete')}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-
-                {filteredTranslations.length === 0 && (
-                  <div className="text-center py-12">
-                    <FileJson className="mx-auto h-12 w-12 text-gray-400" />
-                    <p className="text-gray-500 text-lg mt-4">
-                      {searchTerm || selectedCategory !== 'all'
-                        ? t('translations.noneMatchFilters', 'No translation matches the current filters')
-                        : t('translations.noneForLanguage', 'This language has no translations yet')}
-                    </p>
-                    {(!searchTerm && selectedCategory === 'all') && (
-                      <button
-                        onClick={handleOpenCreateModal}
-                        className="mt-4 text-blue-600 hover:text-blue-800 font-medium"
-                      >
-                        {t('translations.addFirst', 'Add the first translation')}
-                      </button>
-                    )}
-                  </div>
-                )}
-              </div>
+      {loadError && (
+        <Alert variant="error" title={t('translations.loadError', 'Could not load the translations')}>
+          <div className="flex flex-wrap items-center gap-3">
+            <span>{loadError}</span>
+            {selectedLanguage && (
+              <Button size="sm" variant="outline" onClick={() => loadTranslations(selectedLanguage)}>
+                {t('common.tryAgain', 'Try Again')}
+              </Button>
             )}
           </div>
+        </Alert>
+      )}
+
+      {!selectedLanguage ? (
+        <EmptyState
+          icon={<LanguagesIcon className="h-8 w-8" />}
+          title={t('translations.pickLanguageTitle', 'Choose a language first')}
+          description={t(
+            'translations.pickLanguageBody',
+            'Translations belong to one language. Pick one above to see and edit its wording.'
+          )}
+        />
+      ) : (
+        <>
+          <FilterBar>
+            <Input
+              value={searchInput}
+              onChange={(event) => setSearchInput(event.target.value)}
+              placeholder={t('translations.searchPlaceholder', 'Search by key, text or description...')}
+              prefix={<Search className="h-4 w-4" aria-hidden="true" />}
+              aria-label={t('translations.searchPlaceholder', 'Search translations')}
+              containerClassName="sm:flex-1"
+            />
+            <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+              <SelectTrigger className="sm:w-52" aria-label={t('items.category', 'Category')}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {categories.map((category) => (
+                  <SelectItem key={category} value={category}>
+                    {category === ALL ? t('items.allCategories', 'All categories') : category}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </FilterBar>
+
+          {!loading && filteredTranslations.length === 0 ? (
+            isFiltered ? (
+              <EmptyState
+                icon={<Search className="h-8 w-8" />}
+                title={t('translations.noMatchTitle', 'No translation matches this filter')}
+                action={
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setSearchInput('');
+                      setSelectedCategory(ALL);
+                    }}
+                  >
+                    {t('common.clearFilters', 'Clear filters')}
+                  </Button>
+                }
+              />
+            ) : (
+              <EmptyState
+                icon={<LanguagesIcon className="h-8 w-8" />}
+                title={t('translations.empty', 'This language has no translations yet')}
+                description={t(
+                  'translations.emptyBody',
+                  'Add them one at a time, or import a JSON file exported from another language.'
+                )}
+                action={
+                  <Button onClick={openCreate} leadingIcon={<Plus className="h-4 w-4" aria-hidden="true" />}>
+                    {t('translations.addTranslation', 'Add translation')}
+                  </Button>
+                }
+              />
+            )
+          ) : (
+            <>
+              <DataTable
+                columns={columns}
+                rows={filteredTranslations}
+                rowKey={(translation) => translation.key}
+                caption={t('translations.title', 'Translations')}
+                isLoading={loading}
+                skeletonRows={8}
+                mobileActions={(translation) => (
+                  <Button size="sm" variant="outline" onClick={() => openEdit(translation)}>
+                    {t('common.edit', 'Edit')}
+                  </Button>
+                )}
+              />
+
+              <p className="text-sm text-ink-muted" role="status">
+                {t('translations.showingCount', 'Showing {shown} of {total} translations', {
+                  shown: filteredTranslations.length,
+                  total: translations.length,
+                })}
+              </p>
+            </>
+          )}
         </>
       )}
 
-      {/* Modal for Create/Edit */}
-      {isModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full p-6">
-            <h2 className="text-2xl font-bold mb-4 text-gray-800">
-              {editingTranslation ? t('translations.editTranslation', 'Edit translation') : t('translations.addTranslation', 'Add translation')}
-            </h2>
+      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>
+              {editingTranslation
+                ? t('translations.editTranslation', 'Edit translation')
+                : t('translations.addTranslation', 'Add translation')}
+            </DialogTitle>
+            <DialogClose onClose={() => setIsModalOpen(false)} />
+          </DialogHeader>
 
-            <form onSubmit={handleSubmit}>
-              <div className="mb-4">
-                <label htmlFor="key" className="block text-sm font-medium text-gray-700 mb-1">
-                  {t('translations.key', 'Key')} *
-                </label>
-                <input
-                  type="text"
-                  id="key"
-                  name="key"
-                  value={formData.key}
-                  onChange={handleInputChange}
-                  required
-                  disabled={!!editingTranslation}
-                  placeholder={t('translations.keyPlaceholder', 'e.g. common.save, auth.login')}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed font-mono"
-                />
-                <p className="text-xs text-gray-500 mt-1">{t('translations.keyHint', 'Use dots to group keys, e.g. category.name')}</p>
-              </div>
+          <form onSubmit={handleSubmit}>
+            <div className="flex flex-col gap-4 p-4 sm:p-5">
+              <Input
+                label={t('translations.key', 'Key')}
+                required
+                value={formData.key}
+                onChange={(event) => setFormData({ ...formData, key: event.target.value })}
+                // Khoá là định danh, sửa nó trên một bản dịch đã có nghĩa là tạo
+                // ra một khoá mới và bỏ lại khoá cũ mồ côi.
+                readOnly={Boolean(editingTranslation)}
+                placeholder={t('translations.keyPlaceholder', 'e.g. rooms.title')}
+                className="font-mono"
+              />
 
-              <div className="mb-4">
-                <label htmlFor="value" className="block text-sm font-medium text-gray-700 mb-1">
-                  {t('translations.value', 'Text')} *
+              <div>
+                <label
+                  htmlFor="translation-value"
+                  className="mb-1.5 block text-sm font-medium text-ink"
+                >
+                  {t('translations.value', 'Text')}
+                  <span aria-hidden="true" className="ml-0.5 text-destructive">
+                    *
+                  </span>
                 </label>
                 <textarea
-                  id="value"
-                  name="value"
-                  value={formData.value}
-                  onChange={handleInputChange}
+                  id="translation-value"
                   required
                   rows={3}
-                  placeholder={t('translations.valuePlaceholder', 'The translated text...')}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  value={formData.value}
+                  onChange={(event) => setFormData({ ...formData, value: event.target.value })}
+                  className="focus-ring w-full rounded-md border border-input bg-surface px-3 py-2 text-sm text-ink transition-colors duration-100 placeholder:text-ink-muted hover:border-ink-muted"
                 />
               </div>
 
-              <div className="mb-4">
-                <label htmlFor="category" className="block text-sm font-medium text-gray-700 mb-1">
-                  {t('items.category', 'Category')} *
-                </label>
-                <input
-                  type="text"
-                  id="category"
-                  name="category"
-                  value={formData.category}
-                  onChange={handleInputChange}
-                  required
-                  placeholder={t('translations.categoryPlaceholder', 'e.g. common, auth, rooms')}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-                <p className="text-xs text-gray-500 mt-1">{t('translations.categoryHint', 'Groups related translations together')}</p>
-              </div>
+              <Input
+                label={t('items.category', 'Category')}
+                required
+                value={formData.category}
+                onChange={(event) => setFormData({ ...formData, category: event.target.value })}
+                placeholder="common"
+              />
 
-              <div className="mb-6">
-                <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-1">
-                  {t('translations.descriptionOptional', 'Description (optional)')}
-                </label>
-                <textarea
-                  id="description"
-                  name="description"
-                  value={formData.description}
-                  onChange={handleInputChange}
-                  rows={2}
-                  placeholder={t('translations.descriptionPlaceholder', 'Context or notes for whoever translates this...')}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
+              <Input
+                label={t('items.description', 'Description')}
+                value={formData.description ?? ''}
+                onChange={(event) => setFormData({ ...formData, description: event.target.value })}
+                hint={t('translations.descriptionHint', 'Where this text appears, for the next translator.')}
+              />
+            </div>
 
-              <div className="flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={handleCloseModal}
-                  className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition"
-                >
-                  {t('common.cancel', 'Cancel')}
-                </button>
-                <button
-                  type="submit"
-                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
-                >
-                  <Check className="h-4 w-4" />
-                  {editingTranslation ? t('common.update', 'Update') : t('common.create', 'Create')}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>
+                {t('common.cancel', 'Cancel')}
+              </Button>
+              <Button type="submit" isLoading={isSaving} loadingText={t('common.saving', 'Saving...')}>
+                {t('common.save', 'Save')}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
-      {/* Confirmation Dialog */}
       <AlertDialog
         open={confirmDialog.open}
-        onOpenChange={(open) =>
-          setConfirmDialog({ open, translationKey: '' })
-        }
-        title={t('translations.deleteTitle', 'Delete Translation')}
-        description={t(
-          'translations.deleteMessage',
-          'Delete the translation for key "{key}"?',
-          { key: confirmDialog.translationKey }
-        )}
+        onOpenChange={(open) => setConfirmDialog({ open, translationKey: '' })}
+        title={t('translations.deleteTitle', 'Delete translation')}
+        description={t('translations.deleteMessage', 'Delete the translation "{key}"?', {
+          key: confirmDialog.translationKey,
+        })}
         confirmText={t('common.delete', 'Delete')}
         cancelText={t('common.cancel', 'Cancel')}
         onConfirm={confirmDeleteTranslation}

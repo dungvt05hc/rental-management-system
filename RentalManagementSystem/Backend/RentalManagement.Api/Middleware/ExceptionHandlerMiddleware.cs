@@ -3,6 +3,7 @@ using System.Text.Json;
 
 using RentalManagement.Api.Models.DTOs;
 using RentalManagement.Api.Models.Email;
+using RentalManagement.Api.Models.Exceptions;
 
 namespace RentalManagement.Api.Middleware;
 
@@ -48,12 +49,27 @@ public class ExceptionHandlerMiddleware
     {
         var traceId = Activity.Current?.Id ?? context.TraceIdentifier;
 
-        _logger.LogError(
-            exception,
-            "Unhandled exception. TraceId={TraceId} Method={Method} Path={Path}",
-            traceId,
-            context.Request.Method,
-            context.Request.Path.Value);
+        // Lỗi nghiệp vụ là KẾT QUẢ MONG ĐỢI, không phải sự cố: người dùng gửi
+        // một yêu cầu mà luật không cho phép. Ghi nó ở mức Error làm log lỗi đầy
+        // những dòng không ai cần xử lý, và che mất sự cố thật.
+        if (exception is DomainException)
+        {
+            _logger.LogInformation(
+                "Domain rule rejected the request. TraceId={TraceId} Method={Method} Path={Path} Reason={Reason}",
+                traceId,
+                context.Request.Method,
+                context.Request.Path.Value,
+                exception.Message);
+        }
+        else
+        {
+            _logger.LogError(
+                exception,
+                "Unhandled exception. TraceId={TraceId} Method={Method} Path={Path}",
+                traceId,
+                context.Request.Method,
+                context.Request.Path.Value);
+        }
 
         // Headers are already on the wire — the client is mid-response, nothing to do but
         // let the server abort the connection so the payload is not silently truncated.
@@ -74,7 +90,10 @@ public class ExceptionHandlerMiddleware
 
         var errors = new List<string> { $"traceId: {traceId}" };
 
-        if (_environment.IsDevelopment())
+        // Lỗi nghiệp vụ không kèm chi tiết kỹ thuật kể cả ở Development: câu
+        // `message` đã nói đủ, còn stack trace của một luật nghiệp vụ chỉ là
+        // nhiễu và làm người đọc quen với việc bỏ qua phần errors.
+        if (_environment.IsDevelopment() && exception is not DomainException)
         {
             errors.Add($"{exception.GetType().FullName}: {exception.Message}");
 
@@ -91,6 +110,11 @@ public class ExceptionHandlerMiddleware
 
     private static (int StatusCode, string Message) MapException(Exception exception) => exception switch
     {
+        // DomainException phải đứng TRƯỚC InvalidOperationException: nó là loại
+        // duy nhất mà Message được viết sẵn cho người dùng đọc, nên nó được gửi
+        // nguyên văn. Mọi nhánh còn lại thay bằng câu chung — chi tiết chỉ nằm
+        // trong log, tra lại bằng traceId.
+        DomainException domain => (domain.StatusCode, domain.Message),
         EmailRateLimitExceededException => (StatusCodes.Status429TooManyRequests, "Too many emails have been sent to this address. Please try again later"),
         KeyNotFoundException => (StatusCodes.Status404NotFound, "The requested resource was not found"),
         UnauthorizedAccessException => (StatusCodes.Status403Forbidden, "You are not allowed to perform this operation"),

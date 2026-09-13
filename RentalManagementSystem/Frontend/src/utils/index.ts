@@ -126,34 +126,26 @@ export function getInitials(firstName: string, lastName?: string): string {
   return `${first}${last}`;
 }
 
-// Get status color
-export function getStatusColor(status: string): string {
-  const statusColors: Record<string, string> = {
-    // Room statuses
-    'Available': 'bg-green-100 text-green-800',
-    'Occupied': 'bg-blue-100 text-blue-800',
-    'Maintenance': 'bg-yellow-100 text-yellow-800',
-    
-    // Customer statuses
-    'Active': 'bg-green-100 text-green-800',
-    'Inactive': 'bg-gray-100 text-gray-800',
-    'Terminated': 'bg-red-100 text-red-800',
-    
-    // Invoice statuses
-    'Pending': 'bg-yellow-100 text-yellow-800',
-    'Paid': 'bg-green-100 text-green-800',
-    'Overdue': 'bg-red-100 text-red-800',
-    'Cancelled': 'bg-gray-100 text-gray-800',
-    
-    // Payment methods
-    'Cash': 'bg-green-100 text-green-800',
-    'BankTransfer': 'bg-blue-100 text-blue-800',
-    'Check': 'bg-purple-100 text-purple-800',
-    'CreditCard': 'bg-indigo-100 text-indigo-800',
-  };
-  
-  return statusColors[status] || 'bg-gray-100 text-gray-800';
-}
+/*
+ * Màu trạng thái chuyển sang ./statusStyles — ở đó nó đi kèm cả tone (đặc /
+ * nhạt) và hình khối, vì màu một mình không phân biệt đủ năm trạng thái khi in
+ * đen trắng hoặc với người mù màu. Re-export để chỗ gọi cũ không phải sửa.
+ */
+export { getStatusColor, getStatusStyle } from './statusStyles';
+
+/*
+ * Nhãn hiển thị của enum backend. Tách riêng khỏi statusStyles: bảng kia lo
+ * màu và hình khối, bảng này lo chữ. Cả hai tra bằng cùng một chuỗi enum.
+ */
+export {
+  enumLabel,
+  ROOM_STATUS_LABELS,
+  ROOM_TYPE_LABELS,
+  INVOICE_STATUS_LABELS,
+  PAYMENT_METHOD_LABELS,
+} from './enumLabels';
+export type { EnumLabel, EnumLabelMap } from './enumLabels';
+export type { StatusStyle, StatusTone, StatusShape } from './statusStyles';
 
 // Validate email
 export function isValidEmail(email: string): boolean {

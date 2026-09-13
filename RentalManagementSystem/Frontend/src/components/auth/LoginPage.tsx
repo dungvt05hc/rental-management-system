@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { Link, Navigate } from 'react-router-dom';
+import { Navigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { Button, Input, Card, CardHeader, CardTitle, CardContent } from '../ui';
+import { Alert, Button, Input, Skeleton } from '../ui';
 import { useForm } from '../../hooks';
 import { isValidEmail } from '../../utils';
 import { useTranslation } from '../../hooks/useTranslation';
 import { getDefaultRoute } from '../../utils/accessControl';
+import { AuthLink, AuthShell } from './AuthShell';
 
 // type alias chứ không phải interface: useForm ràng buộc
 // T extends Record<string, unknown>, mà interface không có index signature ngầm.
@@ -18,13 +19,9 @@ export function LoginPage() {
   const { t } = useTranslation();
   const { login, isAuthenticated, isLoading, user } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
-  const {
-    values,
-    errors,
-    setValue,
-    setError
-  } = useForm<LoginFormData>({
+  const [signInError, setSignInError] = useState<string>();
+
+  const { values, errors, setValue, setError } = useForm<LoginFormData>({
     email: '',
     password: '',
   });
@@ -58,6 +55,7 @@ export function LoginPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSignInError(undefined);
 
     if (!validateForm()) {
       return;
@@ -68,8 +66,20 @@ export function LoginPage() {
     try {
       await login(values.email, values.password);
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Login failed';
-      setError('password', errorMessage);
+      /*
+       * Lỗi đăng nhập KHÔNG gắn vào ô mật khẩu nữa.
+       *
+       * Bản cũ làm `setError('password', ...)`, nên câu "Email hoặc mật khẩu
+       * không đúng" hiện ra ngay dưới ô mật khẩu — chỉ vào đúng một ô trong khi
+       * lỗi có thể nằm ở ô kia. Nó cũng làm ô mật khẩu mang aria-invalid, tức
+       * là nói với trình đọc màn hình rằng giá trị trong ô đó sai định dạng,
+       * điều không đúng.
+       */
+      setSignInError(
+        error instanceof Error
+          ? error.message
+          : t('auth.loginFailed', 'Could not sign in. Check your email and password.')
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -77,83 +87,67 @@ export function LoginPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
-      </div>
+      <AuthShell title={t('auth.signInToAccount', 'Sign in to your account')}>
+        <div className="flex flex-col gap-4">
+          <Skeleton className="h-16 w-full" />
+          <Skeleton className="h-16 w-full" />
+          <Skeleton className="h-10 w-full" />
+        </div>
+      </AuthShell>
     );
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        <div className="text-center">
-          <h2 className="mt-6 text-3xl font-extrabold text-gray-900">
-            {t('auth.signInToAccount', 'Sign in to your account')}
-          </h2>
-          <p className="mt-2 text-sm text-gray-600">
-            {t('auth.welcomeMessage', 'Welcome to the Rental Management System')}
+    <AuthShell
+      title={t('auth.signInToAccount', 'Sign in to your account')}
+      footer={
+        <>
+          {t('auth.needAccount', 'Need an account?')}{' '}
+          <AuthLink to="/register">{t('auth.registerHere', 'Register here')}</AuthLink>
+        </>
+      }
+    >
+      <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
+        {signInError && (
+          <Alert variant="error" title={t('auth.loginFailedTitle', 'Sign-in failed')}>
+            {signInError}
+          </Alert>
+        )}
+
+        <Input
+          label={t('auth.email', 'Email Address')}
+          type="email"
+          value={values.email}
+          onChange={(e) => setValue('email', e.target.value)}
+          error={errors.email}
+          placeholder={t('auth.enterEmail', 'Enter your email')}
+          autoComplete="email"
+          autoFocus
+          required
+        />
+
+        <div>
+          <Input
+            label={t('auth.password', 'Password')}
+            type="password"
+            value={values.password}
+            onChange={(e) => setValue('password', e.target.value)}
+            error={errors.password}
+            placeholder={t('auth.enterPassword', 'Enter your password')}
+            autoComplete="current-password"
+            required
+          />
+          <p className="mt-1.5 text-right">
+            <AuthLink to="/forgot-password">
+              {t('auth.forgotPassword', 'Forgot your password?')}
+            </AuthLink>
           </p>
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>{t('auth.login', 'Login')}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <Input
-                label={t('auth.email', 'Email Address')}
-                type="email"
-                value={values.email}
-                onChange={(e) => setValue('email', e.target.value)}
-                error={errors.email}
-                placeholder={t('auth.enterEmail', 'Enter your email')}
-                required
-              />
-
-              <Input
-                label={t('auth.password', 'Password')}
-                type="password"
-                value={values.password}
-                onChange={(e) => setValue('password', e.target.value)}
-                error={errors.password}
-                placeholder={t('auth.enterPassword', 'Enter your password')}
-                required
-              />
-
-              <Button
-                type="submit"
-                className="w-full"
-                isLoading={isSubmitting}
-                disabled={isSubmitting}
-              >
-                {t('auth.signIn', 'Sign In')}
-              </Button>
-            </form>
-
-            <div className="mt-4 text-center">
-              <p className="text-sm text-gray-600">
-                {t('auth.needAccount', 'Need an account?')}{' '}
-                <Link
-                  to="/register"
-                  className="font-medium text-primary hover:text-primary/80"
-                >
-                  {t('auth.registerHere', 'Register here')}
-                </Link>
-              </p>
-            </div>
-
-            <div className="mt-4 text-center">
-              <Link
-                to="/forgot-password"
-                className="text-sm font-medium text-primary hover:text-primary/80"
-              >
-                {t('auth.forgotPassword', 'Forgot your password?')}
-              </Link>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    </div>
+        <Button type="submit" fullWidth size="lg" isLoading={isSubmitting}>
+          {t('auth.signIn', 'Sign In')}
+        </Button>
+      </form>
+    </AuthShell>
   );
 }

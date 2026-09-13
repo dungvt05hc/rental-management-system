@@ -79,7 +79,7 @@ const FormItem = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivEl
 
     return (
       <FormItemContext.Provider value={{ id }}>
-        <div ref={ref} className={`space-y-2 ${className || ''}`} {...props} />
+        <div ref={ref} className={`flex flex-col gap-1.5 ${className || ''}`} {...props} />
       </FormItemContext.Provider>
     );
   }
@@ -98,8 +98,8 @@ const FormLabel = React.forwardRef<
   return (
     <label
       ref={ref}
-      className={`text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 ${
-        error ? 'text-red-600' : ''
+      className={`block text-sm font-medium text-ink peer-disabled:cursor-not-allowed peer-disabled:opacity-70 ${
+        error ? 'text-destructive' : ''
       } ${className || ''}`}
       htmlFor={formItemId}
       {...props}
@@ -143,7 +143,7 @@ const FormDescription = React.forwardRef<
     <p
       ref={ref}
       id={formDescriptionId}
-      className={`text-sm text-gray-500 ${className || ''}`}
+      className={`text-xs text-ink-muted ${className || ''}`}
       {...props}
     />
   );
@@ -168,7 +168,8 @@ const FormMessage = React.forwardRef<
     <p
       ref={ref}
       id={formMessageId}
-      className={`text-sm font-medium text-red-600 ${className || ''}`}
+      role="alert"
+      className={`text-xs font-medium text-destructive ${className || ''}`}
       {...props}
     >
       {body}

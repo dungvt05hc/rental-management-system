@@ -1,290 +1,206 @@
-import { useState, useEffect } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Save, Plus, Trash2, X } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle, Button, Input, NumericInput, AlertDialog } from '../ui';
-import { invoiceService, customerService, roomService, itemService } from '../../services';
-import type { CreateInvoiceRequest, UpdateInvoiceRequest, Customer, Room, InvoiceItem, Item, InvoiceStatus } from '../../types';
+import { ArrowLeft, Save } from 'lucide-react';
+import {
+  Alert,
+  AlertDialog,
+  Button,
+  Card,
+  Input,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  Skeleton,
+} from '../ui';
+import { customerService, invoiceService, itemService, roomService } from '../../services';
+import type { Customer, Item, Room } from '../../types';
 import { useTranslation } from '../../hooks/useTranslation';
 import { useToast } from '../../contexts/ToastContext';
-import {
-  calculateItemTotals,
-  calculateInvoiceItemsTotals,
-  roundToCents,
-} from './invoiceItemCalculations';
-import { formatCurrency, parseDecimalInput } from '../../utils';
-import { defineMessage } from '../../utils/i18n';
+import { formatCurrency } from '../../utils';
+import { InvoiceItemsTable } from './InvoiceItemsTable';
+import { emptyInvoiceValues, INVOICE_STATUS_OPTIONS, useInvoiceForm } from './useInvoiceForm';
+import type { InvoiceErrorCode, InvoiceFormValues } from './useInvoiceForm';
 
-const statusOptions = [
-  { value: 1, message: defineMessage('invoices.statusDraft', 'Draft'), color: 'gray' },
-  { value: 2, message: defineMessage('invoices.statusIssued', 'Issued'), color: 'blue' },
-  { value: 3, message: defineMessage('invoices.unpaid', 'Pending'), color: 'yellow' },
-  { value: 4, message: defineMessage('invoices.partiallyPaid', 'Partially Paid'), color: 'orange' },
-  { value: 5, message: defineMessage('invoices.paid', 'Paid'), color: 'green' },
-  { value: 6, message: defineMessage('invoices.overdue', 'Overdue'), color: 'red' },
-  { value: 7, message: defineMessage('invoices.cancelled', 'Cancelled'), color: 'gray' },
+/* ═══════════════════════════════════════════════════════════════════════════
+ * Lập / sửa hoá đơn.
+ *
+ * Toàn bộ phép tính và luật kiểm tra nằm ở useInvoiceForm. File này chỉ còn
+ * việc: nạp dữ liệu, bày ô nhập, gửi đi.
+ *
+ * BA THỨ ĐÃ ĐỔI SO VỚI BẢN CŨ:
+ *
+ *   1. TỔNG TIỀN DÍNH ĐÁY. Bản cũ đặt tổng tiền trong một thẻ ở giữa trang;
+ *      lúc đang gõ dòng thứ tám thì nó đã cuộn mất từ lâu. Nay nó nằm cùng
+ *      thanh với nút Lưu — thứ người ta nhìn trước khi bấm lưu chính là số
+ *      tiền sắp ghi vào sổ.
+ *
+ *   2. LỖI NẰM CẠNH Ô SAI. Bản cũ chỉ có `required` của HTML, nên trình duyệt
+ *      hiện bong bóng ở ô đầu tiên rồi thôi. Nay mỗi ô tự mang câu lỗi của nó,
+ *      và form cuộn tới ô sai đầu tiên.
+ *
+ *   3. Thẻ không còn đánh số 1-2-3-4 kèm vòng tròn xanh và nền gradient. Bốn
+ *      bước đó không phải một wizard — mọi thứ đều hiện cùng lúc trên một
+ *      trang, nên đánh số chúng là hứa một thứ tự không có thật.
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+/** Ô nào sai thì cuộn tới ô đó. Thứ tự đúng như thứ tự bày trên trang. */
+const FIELD_ORDER: (keyof InvoiceFormValues)[] = [
+  'customerId',
+  'roomId',
+  'billingPeriod',
+  'dueDate',
+  'additionalCharges',
+  'discount',
 ];
-
-const defaultItem: InvoiceItem = {
-  itemCode: '',
-  itemName: '',
-  description: '',
-  quantity: 1,
-  unitOfMeasure: 'pcs',
-  unitPrice: 0,
-  discountPercent: 0,
-  discountAmount: 0,
-  taxPercent: 0,
-  taxAmount: 0,
-  lineTotal: 0,
-  lineTotalWithTax: 0,
-  lineNumber: 1,
-  category: '',
-  notes: '',
-};
 
 export function InvoiceFormPage() {
   const { t } = useTranslation();
   const { showSuccess, showError } = useToast();
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
-  const isEditMode = !!id;
+  const isEditMode = Boolean(id);
 
+  const form = useInvoiceForm({ isEditMode });
+  const { values, setField, errors, totals } = form;
+
+  const [isLoading, setIsLoading] = useState(isEditMode);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [rooms, setRooms] = useState<Room[]>([]);
-  const [items, setItems] = useState<Item[]>([]);
-  const [invoiceItems, setInvoiceItems] = useState<InvoiceItem[]>([]);
-  const [formData, setFormData] = useState({
-    customerId: '',
-    roomId: '',
-    billingPeriod: '',
-    additionalCharges: '0',
-    discount: '0',
-    dueDate: '',
-    status: 'Pending',
-    additionalChargesDescription: '',
-    notes: '',
-  });
-
+  const [catalog, setCatalog] = useState<Item[]>([]);
   const [confirmDialog, setConfirmDialog] = useState<{
     open: boolean;
     itemIndex: number | null;
     itemName: string;
-  }>({
-    open: false,
-    itemIndex: null,
-    itemName: '',
-  });
+  }>({ open: false, itemIndex: null, itemName: '' });
+
+  /** Mã lỗi → câu tiếng Việt. Hook chỉ trả mã, dịch là việc của chỗ này. */
+  const errorMessage = useCallback(
+    (code: InvoiceErrorCode | undefined): string | undefined => {
+      if (!code) return undefined;
+      switch (code) {
+        case 'required':
+          return t('validation.required', 'This field is required');
+        case 'notANumber':
+          return t('validation.notANumber', 'Enter a number, for example 1.500.000');
+        case 'negative':
+          return t('validation.negative', 'The amount cannot be negative');
+      }
+    },
+    [t]
+  );
+
+  const { resetTo } = form;
 
   useEffect(() => {
-    loadCustomers();
-    loadRooms();
-    loadItems();
+    let cancelled = false;
 
-    if (isEditMode && id) {
-      loadInvoice(id);
-    } else {
-      const today = new Date();
-      const nextMonth = new Date(today.getFullYear(), today.getMonth() + 1, 1);
-      const dueDate = new Date(today.getFullYear(), today.getMonth() + 1, 5);
+    const loadAll = async () => {
+      // Danh mục dùng chung cho cả hai chế độ; hỏng thì ô chọn rỗng chứ không
+      // chặn cả form — vẫn gõ tay tên khoản mục được.
+      const [customersResponse, roomsResponse, itemsResponse] = await Promise.all([
+        customerService.getCustomers({ pageSize: 1000 }),
+        roomService.getRooms({ pageSize: 1000 }),
+        itemService.getItems({ pageSize: 1000, isActive: true }),
+      ]);
 
-      setFormData(prev => ({
-        ...prev,
-        billingPeriod: nextMonth.toISOString().split('T')[0],
-        dueDate: dueDate.toISOString().split('T')[0],
-      }));
-    }
-  }, [id, isEditMode]);
+      if (cancelled) return;
+      if (customersResponse.success && customersResponse.data) setCustomers(customersResponse.data.items || []);
+      if (roomsResponse.success && roomsResponse.data) setRooms(roomsResponse.data.items || []);
+      if (itemsResponse.success && itemsResponse.data) setCatalog(itemsResponse.data.items || []);
 
-  const loadInvoice = async (invoiceId: string) => {
-    try {
-      setIsLoading(true);
-      const response = await invoiceService.getInvoice(invoiceId);
+      if (!isEditMode || !id) return;
 
-      if (response.success && response.data) {
-        const invoiceData = response.data;
-        setFormData({
-          customerId: String(invoiceData.customer?.id || invoiceData.customerId || ''),
-          roomId: String(invoiceData.room?.id || invoiceData.roomId || ''),
-          billingPeriod: invoiceData.billingPeriod ? invoiceData.billingPeriod.split('T')[0] : '',
-          additionalCharges: String(invoiceData.additionalCharges || 0),
-          discount: String(invoiceData.discount || 0),
-          dueDate: invoiceData.dueDate ? invoiceData.dueDate.split('T')[0] : '',
-          status: String(invoiceData.status || 2), // Use numeric status value
-          additionalChargesDescription: invoiceData.additionalChargesDescription || '',
-          notes: invoiceData.notes || '',
-        });
+      try {
+        const response = await invoiceService.getInvoice(id);
+        if (cancelled) return;
 
-        setInvoiceItems(invoiceData.invoiceItems || []);
+        if (!response.success || !response.data) {
+          throw new Error(response.message || 'Failed to load invoice');
+        }
+
+        const invoice = response.data;
+        resetTo(
+          {
+            ...emptyInvoiceValues(),
+            customerId: String(invoice.customer?.id ?? invoice.customerId ?? ''),
+            roomId: String(invoice.room?.id ?? invoice.roomId ?? ''),
+            billingPeriod: invoice.billingPeriod?.split('T')[0] ?? '',
+            dueDate: invoice.dueDate?.split('T')[0] ?? '',
+            status: String(invoice.status ?? ''),
+            additionalCharges: String(invoice.additionalCharges ?? 0),
+            discount: String(invoice.discount ?? 0),
+            additionalChargesDescription: invoice.additionalChargesDescription ?? '',
+            notes: invoice.notes ?? '',
+          },
+          invoice.invoiceItems ?? []
+        );
+      } catch (err) {
+        if (!cancelled) setLoadError(err instanceof Error ? err.message : 'Failed to load invoice');
+      } finally {
+        if (!cancelled) setIsLoading(false);
       }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load invoice');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const loadCustomers = async () => {
-    try {
-      const response = await customerService.getCustomers({ pageSize: 1000 });
-      if (response.success && response.data) {
-        setCustomers(response.data.items || []);
-      }
-    } catch (err) {
-      console.error('Failed to load customers:', err);
-    }
-  };
-
-  const loadRooms = async () => {
-    try {
-      const response = await roomService.getRooms({ pageSize: 1000 });
-      if (response.success && response.data) {
-        setRooms(response.data.items || []);
-      }
-    } catch (err) {
-      console.error('Failed to load rooms:', err);
-    }
-  };
-
-  const loadItems = async () => {
-    try {
-      const response = await itemService.getItems({ pageSize: 1000, isActive: true });
-      if (response.success && response.data) {
-        setItems(response.data.items || []);
-      }
-    } catch (err) {
-      console.error('Failed to load items:', err);
-    }
-  };
-
-  const handleCustomerChange = (customerId: string) => {
-    const customer = customers.find(t => String(t.id) === customerId);
-
-    if (customer) {
-      setFormData(prev => ({
-        ...prev,
-        customerId,
-        roomId: customer.room?.id ? String(customer.room.id) : prev.roomId,
-      }));
-    } else {
-      setFormData(prev => ({ ...prev, customerId }));
-    }
-  };
-
-  const handleAddMultipleItems = () => {
-    const newItem: InvoiceItem = {
-      ...defaultItem,
-      lineNumber: invoiceItems.length + 1,
     };
 
-    setInvoiceItems([...invoiceItems, newItem]);
-  };
-
-  const handleItemSelect = (index: number, itemId: string) => {
-    const selectedItem = items.find(item => String(item.id) === itemId);
-
-    if (selectedItem) {
-      const newItems = [...invoiceItems];
-      newItems[index] = {
-        ...newItems[index],
-        itemCode: selectedItem.itemCode,
-        itemName: selectedItem.itemName,
-        description: selectedItem.description || '',
-        unitOfMeasure: selectedItem.unitOfMeasure,
-        unitPrice: selectedItem.unitPrice,
-        taxPercent: selectedItem.taxPercent || 0,
-        category: selectedItem.category || '',
-      };
-
-      newItems[index] = calculateItemTotals(newItems[index]);
-
-      setInvoiceItems(newItems);
-    }
-  };
-
-  const handleEditItem = <K extends keyof InvoiceItem>(index: number, field: K, value: InvoiceItem[K]) => {
-    const newItems = [...invoiceItems];
-    newItems[index] = {
-      ...newItems[index],
-      [field]: value,
-    };
-
-    newItems[index] = calculateItemTotals(newItems[index]);
-
-    setInvoiceItems(newItems);
-  };
-
-  const handleDeleteItem = (index: number, itemName: string) => {
-    setConfirmDialog({
-      open: true,
-      itemIndex: index,
-      itemName,
+    loadAll().finally(() => {
+      if (!cancelled && !isEditMode) setIsLoading(false);
     });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [id, isEditMode, resetTo]);
+
+  /* Chọn khách thì tự điền phòng theo hợp đồng đang hiệu lực của họ — hoá đơn
+     luôn phát hành dưới một hợp đồng, và hợp đồng mới là thứ gắn với phòng. */
+  const handleCustomerChange = (customerId: string) => {
+    setField('customerId', customerId);
+    const customer = customers.find((entry) => String(entry.id) === customerId);
+    if (customer?.room?.id) setField('roomId', String(customer.room.id));
   };
 
-  const confirmDeleteItem = () => {
-    if (confirmDialog.itemIndex === null) return;
-    const newItems = invoiceItems.filter((_, i) => i !== confirmDialog.itemIndex);
-    const renumberedItems = newItems.map((item, i) => ({
-      ...item,
-      lineNumber: i + 1,
-    }));
-    setInvoiceItems(renumberedItems);
-    setConfirmDialog({ open: false, itemIndex: null, itemName: '' });
-  };
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+    if (!form.validate()) {
+      // Đưa người dùng tới đúng ô sai đầu tiên thay vì để họ tự dò cả trang.
+      const firstBad = FIELD_ORDER.find((field) => form.errors[field]);
+      if (firstBad) {
+        document.getElementById(`invoice-${firstBad}`)?.scrollIntoView({
+          block: 'center',
+          behavior: 'smooth',
+        });
+        document.getElementById(`invoice-${firstBad}`)?.focus({ preventScroll: true });
+      }
+      return;
+    }
+
     setIsSubmitting(true);
-    setError(null);
-
     try {
-      const validItems = invoiceItems.filter(item =>
-        item.itemCode.trim() !== '' || item.itemName.trim() !== ''
-      );
+      const response =
+        isEditMode && id
+          ? await invoiceService.updateInvoice(id, form.toUpdateRequest())
+          : await invoiceService.createInvoice(form.toCreateRequest());
 
-      if (isEditMode && id) {
-        const updateData: UpdateInvoiceRequest = {
-          additionalCharges: (parseDecimalInput(formData.additionalCharges) ?? 0),
-          discount: (parseDecimalInput(formData.discount) ?? 0),
-          status: parseInt(formData.status) as InvoiceStatus,
-          dueDate: formData.dueDate,
-          additionalChargesDescription: formData.additionalChargesDescription,
-          notes: formData.notes,
-          invoiceItems: validItems,
-        };
-
-        const response = await invoiceService.updateInvoice(id, updateData);
-
-        if (response.success) {
-          showSuccess(t('common.success', 'Success'), t('invoices.updateSuccess', 'Invoice updated successfully'));
-          navigate('/invoices');
-        } else {
-          showError(t('common.error', 'Error'), response.message || t('invoices.updateError', 'Failed to update invoice'));
-        }
+      if (response.success) {
+        showSuccess(
+          t('common.success', 'Success'),
+          isEditMode
+            ? t('invoices.updateSuccess', 'Invoice updated successfully')
+            : t('invoices.createSuccess', 'Invoice created successfully')
+        );
+        navigate('/invoices');
       } else {
-        const createData: CreateInvoiceRequest = {
-          customerId: parseInt(formData.customerId),
-          roomId: parseInt(formData.roomId),
-          billingPeriod: formData.billingPeriod,
-          additionalCharges: (parseDecimalInput(formData.additionalCharges) ?? 0),
-          discount: (parseDecimalInput(formData.discount) ?? 0),
-          dueDate: formData.dueDate,
-          additionalChargesDescription: formData.additionalChargesDescription,
-          notes: formData.notes,
-          invoiceItems: validItems,
-        };
-
-        const response = await invoiceService.createInvoice(createData);
-
-        if (response.success) {
-          showSuccess(t('common.success', 'Success'), t('invoices.createSuccess', 'Invoice created successfully'));
-          navigate('/invoices');
-        } else {
-          showError(t('common.error', 'Error'), response.message || t('invoices.createError', 'Failed to create invoice'));
-        }
+        showError(
+          t('common.error', 'Error'),
+          response.message ||
+            (isEditMode
+              ? t('invoices.updateError', 'Failed to update invoice')
+              : t('invoices.createError', 'Failed to create invoice'))
+        );
       }
     } catch (err) {
       showError(
@@ -296,488 +212,325 @@ export function InvoiceFormPage() {
     }
   };
 
-  const handleChange = <K extends keyof typeof formData>(field: K, value: (typeof formData)[K]) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-  };
-
-  const itemsTotals = calculateInvoiceItemsTotals(invoiceItems);
-
-  // Same expression the backend applies when it recalculates the invoice, so the
-  // figure previewed here is the one that gets stored.
-  const calculateTotal = () => {
-    const additional = parseDecimalInput(formData.additionalCharges) ?? 0;
-    const discount = parseDecimalInput(formData.discount) ?? 0;
-
-    return roundToCents(itemsTotals.total + additional - discount);
-  };
+  const statusItems = useMemo(
+    () =>
+      INVOICE_STATUS_OPTIONS.map((option) => ({
+        value: String(option.status),
+        label: t(option.key, option.fallback),
+      })),
+    [t]
+  );
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-4 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-sm text-gray-600">{t('invoices.loadingOne', 'Loading invoice...')}</p>
-        </div>
+      <div className="flex flex-col gap-4 pb-8">
+        <Skeleton className="h-8 w-64" />
+        <Card className="p-4 sm:p-5">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {Array.from({ length: 4 }).map((_, index) => (
+              <Skeleton key={index} className="h-16 w-full" />
+            ))}
+          </div>
+        </Card>
+        <Skeleton className="h-64 w-full" />
       </div>
     );
   }
 
   return (
-    <div className="space-y-6 pb-20">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-4">
-          <Button
-            variant="outline"
-            onClick={() => navigate('/invoices')}
-            className="flex items-center space-x-2"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            <span>{t('invoices.backToList', 'Back to invoices')}</span>
-          </Button>
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">
-              {isEditMode ? t('invoices.editInvoice', 'Edit Invoice') : t('invoices.createInvoice', 'Create Invoice')}
-            </h1>
-            <p className="text-sm text-gray-500 mt-1">
-              {isEditMode
-                ? t('invoices.editSubtitle', 'Change the invoice details and its line items')
-                : t('invoices.createSubtitle', 'Fill in the details below to raise a new invoice')}
-            </p>
-          </div>
+    <div className="flex flex-col gap-4 pb-8">
+      <div className="flex flex-col gap-2">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="self-start px-2"
+          onClick={() => navigate('/invoices')}
+          leadingIcon={<ArrowLeft className="h-4 w-4" aria-hidden="true" />}
+        >
+          {t('invoices.backToList', 'Back to invoices')}
+        </Button>
+        <div>
+          <h1 className="text-xl font-semibold text-ink">
+            {isEditMode
+              ? t('invoices.editInvoice', 'Edit Invoice')
+              : t('invoices.createInvoice', 'Create Invoice')}
+          </h1>
+          <p className="mt-0.5 text-sm text-ink-muted">
+            {isEditMode
+              ? t('invoices.editSubtitle', 'Change the invoice details and its line items')
+              : t('invoices.createSubtitle', 'Fill in the details below to raise a new invoice')}
+          </p>
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
-        {error && (
-          <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg">
-            {error}
-          </div>
-        )}
+      {loadError && (
+        <Alert variant="error" title={t('invoices.loadError', 'Could not load invoice')}>
+          {t('common.unexpectedError', 'An error occurred')}
+        </Alert>
+      )}
 
-        <Card className="border-0 shadow-lg">
-          <CardHeader className="bg-gradient-to-r from-blue-50 to-blue-100 border-b">
-            <CardTitle className="flex items-center text-lg">
-              <span className="bg-blue-600 text-white rounded-full w-8 h-8 flex items-center justify-center text-sm mr-3">1</span>
-              {t('invoices.billingInformation', 'Billing Information')}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  {t('invoices.customer', 'Customer')} <span className="text-red-500">*</span>
-                </label>
-                <select
-                  value={formData.customerId}
-                  onChange={(e) => handleCustomerChange(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  required
-                  disabled={isEditMode}
+      <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
+        {/* ── Thông tin hoá đơn ───────────────────────────────────────────── */}
+        <Card className="p-4 sm:p-5">
+          <h2 className="text-lg font-semibold text-ink">
+            {t('invoices.billingInformation', 'Billing Information')}
+          </h2>
+
+          <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <div>
+              <label
+                htmlFor="invoice-customerId"
+                className="mb-1.5 block text-sm font-medium text-ink"
+              >
+                {t('invoices.customer', 'Customer')}
+                <span aria-hidden="true" className="ml-0.5 text-destructive">
+                  *
+                </span>
+              </label>
+              <Select
+                value={values.customerId}
+                onValueChange={handleCustomerChange}
+                disabled={isEditMode}
+              >
+                <SelectTrigger
+                  id="invoice-customerId"
+                  aria-invalid={errors.customerId ? true : undefined}
+                  aria-describedby={errors.customerId ? 'invoice-customerId-error' : undefined}
+                  className={errors.customerId ? 'border-destructive' : undefined}
                 >
-                  <option value="">{t('invoices.selectCustomer', 'Select a customer')}</option>
-                  {customers.map(customer => (
-                    <option key={customer.id} value={customer.id}>
+                  <SelectValue placeholder={t('invoices.selectCustomer', 'Select a customer')} />
+                </SelectTrigger>
+                <SelectContent>
+                  {customers.map((customer) => (
+                    <SelectItem key={customer.id} value={String(customer.id)}>
                       {customer.fullName || `${customer.firstName} ${customer.lastName}`}
-                      {customer.room && ` - ${t('rooms.roomLabel', 'Room {number}', { number: customer.room.roomNumber })}`}
-                    </option>
+                      {customer.room
+                        ? ` — ${t('rooms.roomLabel', 'Room {number}', {
+                            number: customer.room.roomNumber,
+                          })}`
+                        : ''}
+                    </SelectItem>
                   ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  {t('contracts.room', 'Room')} <span className="text-red-500">*</span>
-                </label>
-                <select
-                  value={formData.roomId}
-                  onChange={(e) => handleChange('roomId', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  required
-                  disabled={isEditMode}
-                >
-                  <option value="">{t('contracts.selectRoom', 'Select a room')}</option>
-                  {rooms.map(room => (
-                    <option key={room.id} value={room.id}>
-                      {t('rooms.roomLabel', 'Room {number}', { number: room.roomNumber })} — {t('rooms.perMonth', '{amount}/month', { amount: formatCurrency(room.monthlyRent) })}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  {t('invoices.billingPeriod', 'Billing Period')} <span className="text-red-500">*</span>
-                </label>
-                <Input
-                  type="date"
-                  value={formData.billingPeriod}
-                  onChange={(e) => handleChange('billingPeriod', e.target.value)}
-                  required
-                  disabled={isEditMode}
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  {t('invoices.dueDate', 'Due Date')} <span className="text-red-500">*</span>
-                </label>
-                <Input
-                  type="date"
-                  value={formData.dueDate}
-                  onChange={(e) => handleChange('dueDate', e.target.value)}
-                  required
-                />
-              </div>
-
-              {isEditMode && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    {t('rooms.status', 'Status')}
-                  </label>
-                  <select
-                    value={formData.status}
-                    onChange={(e) => handleChange('status', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    {statusOptions.map(option => (
-                      <option key={option.value} value={option.value}>
-                        {t(option.message.key, option.message.defaultValue)}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                </SelectContent>
+              </Select>
+              {errors.customerId && (
+                <p id="invoice-customerId-error" role="alert" className="mt-1.5 text-sm text-destructive">
+                  {errorMessage(errors.customerId)}
+                </p>
               )}
             </div>
-          </CardContent>
-        </Card>
 
-        <Card className="border-0 shadow-lg">
-          <CardHeader className="bg-gradient-to-r from-blue-50 to-blue-100 border-b">
-            <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center text-lg">
-                <span className="bg-blue-600 text-white rounded-full w-8 h-8 flex items-center justify-center text-sm mr-3">2</span>
-                {t('invoices.lineItems', 'Invoice Line Items')}
-              </CardTitle>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleAddMultipleItems}
-                disabled={isSubmitting}
-                className="flex items-center space-x-2 bg-gradient-to-r from-green-50 to-green-100 hover:from-green-100 hover:to-green-200 border-green-300 text-green-700"
+            <div>
+              <label htmlFor="invoice-roomId" className="mb-1.5 block text-sm font-medium text-ink">
+                {t('contracts.room', 'Room')}
+                <span aria-hidden="true" className="ml-0.5 text-destructive">
+                  *
+                </span>
+              </label>
+              <Select
+                value={values.roomId}
+                onValueChange={(value) => setField('roomId', value)}
+                disabled={isEditMode}
               >
-                <Plus className="h-4 w-4" />
-                <span>{t('invoices.addItem', 'Add Item')}</span>
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent className="p-0">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-50 border-b-2 border-gray-200">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 w-12">#</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 min-w-[200px]">{t('items.itemCode', 'Item Code')}</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 min-w-[180px]">{t('items.itemName', 'Item Name')}</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 min-w-[150px]">{t('items.description', 'Description')}</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 w-24">{t('invoices.quantityShort', 'Qty')}</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 w-20">{t('invoices.unitShort', 'Unit')}</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 w-28">{t('items.unitPrice', 'Unit Price')}</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 w-24">{t('invoices.discountPercentShort', 'Disc %')}</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 w-24">{t('items.taxPercent', 'Tax %')}</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 w-32">{t('invoices.lineTotal', 'Line Total')}</th>
-                    <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 w-16">{t('common.actions', 'Actions')}</th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {invoiceItems.length === 0 ? (
-                    <tr>
-                      <td colSpan={11} className="px-4 py-12 text-center">
-                        <div className="text-gray-500">
-                          <p className="text-base font-medium mb-2">{t('invoices.noItemsYet', 'No line items yet')}</p>
-                          <p className="text-sm">{t('invoices.noItemsHint', 'Use the Add Item button to put lines on this invoice')}</p>
-                        </div>
-                      </td>
-                    </tr>
-                  ) : (
-                    invoiceItems.map((item, index) => (
-                      <tr key={index} className="hover:bg-gray-50">
-                        <td className="px-4 py-3 text-gray-700 font-medium">{item.lineNumber}</td>
-                        <td className="px-4 py-3">
-                          <select
-                            value={items.find(i => i.itemCode === item.itemCode)?.id || ''}
-                            onChange={(e) => handleItemSelect(index, e.target.value)}
-                            className="w-full h-9 text-sm border border-gray-300 rounded px-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          >
-                            <option value="">{t('invoices.selectItem', 'Select an item')}</option>
-                            {items.map(i => (
-                              <option key={i.id} value={i.id}>
-                                {i.itemCode} - {i.itemName}
-                              </option>
-                            ))}
-                          </select>
-                        </td>
-                        <td className="px-4 py-3">
-                          <Input
-                            value={item.itemName}
-                            onChange={(e) => handleEditItem(index, 'itemName', e.target.value)}
-                            className="h-9 text-sm"
-                            placeholder={t('items.itemName', 'Item Name')}
-                          />
-                        </td>
-                        <td className="px-4 py-3">
-                          <Input
-                            value={item.description || ''}
-                            onChange={(e) => handleEditItem(index, 'description', e.target.value)}
-                            className="h-9 text-sm"
-                            placeholder={t('items.description', 'Description')}
-                          />
-                        </td>
-                        <td className="px-4 py-3">
-                          <NumericInput
-                            value={item.quantity}
-                            onValueChange={(value) => handleEditItem(index, 'quantity', value ?? 0)}
-                            className="h-9 text-sm text-right"
-                          />
-                        </td>
-                        <td className="px-4 py-3">
-                          <input
-                            type="text"
-                            list="uom-options-form"
-                            value={item.unitOfMeasure}
-                            onChange={(e) => handleEditItem(index, 'unitOfMeasure', e.target.value)}
-                            className="h-9 text-sm border border-gray-300 rounded px-2 w-full focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            placeholder={t('invoices.unitShort', 'Unit')}
-                          />
-                          <datalist id="uom-options-form">
-                            <option value="pcs">pcs</option>
-                            <option value="pc">pc</option>
-                            <option value="piece">piece</option>
-                            <option value="kg">kg</option>
-                            <option value="gram">gram</option>
-                            <option value="ton">ton</option>
-                            <option value="m">m</option>
-                            <option value="cm">cm</option>
-                            <option value="km">km</option>
-                            <option value="sqm">sqm (square meter)</option>
-                            <option value="hrs">hrs</option>
-                            <option value="hour">hour</option>
-                            <option value="day">day</option>
-                            <option value="days">days</option>
-                            <option value="week">week</option>
-                            <option value="weeks">weeks</option>
-                            <option value="month">month</option>
-                            <option value="months">months</option>
-                            <option value="year">year</option>
-                            <option value="years">years</option>
-                            <option value="unit">unit</option>
-                            <option value="box">box</option>
-                            <option value="package">package</option>
-                            <option value="set">set</option>
-                            <option value="liter">liter</option>
-                            <option value="gallon">gallon</option>
-                          </datalist>
-                        </td>
-                        <td className="px-4 py-3">
-                          <NumericInput
-                            value={item.unitPrice}
-                            onValueChange={(value) => handleEditItem(index, 'unitPrice', value ?? 0)}
-                            className="h-9 text-sm text-right"
-                          />
-                        </td>
-                        <td className="px-4 py-3">
-                          <NumericInput
-                            value={item.discountPercent}
-                            onValueChange={(value) => handleEditItem(index, 'discountPercent', value ?? 0)}
-                            className="h-9 text-sm text-right"
-                          />
-                        </td>
-                        <td className="px-4 py-3">
-                          <NumericInput
-                            value={item.taxPercent}
-                            onValueChange={(value) => handleEditItem(index, 'taxPercent', value ?? 0)}
-                            className="h-9 text-sm text-right"
-                          />
-                        </td>
-                        <td className="px-4 py-3 text-right font-semibold text-gray-900">
-                          {formatCurrency(item.lineTotalWithTax)}
-                        </td>
-                        <td className="px-4 py-3 text-center">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleDeleteItem(index, item.itemName)}
-                            disabled={isSubmitting}
-                            className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
-                            title={t('common.delete', 'Delete')}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-                {invoiceItems.length > 0 && (
-                  <tfoot className="bg-gray-50 border-t-2 border-gray-300">
-                    <tr>
-                      <td colSpan={9} className="px-4 py-3 text-right font-semibold text-gray-700">
-                        {t('invoices.subtotal', 'Subtotal')}
-                      </td>
-                      <td className="px-4 py-3 text-right font-bold text-gray-900">
-                        {formatCurrency(itemsTotals.afterDiscount)}
-                      </td>
-                      <td></td>
-                    </tr>
-                    <tr>
-                      <td colSpan={9} className="px-4 py-2 text-right font-semibold text-gray-700">
-                        {t('invoices.totalTax', 'Total tax')}
-                      </td>
-                      <td className="px-4 py-2 text-right font-bold text-gray-900">
-                        {formatCurrency(itemsTotals.tax)}
-                      </td>
-                      <td></td>
-                    </tr>
-                    <tr className="bg-blue-50">
-                      <td colSpan={9} className="px-4 py-3 text-right font-bold text-gray-900 text-base">
-                        {t('invoices.itemsTotal', 'Line items total')}
-                      </td>
-                      <td className="px-4 py-3 text-right font-bold text-blue-600 text-base">
-                        {formatCurrency(itemsTotals.total)}
-                      </td>
-                      <td></td>
-                    </tr>
-                  </tfoot>
-                )}
-              </table>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-0 shadow-lg">
-          <CardHeader className="bg-gradient-to-r from-blue-50 to-blue-100 border-b">
-            <CardTitle className="flex items-center text-lg">
-              <span className="bg-blue-600 text-white rounded-full w-8 h-8 flex items-center justify-center text-sm mr-3">3</span>
-              {t('invoices.chargesAndDiscounts', 'Additional charges and discounts')}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-6 space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  {t('invoices.additionalCharges', 'Additional Charges')}
-                </label>
-                <Input
-                  type="text"
-                  inputMode="decimal"
-                  value={formData.additionalCharges}
-                  onChange={(e) => handleChange('additionalCharges', e.target.value)}
-                  placeholder="0"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  {t('invoices.discount', 'Discount')}
-                </label>
-                <Input
-                  type="text"
-                  inputMode="decimal"
-                  value={formData.discount}
-                  onChange={(e) => handleChange('discount', e.target.value)}
-                  placeholder="0"
-                />
-              </div>
+                <SelectTrigger
+                  id="invoice-roomId"
+                  aria-invalid={errors.roomId ? true : undefined}
+                  aria-describedby={errors.roomId ? 'invoice-roomId-error' : undefined}
+                  className={errors.roomId ? 'border-destructive' : undefined}
+                >
+                  <SelectValue placeholder={t('contracts.selectRoom', 'Select a room')} />
+                </SelectTrigger>
+                <SelectContent>
+                  {rooms.map((room) => (
+                    <SelectItem key={room.id} value={String(room.id)}>
+                      {t('rooms.roomLabel', 'Room {number}', { number: room.roomNumber })} —{' '}
+                      {t('rooms.perMonth', '{amount}/month', {
+                        amount: formatCurrency(room.monthlyRent),
+                      })}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {errors.roomId && (
+                <p id="invoice-roomId-error" role="alert" className="mt-1.5 text-sm text-destructive">
+                  {errorMessage(errors.roomId)}
+                </p>
+              )}
             </div>
 
-            {(parseDecimalInput(formData.additionalCharges) ?? 0) > 0 && (
+            <Input
+              id="invoice-billingPeriod"
+              type="date"
+              label={t('invoices.billingPeriod', 'Billing Period')}
+              required
+              value={values.billingPeriod}
+              onChange={(event) => setField('billingPeriod', event.target.value)}
+              disabled={isEditMode}
+              error={errorMessage(errors.billingPeriod)}
+            />
+
+            <Input
+              id="invoice-dueDate"
+              type="date"
+              label={t('invoices.dueDate', 'Due Date')}
+              required
+              value={values.dueDate}
+              onChange={(event) => setField('dueDate', event.target.value)}
+              error={errorMessage(errors.dueDate)}
+            />
+
+            {isEditMode && (
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  {t('invoices.additionalChargesDescription', 'What the additional charges are for')}
+                <label htmlFor="invoice-status" className="mb-1.5 block text-sm font-medium text-ink">
+                  {t('rooms.status', 'Status')}
                 </label>
-                <textarea
-                  value={formData.additionalChargesDescription}
-                  onChange={(e) => handleChange('additionalChargesDescription', e.target.value)}
-                  placeholder={t('invoices.additionalChargesPlaceholder', 'e.g. utilities, repairs, late fee...')}
-                  rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
+                <Select value={values.status} onValueChange={(value) => setField('status', value)}>
+                  <SelectTrigger id="invoice-status">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {statusItems.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             )}
-
-            <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl p-6 shadow-lg">
-              <div className="space-y-3">
-                <div className="flex justify-between text-sm opacity-90">
-                  <span>{t('invoices.itemsTotal', 'Line items total')}</span>
-                  <span className="font-medium">{formatCurrency(itemsTotals.total)}</span>
-                </div>
-                {(parseDecimalInput(formData.additionalCharges) ?? 0) > 0 && (
-                  <div className="flex justify-between text-sm opacity-90">
-                    <span>{t('invoices.additionalCharges', 'Additional Charges')}</span>
-                    <span className="font-medium">+{formatCurrency((parseDecimalInput(formData.additionalCharges) ?? 0))}</span>
-                  </div>
-                )}
-                {(parseDecimalInput(formData.discount) ?? 0) > 0 && (
-                  <div className="flex justify-between text-sm text-yellow-200">
-                    <span>{t('invoices.discount', 'Discount')}</span>
-                    <span className="font-medium">-{formatCurrency((parseDecimalInput(formData.discount) ?? 0))}</span>
-                  </div>
-                )}
-                <div className="border-t-2 border-white border-opacity-30 pt-3 mt-3 flex justify-between items-center">
-                  <span className="text-xl font-bold">{t('invoices.grandTotal', 'Invoice grand total')}</span>
-                  <span className="text-3xl font-bold">
-                    {formatCurrency(calculateTotal())}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </CardContent>
+          </div>
         </Card>
 
-        <Card className="border-0 shadow-lg">
-          <CardHeader className="bg-gradient-to-r from-blue-50 to-blue-100 border-b">
-            <CardTitle className="flex items-center text-lg">
-              <span className="bg-blue-600 text-white rounded-full w-8 h-8 flex items-center justify-center text-sm mr-3">4</span>
-              {t('common.notes', 'Notes')}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-6">
-            <textarea
-              value={formData.notes}
-              onChange={(e) => handleChange('notes', e.target.value)}
-              placeholder={t('invoices.notesPlaceholder', 'Notes about this invoice...')}
-              rows={4}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+        {/* ── Các dòng hàng ───────────────────────────────────────────────── */}
+        <InvoiceItemsTable
+          items={form.items}
+          catalog={catalog}
+          totals={totals}
+          disabled={isSubmitting}
+          onAdd={form.addItem}
+          onUpdate={form.updateItem}
+          onSelectCatalogItem={form.applyCatalogItem}
+          onRemove={(index, itemName) => setConfirmDialog({ open: true, itemIndex: index, itemName })}
+        />
+
+        {/* ── Phụ thu và giảm giá ─────────────────────────────────────────── */}
+        <Card className="p-4 sm:p-5">
+          <h2 className="text-lg font-semibold text-ink">
+            {t('invoices.chargesAndDiscounts', 'Additional charges and discounts')}
+          </h2>
+
+          <div className="mt-4 grid gap-4 md:grid-cols-2">
+            <Input
+              id="invoice-additionalCharges"
+              inputMode="decimal"
+              numeric
+              suffix="₫"
+              label={t('invoices.additionalCharges', 'Additional Charges')}
+              value={values.additionalCharges}
+              onChange={(event) => setField('additionalCharges', event.target.value)}
+              error={errorMessage(errors.additionalCharges)}
             />
-          </CardContent>
+            <Input
+              id="invoice-discount"
+              inputMode="decimal"
+              numeric
+              suffix="₫"
+              label={t('invoices.discount', 'Discount')}
+              value={values.discount}
+              onChange={(event) => setField('discount', event.target.value)}
+              error={errorMessage(errors.discount)}
+            />
+          </div>
+
+          {totals.additionalCharges > 0 && (
+            <div className="mt-4">
+              <label
+                htmlFor="invoice-charges-description"
+                className="mb-1.5 block text-sm font-medium text-ink"
+              >
+                {t('invoices.additionalChargesDescription', 'What the additional charges are for')}
+              </label>
+              <textarea
+                id="invoice-charges-description"
+                rows={2}
+                value={values.additionalChargesDescription}
+                onChange={(event) => setField('additionalChargesDescription', event.target.value)}
+                placeholder={t('invoices.additionalChargesPlaceholder', 'e.g. utilities, repairs, late fee...')}
+                className="focus-ring w-full rounded-md border border-input bg-surface px-3 py-2 text-sm text-ink transition-colors duration-100 placeholder:text-ink-muted hover:border-ink-muted"
+              />
+            </div>
+          )}
+
+          <div className="mt-4">
+            <label htmlFor="invoice-notes" className="mb-1.5 block text-sm font-medium text-ink">
+              {t('common.notes', 'Notes')}
+            </label>
+            <textarea
+              id="invoice-notes"
+              rows={3}
+              value={values.notes}
+              onChange={(event) => setField('notes', event.target.value)}
+              placeholder={t('invoices.notesPlaceholder', 'Notes about this invoice...')}
+              className="focus-ring w-full rounded-md border border-input bg-surface px-3 py-2 text-sm text-ink transition-colors duration-100 placeholder:text-ink-muted hover:border-ink-muted"
+            />
+          </div>
         </Card>
 
-        <div className="fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg z-10">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-            <div className="flex items-center justify-between">
+        {/*
+         * ── Thanh dính đáy ────────────────────────────────────────────────
+         * Tổng tiền và nút Lưu đi cùng nhau và luôn nhìn thấy. `sticky` chứ
+         * không `fixed`: fixed nằm ngoài luồng trang nên nó che mất phần cuối
+         * form, và bản cũ phải bù bằng pb-20 ước chừng.
+         */}
+        <div className="sticky bottom-0 z-20 -mx-4 border-t border-line bg-surface px-4 py-3 shadow-sticky sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-xs text-ink-muted">
+                {t('invoices.grandTotal', 'Invoice grand total')}
+              </p>
+              <p className="numeric text-2xl font-semibold text-ink">
+                {formatCurrency(totals.grandTotal)}
+              </p>
+              {/* Chỉ nói ra phần cấu thành khi nó khác tổng các dòng. */}
+              {(totals.additionalCharges > 0 || totals.invoiceDiscount > 0) && (
+                <p className="text-xs text-ink-muted">
+                  <span className="numeric">{formatCurrency(totals.total)}</span>
+                  {totals.additionalCharges > 0 && (
+                    <>
+                      {' + '}
+                      <span className="numeric">{formatCurrency(totals.additionalCharges)}</span>
+                    </>
+                  )}
+                  {totals.invoiceDiscount > 0 && (
+                    <>
+                      {' − '}
+                      <span className="numeric">{formatCurrency(totals.invoiceDiscount)}</span>
+                    </>
+                  )}
+                </p>
+              )}
+            </div>
+
+            <div className="flex shrink-0 items-center gap-2 max-sm:w-full">
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => navigate('/invoices')}
                 disabled={isSubmitting}
-                className="flex items-center space-x-2"
+                className="max-sm:flex-1"
               >
-                <X className="h-4 w-4" />
-                <span>{t('common.cancel', 'Cancel')}</span>
+                {t('common.cancel', 'Cancel')}
               </Button>
               <Button
                 type="submit"
-                disabled={isSubmitting}
-                className="flex items-center space-x-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-8"
+                isLoading={isSubmitting}
+                loadingText={t('common.saving', 'Saving...')}
+                leadingIcon={<Save className="h-4 w-4" aria-hidden="true" />}
+                className="max-sm:flex-1"
               >
-                <Save className="h-4 w-4" />
-                <span>
-                  {isSubmitting
-                    ? t('common.saving', 'Saving...')
-                    : isEditMode
-                      ? t('invoices.updateInvoice', 'Update Invoice')
-                      : t('invoices.createInvoice', 'Create Invoice')}
-                </span>
+                {isEditMode
+                  ? t('invoices.updateInvoice', 'Update Invoice')
+                  : t('invoices.createInvoice', 'Create Invoice')}
               </Button>
             </div>
           </div>
@@ -786,18 +539,17 @@ export function InvoiceFormPage() {
 
       <AlertDialog
         open={confirmDialog.open}
-        onOpenChange={(open) =>
-          setConfirmDialog({ open, itemIndex: null, itemName: '' })
-        }
+        onOpenChange={(open) => setConfirmDialog({ open, itemIndex: null, itemName: '' })}
         title={t('invoices.deleteItemTitle', 'Delete Item')}
-        description={t(
-          'invoices.deleteItemMessage',
-          'Remove "{name}" from this invoice?',
-          { name: confirmDialog.itemName }
-        )}
+        description={t('invoices.deleteItemMessage', 'Remove "{name}" from this invoice?', {
+          name: confirmDialog.itemName,
+        })}
         confirmText={t('common.delete', 'Delete')}
         cancelText={t('common.cancel', 'Cancel')}
-        onConfirm={confirmDeleteItem}
+        onConfirm={() => {
+          if (confirmDialog.itemIndex !== null) form.removeItem(confirmDialog.itemIndex);
+          setConfirmDialog({ open: false, itemIndex: null, itemName: '' });
+        }}
         variant="warning"
       />
     </div>

@@ -1,16 +1,11 @@
 import { useState } from 'react';
-import type { InputHTMLAttributes } from 'react';
 import { Input } from './Input';
+import type { InputProps } from './Input';
 import { formatNumber, parseDecimalInput } from '../../utils';
 
-type NumericInputProps = Omit<
-  InputHTMLAttributes<HTMLInputElement>,
-  'value' | 'onChange' | 'type' | 'inputMode'
-> & {
+type NumericInputProps = Omit<InputProps, 'value' | 'onChange' | 'type' | 'inputMode'> & {
   value: number | null | undefined;
   onValueChange: (value: number | null) => void;
-  label?: string;
-  error?: string;
 };
 
 /**
@@ -23,8 +18,17 @@ type NumericInputProps = Omit<
  *
  * Trong lúc gõ, ô hiển thị đúng những gì người dùng nhập (không tự chèn dấu
  * ngăn nghìn giữa chừng); rời khỏi ô thì hiện lại dạng đã định dạng.
+ *
+ * Mặc định bật `numeric`: font Inter + tabular-nums + canh phải, để nhiều ô số
+ * xếp dọc nhau thẳng hàng nghìn.
  */
-export function NumericInput({ value, onValueChange, onBlur, ...props }: NumericInputProps) {
+export function NumericInput({
+  value,
+  onValueChange,
+  onBlur,
+  numeric = true,
+  ...props
+}: NumericInputProps) {
   const [draft, setDraft] = useState<string | null>(null);
 
   const formatted =
@@ -35,6 +39,7 @@ export function NumericInput({ value, onValueChange, onBlur, ...props }: Numeric
       {...props}
       type="text"
       inputMode="decimal"
+      numeric={numeric}
       value={draft ?? formatted}
       onChange={(event) => {
         setDraft(event.target.value);

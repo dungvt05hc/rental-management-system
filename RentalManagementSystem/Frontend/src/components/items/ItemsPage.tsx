@@ -1,108 +1,129 @@
-import React, { useState, useEffect } from 'react';
-import { Plus, Search, Edit, Trash2, X } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Package, Pencil, Plus, Search, Trash2 } from 'lucide-react';
+import {
+  Alert,
+  AlertDialog,
+  Badge,
+  Button,
+  Checkbox,
+  DataTable,
+  EmptyState,
+  FilterBar,
+  Input,
+  PageHeader,
+  Pagination,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../ui';
+import type { DataTableColumn } from '../ui';
 import { itemService } from '../../services';
 import type { Item, ItemSearchRequest } from '../../types';
-import { AlertDialog } from '../ui';
 import { formatCurrency } from '../../utils';
 import { ItemDialog } from './ItemDialog';
 import { useToast } from '../../contexts/ToastContext';
 import { useTranslation } from '../../hooks/useTranslation';
+import { useDebounce } from '../../hooks';
 
-export const ItemsPage: React.FC = () => {
+/* ═══════════════════════════════════════════════════════════════════════════
+ * Danh mục khoản mục.
+ *
+ * Đây là BẢNG GIÁ dùng lại: điện, nước, rác, gửi xe… Người ta vào đây để sửa
+ * đơn giá trước khi lập hoá đơn tháng. Nên cột đơn giá là cột chính, và mã
+ * khoản mục đứng ngay dưới tên — mã mới là thứ hiện ra trong ô chọn ở form
+ * hoá đơn.
+ *
+ * Bản cũ có ba tiêu đề cột viết cứng bằng tiếng Anh ("Code", "Name", "UOM")
+ * lẫn giữa các cột đã dịch, và chip trạng thái ghi "Active"/"Inactive" cũng
+ * viết cứng. Bật tiếng Việt vẫn thấy nguyên tiếng Anh ở đó.
+ *
+ * Bản cũ còn bọc cả trang trong `container mx-auto px-4 py-8` trong khi Layout
+ * đã có sẵn một khung y hệt — nên trang này thụt vào sâu hơn mọi trang khác.
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+const ALL = 'all';
+const PAGE_SIZE = 10;
+
+export function ItemsPage() {
   const { t } = useTranslation();
   const { showSuccess, showError } = useToast();
 
   const [items, setItems] = useState<Item[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [categories, setCategories] = useState<string[]>([]);
-  const [showActiveOnly, setShowActiveOnly] = useState(true);
-  const [pagination, setPagination] = useState({
-    page: 1,
-    pageSize: 10,
-    totalItems: 0,
-    totalPages: 0
-  });
-
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [searchInput, setSearchInput] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState<string>(ALL);
+  const [activeOnly, setActiveOnly] = useState(true);
+  const [page, setPage] = useState(1);
+  const [pagination, setPagination] = useState({ totalItems: 0, totalPages: 0 });
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
-
   const [confirmDialog, setConfirmDialog] = useState<{
     open: boolean;
     itemId: string | null;
     itemName: string;
-  }>({
-    open: false,
-    itemId: null,
-    itemName: '',
-  });
+  }>({ open: false, itemId: null, itemName: '' });
 
-  useEffect(() => {
-    loadItems();
-    loadCategories();
-  }, [searchTerm, selectedCategory, showActiveOnly, pagination.page]);
+  const searchQuery = useDebounce(searchInput, 300);
 
-  const loadItems = async () => {
+  // "Chỉ hiện đang dùng" bật sẵn, nên nó CÓ tính là một bộ lọc: tắt nó đi là
+  // một cách hợp lệ để tìm lại khoản mục đã ngừng dùng.
+  const isFiltered = searchQuery.trim() !== '' || categoryFilter !== ALL || !activeOnly;
+
+  const loadItems = useCallback(async () => {
     try {
-      setLoading(true);
+      setIsLoading(true);
+      setError(null);
+
       const params: ItemSearchRequest = {
-        searchTerm: searchTerm || undefined,
-        category: selectedCategory || undefined,
-        isActive: showActiveOnly ? true : undefined,
-        page: pagination.page,
-        pageSize: pagination.pageSize,
+        searchTerm: searchQuery || undefined,
+        category: categoryFilter === ALL ? undefined : categoryFilter,
+        isActive: activeOnly ? true : undefined,
+        page,
+        pageSize: PAGE_SIZE,
         sortBy: 'ItemName',
-        sortDirection: 'asc'
+        sortDirection: 'asc',
       };
 
       const response = await itemService.getItems(params);
-      
-      if (response.success && response.data) {
-        const paginatedData = response.data;
-        setItems(paginatedData.items || []);
-        setPagination(prev => ({
-          ...prev,
-          totalItems: paginatedData.totalItems || 0,
-          totalPages: paginatedData.totalPages || Math.ceil((paginatedData.totalItems || 0) / prev.pageSize)
-        }));
+
+      if (!response.success || !response.data) {
+        throw new Error(response.message || 'Failed to load items');
       }
-    } catch (error) {
-      console.error('Error loading items:', error);
+
+      setItems(response.data.items || []);
+      setPagination({
+        totalItems: response.data.totalItems || 0,
+        totalPages: response.data.totalPages || 1,
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
-  };
+  }, [page, searchQuery, categoryFilter, activeOnly]);
 
-  const loadCategories = async () => {
-    try {
-      const response = await itemService.getCategories();
-      if (response.success && response.data) {
-        setCategories(response.data);
-      }
-    } catch (error) {
-      console.error('Error loading categories:', error);
-    }
-  };
-
-  const handleDialogSuccess = () => {
-    setDialogOpen(false);
+  useEffect(() => {
     loadItems();
+  }, [loadItems]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [searchQuery, categoryFilter, activeOnly]);
+
+  /* Danh sách nhóm chỉ đổi khi thêm/sửa khoản mục, nên tải một lần lúc mở
+     trang chứ không tải lại theo từng lần gõ như bản cũ. */
+  const loadCategories = useCallback(async () => {
+    const response = await itemService.getCategories();
+    if (response.success && response.data) setCategories(response.data);
+  }, []);
+
+  useEffect(() => {
     loadCategories();
-  };
-
-  const handleEdit = (item: Item) => {
-    setSelectedItem(item);
-    setDialogOpen(true);
-  };
-
-  const handleDeleteItem = (itemId: string, itemName: string) => {
-    setConfirmDialog({
-      open: true,
-      itemId,
-      itemName,
-    });
-  };
+  }, [loadCategories]);
 
   const confirmDeleteItem = async () => {
     if (!confirmDialog.itemId) return;
@@ -123,220 +144,251 @@ export const ItemsPage: React.FC = () => {
     }
   };
 
+  const handleEdit = (item: Item) => {
+    setSelectedItem(item);
+    setDialogOpen(true);
+  };
+
+  const columns: DataTableColumn<Item>[] = useMemo(
+    () => [
+      {
+        key: 'name',
+        header: t('items.itemName', 'Item Name'),
+        cell: (item) => (
+          <div className="min-w-0">
+            <span className="block truncate font-medium text-ink">{item.itemName}</span>
+            <span className="numeric block truncate text-xs text-ink-muted">{item.itemCode}</span>
+          </div>
+        ),
+        mobile: 'title',
+      },
+      {
+        key: 'unitPrice',
+        header: t('items.unitPrice', 'Unit Price'),
+        cell: (item) => (
+          <span className="font-semibold text-ink">{formatCurrency(item.unitPrice)}</span>
+        ),
+        numeric: true,
+        mobile: 'primary',
+      },
+      {
+        key: 'unitOfMeasure',
+        header: t('invoices.unitShort', 'Unit'),
+        cell: (item) => item.unitOfMeasure,
+        width: 'w-24',
+      },
+      {
+        key: 'category',
+        header: t('items.category', 'Category'),
+        cell: (item) => item.category || <span className="text-ink-muted">—</span>,
+      },
+      {
+        key: 'taxPercent',
+        header: t('items.taxPercent', 'Tax %'),
+        cell: (item) => `${item.taxPercent}%`,
+        numeric: true,
+        width: 'w-24',
+      },
+      {
+        key: 'status',
+        header: t('rooms.status', 'Status'),
+        cell: (item) => (
+          <Badge status={item.isActive ? 'active' : 'inactive'} size="sm">
+            {item.isActive ? t('items.statusActive', 'Active') : t('items.statusInactive', 'Inactive')}
+          </Badge>
+        ),
+        mobile: 'status',
+        width: 'w-32',
+      },
+      {
+        key: 'actions',
+        header: <span className="sr-only">{t('common.actions', 'Actions')}</span>,
+        align: 'right',
+        width: 'w-24',
+        mobile: 'hidden',
+        cell: (item) => (
+          <div className="flex justify-end gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => handleEdit(item)}
+              aria-label={t('items.editNamed', 'Edit {name}', { name: item.itemName })}
+            >
+              <Pencil className="h-4 w-4" aria-hidden="true" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-destructive hover:bg-destructive-tint"
+              onClick={() =>
+                setConfirmDialog({ open: true, itemId: item.id, itemName: item.itemName })
+              }
+              aria-label={t('items.deleteNamed', 'Delete {name}', { name: item.itemName })}
+            >
+              <Trash2 className="h-4 w-4" aria-hidden="true" />
+            </Button>
+          </div>
+        ),
+      },
+    ],
+    [t]
+  );
+
+  const clearFilters = () => {
+    setSearchInput('');
+    setCategoryFilter(ALL);
+    setActiveOnly(true);
+  };
+
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-gray-800">{t('items.title', 'Items')}</h1>
-        <button
-          onClick={() => {
-            setSelectedItem(null);
-            setDialogOpen(true);
-          }}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2"
-        >
-          <Plus size={20} />
-          {t('items.createItem', 'Create New Item')}
-        </button>
-      </div>
-
-      {/* Filters */}
-      <div className="bg-white rounded-lg shadow-md p-4 mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
-            <input
-              type="text"
-              placeholder={t('items.searchShortPlaceholder', 'Search items...')}
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-
-          <select
-            value={selectedCategory}
-            onChange={(e) => setSelectedCategory(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="">{t('items.allCategories', 'All categories')}</option>
-            {categories.map((cat) => (
-              <option key={cat} value={cat}>
-                {cat}
-              </option>
-            ))}
-          </select>
-
-          <label className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg cursor-pointer">
-            <input
-              type="checkbox"
-              checked={showActiveOnly}
-              onChange={(e) => setShowActiveOnly(e.target.checked)}
-              className="w-4 h-4 text-blue-600"
-            />
-            <span>{t('items.activeOnly', 'Active only')}</span>
-          </label>
-
-          <button
+    <div className="flex flex-col gap-4 pb-8">
+      <PageHeader
+        title={t('items.title', 'Items')}
+        count={
+          pagination.totalItems > 0
+            ? t('items.totalCount', '{count} items', { count: pagination.totalItems })
+            : undefined
+        }
+        actions={
+          <Button
             onClick={() => {
-              setSearchTerm('');
-              setSelectedCategory('');
-              setShowActiveOnly(true);
+              setSelectedItem(null);
+              setDialogOpen(true);
             }}
-            className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center justify-center gap-2"
+            leadingIcon={<Plus className="h-4 w-4" aria-hidden="true" />}
           >
-            <X size={20} />
-            {t('items.clearFilters', 'Clear filters')}
-          </button>
-        </div>
-      </div>
+            {t('items.createItem', 'Create New Item')}
+          </Button>
+        }
+      />
 
-      {/* Items Table */}
-      <div className="bg-white rounded-lg shadow-md overflow-hidden">
-        {loading ? (
-          <div className="flex justify-center items-center h-64">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      <FilterBar>
+        <Input
+          value={searchInput}
+          onChange={(event) => setSearchInput(event.target.value)}
+          placeholder={t('items.searchShortPlaceholder', 'Search items...')}
+          prefix={<Search className="h-4 w-4" aria-hidden="true" />}
+          aria-label={t('items.searchShortPlaceholder', 'Search items...')}
+          containerClassName="sm:flex-1"
+        />
+        <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+          <SelectTrigger className="sm:w-52" aria-label={t('items.category', 'Category')}>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={ALL}>{t('items.allCategories', 'All categories')}</SelectItem>
+            {categories.map((category) => (
+              <SelectItem key={category} value={category}>
+                {category}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <label className="flex min-h-touch shrink-0 items-center gap-2 text-sm text-ink sm:min-h-0">
+          <Checkbox
+            checked={activeOnly}
+            onCheckedChange={setActiveOnly}
+            aria-label={t('items.activeOnly', 'Active only')}
+          />
+          {t('items.activeOnly', 'Active only')}
+        </label>
+      </FilterBar>
+
+      {error ? (
+        <Alert variant="error" title={t('items.loadError', 'Could not load items')}>
+          <div className="flex flex-wrap items-center gap-3">
+            <span>{t('common.unexpectedError', 'An error occurred')}</span>
+            <Button size="sm" variant="outline" onClick={loadItems}>
+              {t('common.tryAgain', 'Try Again')}
+            </Button>
           </div>
-        ) : items.length === 0 ? (
-          <div className="text-center py-12 text-gray-500">
-            {t('items.emptyState', 'No items yet. Create the first one to get started.')}
-          </div>
+        </Alert>
+      ) : !isLoading && items.length === 0 ? (
+        isFiltered ? (
+          <EmptyState
+            icon={<Search className="h-8 w-8" />}
+            title={t('items.noMatchTitle', 'No item matches this filter')}
+            description={t(
+              'items.noMatchBody',
+              'Items you stopped using are hidden by default — turn off "Active only" to see them again.'
+            )}
+            action={
+              <Button variant="outline" onClick={clearFilters}>
+                {t('common.clearFilters', 'Clear filters')}
+              </Button>
+            }
+          />
         ) : (
-          <>
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Code
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Name
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      {t('items.category', 'Category')}
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      {t('items.unitPrice', 'Unit Price')}
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      UOM
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      {t('items.taxPercent', 'Tax %')}
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      {t('rooms.status', 'Status')}
-                    </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      {t('common.actions', 'Actions')}
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {items.map((item) => (
-                    <tr key={item.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {item.itemCode}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        <div>
-                          <div className="font-medium">{item.itemName}</div>
-                          {item.description && (
-                            <div className="text-gray-500 text-xs">{item.description}</div>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {item.category || '-'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {formatCurrency(item.unitPrice)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {item.unitOfMeasure}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {item.taxPercent}%
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span
-                          className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                            item.isActive
-                              ? 'bg-green-100 text-green-800'
-                              : 'bg-gray-100 text-gray-800'
-                          }`}
-                        >
-                          {item.isActive ? 'Active' : 'Inactive'}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <button
-                          onClick={() => handleEdit(item)}
-                          className="text-blue-600 hover:text-blue-900 mr-3"
-                        >
-                          <Edit size={18} />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteItem(item.id, item.itemName)}
-                          className="text-red-600 hover:text-red-900"
-                        >
-                          <Trash2 size={18} />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+          <EmptyState
+            icon={<Package className="h-8 w-8" />}
+            title={t('items.noItemsTitle', 'No items yet')}
+            description={t(
+              'items.noItemsBody',
+              'Set up the things you bill for — electricity, water, parking. Each one becomes a line you can drop onto an invoice.'
+            )}
+            action={
+              <Button
+                onClick={() => {
+                  setSelectedItem(null);
+                  setDialogOpen(true);
+                }}
+                leadingIcon={<Plus className="h-4 w-4" aria-hidden="true" />}
+              >
+                {t('items.createItem', 'Create New Item')}
+              </Button>
+            }
+          />
+        )
+      ) : (
+        <>
+          <DataTable
+            columns={columns}
+            rows={items}
+            rowKey={(item) => item.id}
+            caption={t('items.tableCaption', 'List of billable items')}
+            isLoading={isLoading}
+            skeletonRows={PAGE_SIZE}
+            rowStatus={(item) => (item.isActive ? 'active' : 'inactive')}
+            mobileActions={(item) => (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => handleEdit(item)}
+                leadingIcon={<Pencil className="h-4 w-4" aria-hidden="true" />}
+              >
+                {t('common.edit', 'Edit')}
+              </Button>
+            )}
+          />
 
-            {/* Pagination */}
-            <div className="bg-gray-50 px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
-              <div className="text-sm text-gray-700">
-                Showing {(pagination.page - 1) * pagination.pageSize + 1} to{' '}
-                {Math.min(pagination.page * pagination.pageSize, pagination.totalItems)} of{' '}
-                {pagination.totalItems} items
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setPagination(prev => ({ ...prev, page: prev.page - 1 }))}
-                  disabled={pagination.page === 1}
-                  className="px-4 py-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100"
-                >
-                  {t('common.previous', 'Previous')}
-                </button>
-                <button
-                  onClick={() => setPagination(prev => ({ ...prev, page: prev.page + 1 }))}
-                  disabled={pagination.page >= pagination.totalPages}
-                  className="px-4 py-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100"
-                >
-                  {t('common.next', 'Next')}
-                </button>
-              </div>
-            </div>
-          </>
-        )}
-      </div>
+          <Pagination
+            page={page}
+            pageSize={PAGE_SIZE}
+            totalItems={pagination.totalItems}
+            totalPages={pagination.totalPages}
+            onPageChange={setPage}
+          />
+        </>
+      )}
 
-      {/* Item Dialog */}
       <ItemDialog
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         item={selectedItem}
-        onSuccess={handleDialogSuccess}
+        onSuccess={() => {
+          setDialogOpen(false);
+          loadItems();
+          loadCategories();
+        }}
       />
 
-      {/* Confirmation Dialog */}
       <AlertDialog
         open={confirmDialog.open}
-        onOpenChange={(open) =>
-          setConfirmDialog({ open, itemId: null, itemName: '' })
-        }
+        onOpenChange={(open) => setConfirmDialog({ open, itemId: null, itemName: '' })}
         title={t('items.deleteConfirmTitle', 'Delete Item')}
-        description={t(
-          'items.deleteConfirmMessage',
-          'Delete item "{name}"? This cannot be undone.',
-          { name: confirmDialog.itemName }
-        )}
+        description={t('items.deleteConfirmMessage', 'Delete item "{name}"? This cannot be undone.', {
+          name: confirmDialog.itemName,
+        })}
         confirmText={t('common.delete', 'Delete')}
         cancelText={t('common.cancel', 'Cancel')}
         onConfirm={confirmDeleteItem}
@@ -344,4 +396,4 @@ export const ItemsPage: React.FC = () => {
       />
     </div>
   );
-};
+}

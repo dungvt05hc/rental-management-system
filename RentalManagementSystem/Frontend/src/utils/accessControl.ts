@@ -12,7 +12,10 @@ export type FeatureKey =
   | 'users'
   | 'invitations'
   | 'system'
-  | 'languages';
+  | 'languages'
+  // Trang nội bộ về hệ thống thiết kế. Không có trong danh sách của
+  // Manager/Staff bên dưới nên chỉ Admin (vốn có '*') vào được.
+  | 'designSystem';
 
 const ROLE_FEATURES: Record<UserRole, ReadonlyArray<FeatureKey | '*'>> = {
   [UserRole.Admin]: ['*'],

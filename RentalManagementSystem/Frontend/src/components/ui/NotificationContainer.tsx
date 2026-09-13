@@ -1,52 +1,35 @@
-import { useNotification } from '../../contexts/NotificationContext';
 import { useEffect, useState } from 'react';
+import { AlertTriangle, CheckCircle2, Info, X, XCircle } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+import { useNotification } from '../../contexts/NotificationContext';
 import type { Notification } from '../../contexts/NotificationContext';
 import { useTranslation } from '../../hooks/useTranslation';
+import { cn } from '../../utils';
 
-const variantStyles = {
+const variantStyles: Record<
+  Notification['type'],
+  { container: string; icon: string; Icon: LucideIcon }
+> = {
   success: {
-    container: 'bg-green-50 border-green-400 text-green-800',
-    icon: 'text-green-500',
-    progressBar: 'bg-green-500',
+    container: 'border-status-paid/30 bg-status-paid-tint text-status-paid',
+    icon: 'text-status-paid',
+    Icon: CheckCircle2,
   },
   error: {
-    container: 'bg-red-50 border-red-400 text-red-800',
-    icon: 'text-red-500',
-    progressBar: 'bg-red-500',
+    container: 'border-status-overdue/30 bg-status-overdue-tint text-status-overdue',
+    icon: 'text-status-overdue',
+    Icon: XCircle,
   },
   warning: {
-    container: 'bg-yellow-50 border-yellow-400 text-yellow-800',
-    icon: 'text-yellow-500',
-    progressBar: 'bg-yellow-500',
+    container: 'border-status-maintenance/30 bg-status-maintenance-tint text-status-maintenance',
+    icon: 'text-status-maintenance',
+    Icon: AlertTriangle,
   },
   info: {
-    container: 'bg-blue-50 border-blue-400 text-blue-800',
-    icon: 'text-blue-500',
-    progressBar: 'bg-blue-500',
+    container: 'border-primary/30 bg-primary-tint text-primary',
+    icon: 'text-primary',
+    Icon: Info,
   },
-};
-
-const icons = {
-  success: (
-    <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
-      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-    </svg>
-  ),
-  error: (
-    <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
-      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-    </svg>
-  ),
-  warning: (
-    <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
-      <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-    </svg>
-  ),
-  info: (
-    <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
-      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-    </svg>
-  ),
 };
 
 function NotificationItem({ notification }: { notification: Notification }) {
@@ -54,57 +37,52 @@ function NotificationItem({ notification }: { notification: Notification }) {
   const { removeNotification } = useNotification();
   const [isExiting, setIsExiting] = useState(false);
   const styles = variantStyles[notification.type];
+  const Icon = styles.Icon;
 
   useEffect(() => {
-    // Trigger exit animation before removal
     if (notification.duration && notification.duration > 0) {
-      const timeout = setTimeout(() => {
-        setIsExiting(true);
-      }, notification.duration - 300);
+      const timeout = setTimeout(() => setIsExiting(true), notification.duration - 200);
       return () => clearTimeout(timeout);
     }
   }, [notification.duration]);
 
   const handleClose = () => {
     setIsExiting(true);
-    setTimeout(() => {
-      removeNotification(notification.id);
-    }, 300);
+    setTimeout(() => removeNotification(notification.id), 200);
   };
 
   return (
     <div
-      className={`
-        flex items-start gap-3 w-full max-w-sm p-4 mb-4 rounded-lg border shadow-lg
-        transition-all duration-300 ease-in-out
-        ${styles.container}
-        ${isExiting ? 'opacity-0 translate-x-full' : 'opacity-100 translate-x-0'}
-      `}
-      role="alert"
+      className={cn(
+        'flex w-full items-start gap-3 rounded-lg border p-3 shadow-overlay',
+        // Chỉ mờ dần khi biến mất, KHÔNG trượt ngang. Trượt ngang là chuyển
+        // động trang trí; mờ dần là đủ để mắt hiểu "cái này vừa đi".
+        'transition-opacity duration-200',
+        styles.container,
+        isExiting ? 'opacity-0' : 'opacity-100'
+      )}
     >
-      <div className={`flex-shrink-0 ${styles.icon}`}>
-        {icons[notification.type]}
-      </div>
-      <div className="flex-1 min-w-0">
+      <Icon className={cn('mt-0.5 h-5 w-5 shrink-0', styles.icon)} aria-hidden="true" />
+
+      <div className="min-w-0 flex-1">
         {notification.title && (
-          <h3 className="text-sm font-semibold mb-1">
-            {notification.title}
-          </h3>
+          <h3 className="mb-0.5 text-sm font-semibold">{notification.title}</h3>
         )}
-        <p className="text-sm break-words">
-          {notification.message}
-        </p>
+        <p className="text-sm break-words">{notification.message}</p>
       </div>
+
       <button
         type="button"
         onClick={handleClose}
-        className="flex-shrink-0 inline-flex text-gray-400 hover:text-gray-900 rounded-lg focus:ring-2 focus:ring-gray-300 p-1.5 hover:bg-gray-100 transition-colors"
-        aria-label={t('common.close', 'Close')}
+        aria-label={t('common.close', 'Đóng')}
+        className={cn(
+          '-m-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-md',
+          'transition-colors duration-100 hover:bg-ink/10',
+          'focus-ring',
+          'max-sm:h-touch max-sm:w-touch'
+        )}
       >
-        <span className="sr-only">{t('common.close', 'Close')}</span>
-        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-          <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-        </svg>
+        <X className="h-4 w-4" aria-hidden="true" />
       </button>
     </div>
   );
@@ -113,21 +91,20 @@ function NotificationItem({ notification }: { notification: Notification }) {
 export function NotificationContainer() {
   const { notifications } = useNotification();
 
-  if (notifications.length === 0) {
-    return null;
-  }
-
   return (
+    // aria-live phải tồn tại sẵn trong DOM từ trước thì trình đọc màn hình mới
+    // đọc nội dung được chèn vào sau. Bản cũ return null khi rỗng, nên thông
+    // báo đầu tiên thường bị đọc hụt.
     <div
-      className="fixed top-4 right-4 z-50 flex flex-col items-end pointer-events-none"
+      className="pointer-events-none fixed inset-x-4 top-4 z-50 flex flex-col items-end gap-2 sm:left-auto sm:right-4 sm:w-96"
       aria-live="polite"
-      aria-atomic="true"
+      aria-atomic="false"
     >
-      <div className="pointer-events-auto">
-        {notifications.map((notification) => (
-          <NotificationItem key={notification.id} notification={notification} />
-        ))}
-      </div>
+      {notifications.map((notification) => (
+        <div key={notification.id} className="pointer-events-auto w-full">
+          <NotificationItem notification={notification} />
+        </div>
+      ))}
     </div>
   );
 }

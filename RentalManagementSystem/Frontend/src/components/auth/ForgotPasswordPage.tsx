@@ -1,10 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { MailCheck } from 'lucide-react';
-import { Button, Input, Card, CardHeader, CardTitle, CardContent } from '../ui';
+import { Alert, Button, Input } from '../ui';
 import { authService } from '../../services/auth';
 import { isValidEmail } from '../../utils';
 import { useTranslation } from '../../hooks/useTranslation';
+import { AuthLink, AuthShell } from './AuthShell';
 
 // Khoảng chờ trước khi cho gửi lại. Đủ dài để email kịp tới nơi, nên người dùng
 // không bấm lại chỉ vì sốt ruột và tự đụng trần rate limit của server.
@@ -62,97 +61,68 @@ export function ForgotPasswordPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        <div className="text-center">
-          <h2 className="mt-6 text-3xl font-extrabold text-gray-900">
-            {t('auth.forgotPasswordTitle', 'Forgot your password?')}
-          </h2>
-          <p className="mt-2 text-sm text-gray-600">
-            {t(
+    <AuthShell
+      title={t('auth.forgotPasswordTitle', 'Forgot your password?')}
+      subtitle={
+        isSent
+          ? undefined
+          : t(
               'auth.forgotPasswordSubtitle',
               'Enter your email address and we will send you a link to choose a new password.'
+            )
+      }
+      footer={<AuthLink to="/login">{t('auth.backToLogin', 'Back to sign in')}</AuthLink>}
+    >
+      {isSent ? (
+        <div className="flex flex-col gap-4">
+          <Alert variant="success" title={t('auth.checkYourEmail', 'Check your email')}>
+            {t(
+              'auth.resetLinkSent',
+              'If this email is in our system, we have sent password reset instructions to it.'
+            )}
+          </Alert>
+
+          <p className="text-sm text-ink-muted">
+            {t(
+              'auth.resetLinkSentHint',
+              'The link is valid for one hour. Remember to check your spam folder.'
             )}
           </p>
+
+          {/* Đếm ngược nằm ngay trên nút, không phải một dòng chữ rời: người
+              dùng cần biết vì sao nút đang mờ, ở đúng chỗ họ đang nhìn. */}
+          <Button
+            type="button"
+            variant="outline"
+            fullWidth
+            onClick={send}
+            isLoading={isSubmitting}
+            disabled={secondsLeft > 0 || isSubmitting}
+          >
+            {secondsLeft > 0
+              ? t('auth.resendIn', 'Resend in {seconds}s', { seconds: secondsLeft })
+              : t('auth.resendEmail', 'Resend email')}
+          </Button>
         </div>
+      ) : (
+        <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
+          <Input
+            label={t('auth.email', 'Email Address')}
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            error={emailError}
+            placeholder={t('auth.enterEmail', 'Enter your email')}
+            autoComplete="email"
+            autoFocus
+            required
+          />
 
-        <Card>
-          <CardHeader>
-            <CardTitle>
-              {isSent
-                ? t('auth.checkYourEmail', 'Check your email')
-                : t('auth.resetPassword', 'Reset password')}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {isSent ? (
-              <div className="space-y-4">
-                <div className="flex items-start gap-3 rounded-md bg-green-50 p-4">
-                  <MailCheck className="h-5 w-5 shrink-0 text-green-600" aria-hidden="true" />
-                  <p className="text-sm text-green-800">
-                    {t(
-                      'auth.resetLinkSent',
-                      'If this email is in our system, we have sent password reset instructions to it.'
-                    )}
-                  </p>
-                </div>
-
-                <p className="text-sm text-gray-600">
-                  {t(
-                    'auth.resetLinkSentHint',
-                    'The link is valid for one hour. Remember to check your spam folder.'
-                  )}
-                </p>
-
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full"
-                  onClick={send}
-                  isLoading={isSubmitting}
-                  disabled={secondsLeft > 0 || isSubmitting}
-                >
-                  {secondsLeft > 0
-                    ? t('auth.resendIn', 'Resend in {seconds}s').replace(
-                        '{seconds}',
-                        String(secondsLeft)
-                      )
-                    : t('auth.resendEmail', 'Resend email')}
-                </Button>
-              </div>
-            ) : (
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <Input
-                  label={t('auth.email', 'Email Address')}
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  error={emailError}
-                  placeholder={t('auth.enterEmail', 'Enter your email')}
-                  autoComplete="email"
-                  autoFocus
-                  required
-                />
-
-                <Button
-                  type="submit"
-                  className="w-full"
-                  isLoading={isSubmitting}
-                  disabled={isSubmitting}
-                >
-                  {t('auth.sendResetLink', 'Send reset link')}
-                </Button>
-              </form>
-            )}
-
-            <div className="mt-4 text-center">
-              <Link to="/login" className="text-sm font-medium text-primary hover:text-primary/80">
-                {t('auth.backToLogin', 'Back to sign in')}
-              </Link>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    </div>
+          <Button type="submit" fullWidth size="lg" isLoading={isSubmitting}>
+            {t('auth.sendResetLink', 'Send reset link')}
+          </Button>
+        </form>
+      )}
+    </AuthShell>
   );
 }

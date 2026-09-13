@@ -1,694 +1,383 @@
-import { useState, useEffect } from 'react';
-import { Plus, Trash2, Edit2, Save, X, ChevronDown, ChevronRight, Search } from 'lucide-react';
-import { Button, Input, NumericInput, AlertDialog } from '../ui';
+import { Plus, Trash2 } from 'lucide-react';
+import {
+  Button,
+  Input,
+  NumericInput,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../ui';
 import type { InvoiceItem, Item } from '../../types';
-import { itemService } from '../../services';
-import { calculateItemTotals, calculateInvoiceItemsTotals } from './invoiceItemCalculations';
 import { formatCurrency } from '../../utils';
 import { useTranslation } from '../../hooks/useTranslation';
+import type { InvoiceTotals } from './useInvoiceForm';
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * Bảng nhập các dòng của hoá đơn.
+ *
+ * Component này KHÔNG tính tiền. Mọi phép cộng nằm ở useInvoiceForm; ở đây chỉ
+ * có ô nhập và cách bày. Đó là lý do nó xuống còn chừng này dòng: bản cũ 694
+ * dòng vì nó vừa dựng giao diện vừa tự cộng lại tổng, lại còn không được màn
+ * hình nào import — form tự chép một bản thứ hai của cùng cái bảng này.
+ *
+ * DESKTOP: bảng. Người lập hoá đơn nhập theo cột, mắt chạy dọc cột đơn giá.
+ * MOBILE : mỗi dòng là một thẻ. Bảng mười một cột trên điện thoại chỉ có hai
+ *          lối thoát — cuộn ngang, hoặc bóp ô nhập xuống 30px. Cả hai đều hỏng
+ *          khi thứ đang gõ là tiền.
+ *
+ * Đơn vị tính dùng <datalist>: gợi ý sẵn nhưng vẫn gõ tự do được. Ép thành
+ * <select> là chặn mất những đơn vị thật mà danh sách chưa lường tới.
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+/** Gợi ý đơn vị tính. Không phải danh sách đóng — ô vẫn gõ tự do. */
+const UNIT_SUGGESTIONS = [
+  'pcs',
+  'kg',
+  'm',
+  'm²',
+  'kWh',
+  'm³',
+  'giờ',
+  'ngày',
+  'tháng',
+  'bộ',
+  'thùng',
+];
+
+const UNIT_LIST_ID = 'invoice-item-units';
 
 interface InvoiceItemsTableProps {
   items: InvoiceItem[];
-  onChange: (items: InvoiceItem[]) => void;
+  /** Danh mục khoản mục để chọn nhanh. */
+  catalog: Item[];
+  totals: InvoiceTotals;
   disabled?: boolean;
+  onAdd: () => void;
+  onUpdate: <K extends keyof InvoiceItem>(index: number, field: K, value: InvoiceItem[K]) => void;
+  onSelectCatalogItem: (index: number, catalogItem: Item) => void;
+  onRemove: (index: number, itemName: string) => void;
 }
 
-const defaultItem: InvoiceItem = {
-  itemCode: '',
-  itemName: '',
-  description: '',
-  quantity: 1,
-  unitOfMeasure: 'pcs',
-  unitPrice: 0,
-  discountPercent: 0,
-  discountAmount: 0,
-  taxPercent: 0,
-  taxAmount: 0,
-  lineTotal: 0,
-  lineTotalWithTax: 0,
-  lineNumber: 1,
-  category: '',
-  notes: '',
-};
-
-export function InvoiceItemsTable({ items, onChange, disabled = false }: InvoiceItemsTableProps) {
+export function InvoiceItemsTable({
+  items,
+  catalog,
+  totals,
+  disabled = false,
+  onAdd,
+  onUpdate,
+  onSelectCatalogItem,
+  onRemove,
+}: InvoiceItemsTableProps) {
   const { t } = useTranslation();
-  const [editingIndex, setEditingIndex] = useState<number | null>(null);
-  const [editingItem, setEditingItem] = useState<InvoiceItem | null>(null);
-  const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
-  const [availableItems, setAvailableItems] = useState<Item[]>([]);
-  const [showItemSelector, setShowItemSelector] = useState(false);
-  const [itemSearchTerm, setItemSearchTerm] = useState('');
-  const [confirmDialog, setConfirmDialog] = useState<{
-    open: boolean;
-    itemIndex: number | null;
-    itemName: string;
-  }>({
-    open: false,
-    itemIndex: null,
-    itemName: '',
-  });
 
-  // Load available items when component mounts
-  useEffect(() => {
-    loadAvailableItems();
-  }, []);
-
-  const loadAvailableItems = async () => {
-    try {
-      const response = await itemService.getActiveItems();
-      if (response.success && response.data) {
-        setAvailableItems(response.data);
-      }
-    } catch (err) {
-      console.error('Failed to load items:', err);
-    }
+  const catalogValueOf = (item: InvoiceItem): string => {
+    const match = catalog.find((entry) => entry.itemCode === item.itemCode);
+    return match ? String(match.id) : '';
   };
 
-  const toggleRowExpansion = (index: number) => {
-    const newExpanded = new Set(expandedRows);
-    if (newExpanded.has(index)) {
-      newExpanded.delete(index);
-    } else {
-      newExpanded.add(index);
-    }
-    setExpandedRows(newExpanded);
+  const handleCatalogChange = (index: number, value: string) => {
+    const selected = catalog.find((entry) => String(entry.id) === value);
+    if (selected) onSelectCatalogItem(index, selected);
   };
 
-  const handleAddRow = () => {
-    const newItem = calculateItemTotals({
-      ...defaultItem,
-      lineNumber: items.length + 1,
-    });
-    onChange([...items, newItem]);
-    setEditingIndex(items.length);
-    setEditingItem(newItem);
-  };
-
-  const handleEditRow = (index: number) => {
-    setEditingIndex(index);
-    setEditingItem({ ...items[index] });
-  };
-
-  const handleSaveRow = () => {
-    if (editingItem && editingIndex !== null) {
-      const updatedItem = calculateItemTotals(editingItem);
-      const newItems = [...items];
-      newItems[editingIndex] = updatedItem;
-      onChange(newItems);
-      setEditingIndex(null);
-      setEditingItem(null);
-    }
-  };
-
-  const handleCancelEdit = () => {
-    setEditingIndex(null);
-    setEditingItem(null);
-  };
-
-  const handleDeleteRow = (index: number, itemName: string) => {
-    setConfirmDialog({
-      open: true,
-      itemIndex: index,
-      itemName,
-    });
-  };
-
-  const confirmDeleteItem = () => {
-    if (confirmDialog.itemIndex === null) return;
-    const newItems = items.filter((_, i) => i !== confirmDialog.itemIndex);
-    // Renumber lines
-    const renumberedItems = newItems.map((item, i) => ({
-      ...item,
-      lineNumber: i + 1,
-    }));
-    onChange(renumberedItems);
-    setConfirmDialog({ open: false, itemIndex: null, itemName: '' });
-  };
-
-  const handleFieldChange = <K extends keyof InvoiceItem>(field: K, value: InvoiceItem[K]) => {
-    if (editingItem) {
-      setEditingItem({
-        ...editingItem,
-        [field]: value,
-      });
-    }
-  };
-
-  const handleSelectItem = (item: Item) => {
-    if (editingItem) {
-      // Populate fields from selected item
-      setEditingItem({
-        ...editingItem,
-        itemCode: item.itemCode,
-        itemName: item.itemName,
-        description: item.description || '',
-        unitOfMeasure: item.unitOfMeasure,
-        unitPrice: item.unitPrice,
-        taxPercent: item.taxPercent || 0,
-        category: item.category || '',
-        notes: item.notes || '',
-      });
-      setShowItemSelector(false);
-      setItemSearchTerm('');
-    }
-  };
-
-  const filteredItems = availableItems.filter(item =>
-    item.itemCode.toLowerCase().includes(itemSearchTerm.toLowerCase()) ||
-    item.itemName.toLowerCase().includes(itemSearchTerm.toLowerCase()) ||
-    (item.category && item.category.toLowerCase().includes(itemSearchTerm.toLowerCase()))
+  const addButton = (
+    <Button
+      type="button"
+      variant="outline"
+      size="sm"
+      onClick={onAdd}
+      disabled={disabled}
+      leadingIcon={<Plus className="h-4 w-4" aria-hidden="true" />}
+    >
+      {t('invoices.addItem', 'Add Item')}
+    </Button>
   );
 
-  const totals = calculateInvoiceItemsTotals(items);
-
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
+    <section className="rounded-lg border border-line bg-surface" aria-labelledby="invoice-items-heading">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line p-4 sm:p-5">
         <div>
-          <h3 className="text-lg font-semibold text-gray-900">{t('invoices.lineItems', 'Invoice Line Items')}</h3>
-          <p className="text-xs text-gray-500 mt-1">{t('invoices.lineItemsHint', 'Every field of each line is shown, calculations included')}</p>
+          <h2 id="invoice-items-heading" className="text-lg font-semibold text-ink">
+            {t('invoices.lineItems', 'Invoice Line Items')}
+          </h2>
+          <p className="mt-0.5 text-sm text-ink-muted">
+            {items.length > 0
+              ? t('invoices.itemCount', '{count} items', { count: items.length })
+              : t('invoices.noItemsHint', 'Use the Add Item button to put lines on this invoice')}
+          </p>
         </div>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={handleAddRow}
-          disabled={disabled || editingIndex !== null}
-          className="flex items-center space-x-2"
-        >
-          <Plus className="h-4 w-4" />
-          <span>{t('invoices.addItem', 'Add Item')}</span>
-        </Button>
+        {addButton}
       </div>
 
-      <div className="border rounded-lg overflow-hidden shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-100 border-b-2 border-gray-300">
-              <tr>
-                <th className="px-3 py-3 text-left text-xs font-bold text-gray-700 w-10"></th>
-                <th className="px-3 py-3 text-left text-xs font-bold text-gray-700 w-12">#</th>
-                <th className="px-3 py-3 text-left text-xs font-bold text-gray-700 min-w-[120px]">{t('items.itemCode', 'Item Code')}</th>
-                <th className="px-3 py-3 text-left text-xs font-bold text-gray-700 min-w-[140px]">{t('items.itemName', 'Item Name')}</th>
-                <th className="px-3 py-3 text-left text-xs font-bold text-gray-700 min-w-[150px]">{t('items.description', 'Description')}</th>
-                <th className="px-3 py-3 text-right text-xs font-bold text-gray-700 w-20">{t('invoices.quantityShort', 'Qty')}</th>
-                <th className="px-3 py-3 text-left text-xs font-bold text-gray-700 w-20">{t('invoices.unitShort', 'Unit')}</th>
-                <th className="px-3 py-3 text-right text-xs font-bold text-gray-700 w-28">{t('items.unitPrice', 'Unit Price')}</th>
-                <th className="px-3 py-3 text-right text-xs font-bold text-gray-700 w-24">{t('invoices.discountPercentShort', 'Disc %')}</th>
-                <th className="px-3 py-3 text-right text-xs font-bold text-gray-700 w-28">{t('invoices.discountAmountShort', 'Disc Amt')}</th>
-                <th className="px-3 py-3 text-right text-xs font-bold text-gray-700 w-24">{t('items.taxPercent', 'Tax %')}</th>
-                <th className="px-3 py-3 text-right text-xs font-bold text-gray-700 w-28">{t('invoices.taxAmountShort', 'Tax Amt')}</th>
-                <th className="px-3 py-3 text-right text-xs font-bold text-gray-700 w-32">{t('invoices.lineTotal', 'Line Total')}</th>
-                <th className="px-3 py-3 text-center text-xs font-bold text-gray-700 w-24">{t('common.actions', 'Actions')}</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {items.length === 0 ? (
-                <tr>
-                  <td colSpan={14} className="px-3 py-12 text-center">
-                    <div className="flex flex-col items-center justify-center space-y-2">
-                      <p className="text-gray-500 font-medium">{t('invoices.noItemsYet', 'No line items yet')}</p>
-                      <p className="text-gray-400 text-xs">{t('invoices.noItemsHint', 'Use the Add Item button to put lines on this invoice')}</p>
-                    </div>
-                  </td>
-                </tr>
-              ) : (
-                items.map((item, index) => {
-                  const isExpanded = expandedRows.has(index);
-                  const isEditing = editingIndex === index;
-                  
-                  return (
-                    <>
-                      <tr key={index} className={`hover:bg-gray-50 ${isExpanded ? 'bg-blue-50' : ''}`}>
-                        {isEditing ? (
-                          <>
-                            <td className="px-3 py-2"></td>
-                            <td className="px-3 py-2 text-gray-700 font-medium">{item.lineNumber}</td>
-                            <td className="px-3 py-2">
-                              <Input
-                                value={editingItem?.itemCode || ''}
-                                onChange={(e) => handleFieldChange('itemCode', e.target.value)}
-                                className="h-9 text-xs"
-                                placeholder={t('items.itemCode', 'Item Code')}
-                              />
-                            </td>
-                            <td className="px-3 py-2">
-                              <Input
-                                value={editingItem?.itemName || ''}
-                                onChange={(e) => handleFieldChange('itemName', e.target.value)}
-                                className="h-9 text-xs"
-                                placeholder={t('items.itemName', 'Item Name')}
-                              />
-                            </td>
-                            <td className="px-3 py-2">
-                              <Input
-                                value={editingItem?.description || ''}
-                                onChange={(e) => handleFieldChange('description', e.target.value)}
-                                className="h-9 text-xs"
-                                placeholder={t('items.description', 'Description')}
-                              />
-                            </td>
-                            <td className="px-3 py-2">
-                              <NumericInput
-                                value={editingItem?.quantity ?? 0}
-                                onValueChange={(value) => handleFieldChange('quantity', value ?? 0)}
-                                className="h-9 text-xs text-right"
-                              />
-                            </td>
-                            <td className="px-3 py-2">
-                              <input
-                                type="text"
-                                list="uom-options"
-                                value={editingItem?.unitOfMeasure || 'pcs'}
-                                onChange={(e) => handleFieldChange('unitOfMeasure', e.target.value)}
-                                className="h-9 text-xs border border-gray-300 rounded px-2 w-full focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                placeholder={t('invoices.unitShort', 'Unit')}
-                              />
-                              <datalist id="uom-options">
-                                <option value="pcs">pcs</option>
-                                <option value="pc">pc</option>
-                                <option value="piece">piece</option>
-                                <option value="kg">kg</option>
-                                <option value="gram">gram</option>
-                                <option value="ton">ton</option>
-                                <option value="m">m</option>
-                                <option value="cm">cm</option>
-                                <option value="km">km</option>
-                                <option value="sqm">sqm (square meter)</option>
-                                <option value="hrs">hrs</option>
-                                <option value="hour">hour</option>
-                                <option value="day">day</option>
-                                <option value="days">days</option>
-                                <option value="week">week</option>
-                                <option value="weeks">weeks</option>
-                                <option value="month">month</option>
-                                <option value="months">months</option>
-                                <option value="year">year</option>
-                                <option value="years">years</option>
-                                <option value="unit">unit</option>
-                                <option value="box">box</option>
-                                <option value="package">package</option>
-                                <option value="set">set</option>
-                                <option value="liter">liter</option>
-                                <option value="gallon">gallon</option>
-                              </datalist>
-                            </td>
-                            <td className="px-3 py-2">
-                              <NumericInput
-                                value={editingItem?.unitPrice ?? 0}
-                                onValueChange={(value) => handleFieldChange('unitPrice', value ?? 0)}
-                                className="h-9 text-xs text-right"
-                              />
-                            </td>
-                            <td className="px-3 py-2">
-                              <NumericInput
-                                value={editingItem?.discountPercent ?? 0}
-                                onValueChange={(value) => handleFieldChange('discountPercent', value ?? 0)}
-                                className="h-9 text-xs text-right"
-                              />
-                            </td>
-                            <td className="px-3 py-2 text-right text-gray-600 font-medium">
-                              {formatCurrency(calculateItemTotals(editingItem!).discountAmount)}
-                            </td>
-                            <td className="px-3 py-2">
-                              <NumericInput
-                                value={editingItem?.taxPercent ?? 0}
-                                onValueChange={(value) => handleFieldChange('taxPercent', value ?? 0)}
-                                className="h-9 text-xs text-right"
-                              />
-                            </td>
-                            <td className="px-3 py-2 text-right text-gray-600 font-medium">
-                              {formatCurrency(calculateItemTotals(editingItem!).taxAmount)}
-                            </td>
-                            <td className="px-3 py-2 text-right font-bold text-blue-600">
-                              {formatCurrency(calculateItemTotals(editingItem!).lineTotalWithTax)}
-                            </td>
-                            <td className="px-3 py-2">
-                              <div className="flex items-center justify-center space-x-1">
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={handleSaveRow}
-                                  className="h-8 w-8 p-0 bg-green-50 hover:bg-green-100 text-green-600"
-                                  title={t('common.save', 'Save')}
-                                >
-                                  <Save className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={handleCancelEdit}
-                                  className="h-8 w-8 p-0 bg-gray-50 hover:bg-gray-100"
-                                  title={t('common.cancel', 'Cancel')}
-                                >
-                                  <X className="h-4 w-4" />
-                                </Button>
-                              </div>
-                            </td>
-                          </>
-                        ) : (
-                          <>
-                            <td className="px-3 py-2">
-                              <button
-                                type="button"
-                                onClick={() => toggleRowExpansion(index)}
-                                className="text-gray-400 hover:text-gray-600 transition-colors"
-                                title={isExpanded ? 'Collapse details' : 'Expand details'}
-                              >
-                                {isExpanded ? (
-                                  <ChevronDown className="h-4 w-4" />
-                                ) : (
-                                  <ChevronRight className="h-4 w-4" />
-                                )}
-                              </button>
-                            </td>
-                            <td className="px-3 py-2 text-gray-700 font-semibold">{item.lineNumber}</td>
-                            <td className="px-3 py-2 font-mono text-xs text-blue-600 font-medium">{item.itemCode}</td>
-                            <td className="px-3 py-2 font-medium text-gray-900">{item.itemName}</td>
-                            <td className="px-3 py-2 text-gray-600 text-xs">{item.description || '-'}</td>
-                            <td className="px-3 py-2 text-right font-medium text-gray-900">{item.quantity}</td>
-                            <td className="px-3 py-2 text-gray-600 text-xs">{item.unitOfMeasure}</td>
-                            <td className="px-3 py-2 text-right font-medium text-gray-900">{formatCurrency(item.unitPrice)}</td>
-                            <td className="px-3 py-2 text-right text-orange-600 font-medium">{item.discountPercent}%</td>
-                            <td className="px-3 py-2 text-right text-orange-600 font-medium">
-                              {formatCurrency(item.discountAmount)}
-                            </td>
-                            <td className="px-3 py-2 text-right text-purple-600 font-medium">{item.taxPercent}%</td>
-                            <td className="px-3 py-2 text-right text-purple-600 font-medium">
-                              {formatCurrency(item.taxAmount)}
-                            </td>
-                            <td className="px-3 py-2 text-right font-bold text-blue-600 text-base">
-                              {formatCurrency(item.lineTotalWithTax)}
-                            </td>
-                            <td className="px-3 py-2">
-                              <div className="flex items-center justify-center space-x-1">
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => handleEditRow(index)}
-                                  disabled={disabled || editingIndex !== null}
-                                  className="h-8 w-8 p-0 hover:bg-blue-50"
-                                  title={t('common.edit', 'Edit')}
-                                >
-                                  <Edit2 className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => handleDeleteRow(index, item.itemName)}
-                                  disabled={disabled || editingIndex !== null}
-                                  className="h-8 w-8 p-0 text-red-600 hover:bg-red-50 hover:text-red-700"
-                                  title={t('common.delete', 'Delete')}
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </div>
-                            </td>
-                          </>
-                        )}
-                      </tr>
-                      
-                      {/* Expanded row showing Category and Notes */}
-                      {isExpanded && !isEditing && (
-                        <tr className="bg-blue-50 border-t border-blue-200">
-                          <td colSpan={14} className="px-6 py-4">
-                            <div className="grid grid-cols-2 gap-6">
-                              <div>
-                                <label className="block text-xs font-semibold text-gray-700 mb-1">{t('items.category', 'Category')}</label>
-                                <p className="text-sm text-gray-900 bg-white px-3 py-2 rounded border border-gray-200">
-                                  {item.category || <span className="text-gray-400 italic">{t('items.noCategory', 'No category')}</span>}
-                                </p>
-                              </div>
-                              <div>
-                                <label className="block text-xs font-semibold text-gray-700 mb-1">{t('common.notes', 'Notes')}</label>
-                                <p className="text-sm text-gray-900 bg-white px-3 py-2 rounded border border-gray-200 min-h-[40px]">
-                                  {item.notes || <span className="text-gray-400 italic">{t('invoices.noNotes', 'No notes')}</span>}
-                                </p>
-                              </div>
-                            </div>
-                            
-                            {/* Calculation breakdown */}
-                            <div className="mt-4 pt-4 border-t border-blue-200">
-                              <p className="text-xs font-semibold text-gray-700 mb-2">{t('invoices.calculationBreakdown', 'Calculation breakdown')}</p>
-                              <div className="grid grid-cols-4 gap-4 text-xs">
-                                <div className="bg-white px-3 py-2 rounded border border-gray-200">
-                                  <span className="text-gray-600">{t('invoices.subtotal', 'Subtotal')}</span>
-                                  <span className="ml-2 font-semibold text-gray-900">
-                                    {formatCurrency((item.quantity * item.unitPrice))}
-                                  </span>
-                                </div>
-                                <div className="bg-white px-3 py-2 rounded border border-orange-200">
-                                  <span className="text-gray-600">- {t('invoices.discount', 'Discount')}</span>
-                                  <span className="ml-2 font-semibold text-orange-600">
-                                    {formatCurrency(item.discountAmount)}
-                                  </span>
-                                </div>
-                                <div className="bg-white px-3 py-2 rounded border border-purple-200">
-                                  <span className="text-gray-600">+ {t('invoices.tax', 'Tax')}</span>
-                                  <span className="ml-2 font-semibold text-purple-600">
-                                    {formatCurrency(item.taxAmount)}
-                                  </span>
-                                </div>
-                                <div className="bg-blue-100 px-3 py-2 rounded border border-blue-300">
-                                  <span className="text-gray-600">= {t('invoices.total', 'Total')}</span>
-                                  <span className="ml-2 font-bold text-blue-600">
-                                    {formatCurrency(item.lineTotalWithTax)}
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-                          </td>
-                        </tr>
-                      )}
-                      
-                      {/* Editing Category and Notes */}
-                      {isEditing && (
-                        <>
-                          {/* Item Selector Section */}
-                          <tr className="bg-gradient-to-r from-green-50 to-blue-50 border-t-2 border-green-200">
-                            <td colSpan={14} className="px-6 py-4">
-                              <div className="mb-4">
-                                <div className="flex items-center justify-between mb-3">
-                                  <label className="block text-sm font-bold text-gray-900">
-                                    🔍 Select from Item Master
-                                  </label>
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => setShowItemSelector(!showItemSelector)}
-                                    className="flex items-center space-x-2"
-                                  >
-                                    <Search className="h-4 w-4" />
-                                    <span>{showItemSelector ? 'Hide Items' : 'Browse Items'}</span>
-                                  </Button>
-                                </div>
-                                
-                                {showItemSelector && (
-                                  <div className="bg-white border border-gray-300 rounded-lg p-4 shadow-lg">
-                                    <div className="mb-3">
-                                      <Input
-                                        value={itemSearchTerm}
-                                        onChange={(e) => setItemSearchTerm(e.target.value)}
-                                        placeholder={t('items.searchPlaceholder', 'Search by item code, name or category...')}
-                                        className="w-full"
-                                      />
-                                    </div>
-                                    
-                                    <div className="max-h-60 overflow-y-auto border border-gray-200 rounded">
-                                      {filteredItems.length === 0 ? (
-                                        <div className="p-8 text-center text-gray-500">
-                                          <p className="font-medium">{t('items.noItemsFound', 'No items found')}</p>
-                                          <p className="text-xs mt-1">{t('items.tryAnotherSearch', 'Try a different search term')}</p>
-                                        </div>
-                                      ) : (
-                                        <table className="w-full text-xs">
-                                          <thead className="bg-gray-100 sticky top-0">
-                                            <tr>
-                                              <th className="px-3 py-2 text-left font-semibold">{t('items.itemCode', 'Item Code')}</th>
-                                              <th className="px-3 py-2 text-left font-semibold">{t('items.itemName', 'Item Name')}</th>
-                                              <th className="px-3 py-2 text-left font-semibold">{t('items.category', 'Category')}</th>
-                                              <th className="px-3 py-2 text-right font-semibold">{t('items.unitPrice', 'Unit Price')}</th>
-                                              <th className="px-3 py-2 text-center font-semibold">UoM</th>
-                                              <th className="px-3 py-2 text-right font-semibold">{t('items.taxPercent', 'Tax %')}</th>
-                                              <th className="px-3 py-2 text-center font-semibold">{t('common.actions', 'Actions')}</th>
-                                            </tr>
-                                          </thead>
-                                          <tbody className="divide-y divide-gray-200">
-                                            {filteredItems.map((availableItem) => (
-                                              <tr
-                                                key={availableItem.id}
-                                                className="hover:bg-blue-50 transition-colors cursor-pointer"
-                                                onClick={() => handleSelectItem(availableItem)}
-                                              >
-                                                <td className="px-3 py-2 font-mono text-blue-600 font-medium">
-                                                  {availableItem.itemCode}
-                                                </td>
-                                                <td className="px-3 py-2 font-medium text-gray-900">
-                                                  {availableItem.itemName}
-                                                </td>
-                                                <td className="px-3 py-2 text-gray-600">
-                                                  {availableItem.category || '-'}
-                                                </td>
-                                                <td className="px-3 py-2 text-right font-medium text-gray-900">
-                                                  {formatCurrency(availableItem.unitPrice)}
-                                                </td>
-                                                <td className="px-3 py-2 text-center text-gray-700">
-                                                  {availableItem.unitOfMeasure}
-                                                </td>
-                                                <td className="px-3 py-2 text-right text-purple-600 font-medium">
-                                                  {availableItem.taxPercent}%
-                                                </td>
-                                                <td className="px-3 py-2 text-center">
-                                                  <Button
-                                                    type="button"
-                                                    variant="outline"
-                                                    size="sm"
-                                                    onClick={() => handleSelectItem(availableItem)}
-                                                    className="h-7 px-3 text-xs bg-blue-50 hover:bg-blue-100 text-blue-600"
-                                                  >
-                                                    {t('invoices.selectItem', 'Select an item')}
-                                                  </Button>
-                                                </td>
-                                              </tr>
-                                            ))}
-                                          </tbody>
-                                        </table>
-                                      )}
-                                    </div>
-                                    
-                                    <p className="text-xs text-gray-500 mt-2">
-                                      💡 Click on any item to auto-populate its details (UoM, Tax %, Category, etc.)
-                                    </p>
-                                  </div>
-                                )}
-                              </div>
-                            </td>
-                          </tr>
-                          {/* Category and Notes Section */}
-                          <tr className="bg-yellow-50 border-t border-yellow-200">
-                            <td colSpan={14} className="px-6 py-4">
-                              <div className="grid grid-cols-2 gap-6">
-                                <div>
-                                  <label className="block text-xs font-semibold text-gray-700 mb-2">
-                                    {t('items.category', 'Category')}
-                                  </label>
-                                  <Input
-                                    value={editingItem?.category || ''}
-                                    onChange={(e) => handleFieldChange('category', e.target.value)}
-                                    className="h-9 text-sm"
-                                    placeholder={t('items.categoryPlaceholder', 'e.g. Rent, Utilities, Services')}
-                                  />
-                                </div>
-                                <div>
-                                  <label className="block text-xs font-semibold text-gray-700 mb-2">
-                                    {t('common.notes', 'Notes')}
-                                  </label>
-                                  <textarea
-                                    value={editingItem?.notes || ''}
-                                    onChange={(e) => handleFieldChange('notes', e.target.value)}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                                    placeholder={t('invoices.lineNotesPlaceholder', 'Notes or special instructions for this line...')}
-                                    rows={2}
-                                  />
-                                </div>
-                              </div>
-                            </td>
-                          </tr>
-                        </>
-                      )}
-                    </>
-                  );
-                })
-              )}
-            </tbody>
-            {items.length > 0 && (
-              <tfoot className="bg-gray-50 border-t-2 border-gray-300">
-                <tr>
-                  <td colSpan={7} className="px-3 py-3 text-right font-semibold text-gray-700">
-                    {t('invoices.subtotalBeforeDiscount', 'Subtotal before discounts')}
-                  </td>
-                  <td className="px-3 py-3 text-right font-bold text-gray-900" colSpan={6}>
-                    {formatCurrency(totals.subtotal)}
-                  </td>
-                  <td></td>
-                </tr>
-                <tr>
-                  <td colSpan={7} className="px-3 py-2 text-right font-semibold text-orange-700">
-                    {t('invoices.totalDiscounts', 'Total discounts')}
-                  </td>
-                  <td className="px-3 py-2 text-right font-bold text-orange-600" colSpan={6}>
-                    -{formatCurrency(totals.discount)}
-                  </td>
-                  <td></td>
-                </tr>
-                <tr>
-                  <td colSpan={7} className="px-3 py-2 text-right font-semibold text-gray-700">
-                    {t('invoices.subtotalAfterDiscount', 'Subtotal after discounts')}
-                  </td>
-                  <td className="px-3 py-2 text-right font-bold text-gray-900" colSpan={6}>
-                    {formatCurrency(totals.afterDiscount)}
-                  </td>
-                  <td></td>
-                </tr>
-                <tr>
-                  <td colSpan={7} className="px-3 py-2 text-right font-semibold text-purple-700">
-                    {t('invoices.totalTax', 'Total tax')}
-                  </td>
-                  <td className="px-3 py-2 text-right font-bold text-purple-600" colSpan={6}>
-                    +{formatCurrency(totals.tax)}
-                  </td>
-                  <td></td>
-                </tr>
-                <tr className="bg-blue-100 border-t-2 border-blue-300">
-                  <td colSpan={7} className="px-3 py-4 text-right font-bold text-gray-900 text-lg">
-                    {t('invoices.itemsTotal', 'Line items total')}
-                  </td>
-                  <td className="px-3 py-4 text-right font-bold text-blue-600 text-xl" colSpan={6}>
-                    {formatCurrency(totals.total)}
-                  </td>
-                  <td></td>
-                </tr>
-              </tfoot>
-            )}
-          </table>
-        </div>
-      </div>
+      <datalist id={UNIT_LIST_ID}>
+        {UNIT_SUGGESTIONS.map((unit) => (
+          <option key={unit} value={unit} />
+        ))}
+      </datalist>
 
-      {items.length > 0 && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-xs text-gray-700">
-          <p className="font-semibold text-blue-900 mb-2">💡 {t('invoices.tips', 'Tips')}</p>
-          <ul className="space-y-1 ml-4">
-            <li>• {t('invoices.tipExpand', 'The arrow on the left opens and closes the extra details of a line (category and notes).')}</li>
-            <li>• {t('invoices.tipEdit', 'The edit button opens every field of the line, category and notes included.')}</li>
-            <li>• {t('invoices.tipAutoCalc', 'Discount amount and tax amount are worked out for you.')}</li>
-            <li>• {t('invoices.tipLineTotal', 'Line total = quantity × unit price − discount + tax.')}</li>
-          </ul>
-        </div>
+      {items.length === 0 ? (
+        <p className="px-4 py-10 text-center text-sm text-ink-muted sm:px-5">
+          {t('invoices.noItemsYet', 'No line items yet')}
+        </p>
+      ) : (
+        <>
+          {/* ══ DESKTOP ═════════════════════════════════════════════════════ */}
+          <div className="hidden overflow-x-auto lg:block">
+            <table className="w-full border-collapse text-sm">
+              <caption className="sr-only">{t('invoices.lineItems', 'Invoice Line Items')}</caption>
+              <thead>
+                <tr className="border-b border-line">
+                  <th scope="col" className="h-11 w-10 px-3 text-left text-xs font-semibold text-ink-muted">
+                    #
+                  </th>
+                  <th scope="col" className="h-11 px-3 text-left text-xs font-semibold text-ink-muted">
+                    {t('items.itemName', 'Item Name')}
+                  </th>
+                  <th scope="col" className="h-11 w-24 px-3 text-right text-xs font-semibold text-ink-muted">
+                    {t('invoices.quantityShort', 'Qty')}
+                  </th>
+                  <th scope="col" className="h-11 w-24 px-3 text-left text-xs font-semibold text-ink-muted">
+                    {t('invoices.unitShort', 'Unit')}
+                  </th>
+                  <th scope="col" className="h-11 w-40 px-3 text-right text-xs font-semibold text-ink-muted">
+                    {t('items.unitPrice', 'Unit Price')}
+                  </th>
+                  <th scope="col" className="h-11 w-24 px-3 text-right text-xs font-semibold text-ink-muted">
+                    {t('invoices.discountPercentShort', 'Disc %')}
+                  </th>
+                  <th scope="col" className="h-11 w-24 px-3 text-right text-xs font-semibold text-ink-muted">
+                    {t('items.taxPercent', 'Tax %')}
+                  </th>
+                  <th scope="col" className="h-11 w-36 px-3 text-right text-xs font-semibold text-ink-muted">
+                    {t('invoices.lineTotal', 'Line Total')}
+                  </th>
+                  <th scope="col" className="h-11 w-12 px-3">
+                    <span className="sr-only">{t('common.actions', 'Actions')}</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((item, index) => (
+                  <tr key={index} className="border-b border-line last:border-0 align-top">
+                    <td className="numeric px-3 py-3 text-sm text-ink-muted">{item.lineNumber}</td>
+                    <td className="px-3 py-3">
+                      <div className="flex flex-col gap-1.5">
+                        <Select
+                          value={catalogValueOf(item)}
+                          onValueChange={(value) => handleCatalogChange(index, value)}
+                          disabled={disabled}
+                        >
+                          <SelectTrigger
+                            className="h-9 min-h-0"
+                            aria-label={t('invoices.selectItem', 'Select an item')}
+                          >
+                            <SelectValue placeholder={t('invoices.selectItem', 'Select an item')} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {catalog.map((entry) => (
+                              <SelectItem key={entry.id} value={String(entry.id)}>
+                                {entry.itemCode} — {entry.itemName}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Input
+                          value={item.itemName}
+                          onChange={(event) => onUpdate(index, 'itemName', event.target.value)}
+                          placeholder={t('items.itemName', 'Item Name')}
+                          aria-label={t('invoices.itemNameOfLine', 'Name of line {line}', {
+                            line: item.lineNumber,
+                          })}
+                          className="h-9 min-h-0"
+                          disabled={disabled}
+                        />
+                      </div>
+                    </td>
+                    <td className="px-3 py-3">
+                      <NumericInput
+                        value={item.quantity}
+                        onValueChange={(value) => onUpdate(index, 'quantity', value ?? 0)}
+                        aria-label={t('invoices.quantityShort', 'Qty')}
+                        className="h-9 min-h-0"
+                        disabled={disabled}
+                      />
+                    </td>
+                    <td className="px-3 py-3">
+                      <Input
+                        list={UNIT_LIST_ID}
+                        value={item.unitOfMeasure}
+                        onChange={(event) => onUpdate(index, 'unitOfMeasure', event.target.value)}
+                        aria-label={t('invoices.unitShort', 'Unit')}
+                        className="h-9 min-h-0"
+                        disabled={disabled}
+                      />
+                    </td>
+                    <td className="px-3 py-3">
+                      <NumericInput
+                        value={item.unitPrice}
+                        onValueChange={(value) => onUpdate(index, 'unitPrice', value ?? 0)}
+                        aria-label={t('items.unitPrice', 'Unit Price')}
+                        suffix="₫"
+                        className="h-9 min-h-0"
+                        disabled={disabled}
+                      />
+                    </td>
+                    <td className="px-3 py-3">
+                      <NumericInput
+                        value={item.discountPercent}
+                        onValueChange={(value) => onUpdate(index, 'discountPercent', value ?? 0)}
+                        aria-label={t('invoices.discountPercentShort', 'Disc %')}
+                        className="h-9 min-h-0"
+                        disabled={disabled}
+                      />
+                    </td>
+                    <td className="px-3 py-3">
+                      <NumericInput
+                        value={item.taxPercent}
+                        onValueChange={(value) => onUpdate(index, 'taxPercent', value ?? 0)}
+                        aria-label={t('items.taxPercent', 'Tax %')}
+                        className="h-9 min-h-0"
+                        disabled={disabled}
+                      />
+                    </td>
+                    <td className="numeric px-3 py-3 text-right text-sm font-semibold text-ink">
+                      {formatCurrency(item.lineTotalWithTax)}
+                    </td>
+                    <td className="px-3 py-3">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="text-destructive hover:bg-destructive-tint"
+                        onClick={() => onRemove(index, item.itemName)}
+                        disabled={disabled}
+                        aria-label={t('invoices.removeLine', 'Remove line {line}', {
+                          line: item.lineNumber,
+                        })}
+                      >
+                        <Trash2 className="h-4 w-4" aria-hidden="true" />
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* ══ MOBILE / TABLET ═════════════════════════════════════════════ */}
+          <div className="flex flex-col divide-y divide-line lg:hidden">
+            {items.map((item, index) => (
+              <div key={index} className="flex flex-col gap-3 p-4">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="numeric text-xs font-semibold text-ink-muted">
+                    {t('invoices.lineNumber', 'Line {line}', { line: item.lineNumber })}
+                  </span>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="text-destructive hover:bg-destructive-tint"
+                    onClick={() => onRemove(index, item.itemName)}
+                    disabled={disabled}
+                    aria-label={t('invoices.removeLine', 'Remove line {line}', {
+                      line: item.lineNumber,
+                    })}
+                  >
+                    <Trash2 className="h-4 w-4" aria-hidden="true" />
+                  </Button>
+                </div>
+
+                <Select
+                  value={catalogValueOf(item)}
+                  onValueChange={(value) => handleCatalogChange(index, value)}
+                  disabled={disabled}
+                >
+                  <SelectTrigger aria-label={t('invoices.selectItem', 'Select an item')}>
+                    <SelectValue placeholder={t('invoices.selectItem', 'Select an item')} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {catalog.map((entry) => (
+                      <SelectItem key={entry.id} value={String(entry.id)}>
+                        {entry.itemCode} — {entry.itemName}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <Input
+                  label={t('items.itemName', 'Item Name')}
+                  value={item.itemName}
+                  onChange={(event) => onUpdate(index, 'itemName', event.target.value)}
+                  disabled={disabled}
+                />
+
+                <div className="grid grid-cols-2 gap-3">
+                  <NumericInput
+                    label={t('invoices.quantityShort', 'Qty')}
+                    value={item.quantity}
+                    onValueChange={(value) => onUpdate(index, 'quantity', value ?? 0)}
+                    disabled={disabled}
+                  />
+                  <Input
+                    label={t('invoices.unitShort', 'Unit')}
+                    list={UNIT_LIST_ID}
+                    value={item.unitOfMeasure}
+                    onChange={(event) => onUpdate(index, 'unitOfMeasure', event.target.value)}
+                    disabled={disabled}
+                  />
+                  <NumericInput
+                    label={t('items.unitPrice', 'Unit Price')}
+                    value={item.unitPrice}
+                    onValueChange={(value) => onUpdate(index, 'unitPrice', value ?? 0)}
+                    suffix="₫"
+                    containerClassName="col-span-2"
+                    disabled={disabled}
+                  />
+                  <NumericInput
+                    label={t('invoices.discountPercentShort', 'Disc %')}
+                    value={item.discountPercent}
+                    onValueChange={(value) => onUpdate(index, 'discountPercent', value ?? 0)}
+                    disabled={disabled}
+                  />
+                  <NumericInput
+                    label={t('items.taxPercent', 'Tax %')}
+                    value={item.taxPercent}
+                    onValueChange={(value) => onUpdate(index, 'taxPercent', value ?? 0)}
+                    disabled={disabled}
+                  />
+                </div>
+
+                <div className="flex items-baseline justify-between border-t border-line pt-2">
+                  <span className="text-sm text-ink-muted">
+                    {t('invoices.lineTotal', 'Line Total')}
+                  </span>
+                  <span className="numeric text-lg font-semibold text-ink">
+                    {formatCurrency(item.lineTotalWithTax)}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* ══ Cộng các dòng ═══════════════════════════════════════════════ */}
+          <dl className="flex flex-col gap-1.5 border-t border-line p-4 sm:p-5">
+            <div className="flex justify-between gap-4 text-sm">
+              <dt className="text-ink-muted">{t('invoices.subtotal', 'Subtotal')}</dt>
+              <dd className="numeric text-ink">{formatCurrency(totals.afterDiscount)}</dd>
+            </div>
+            <div className="flex justify-between gap-4 text-sm">
+              <dt className="text-ink-muted">{t('invoices.totalTax', 'Total tax')}</dt>
+              <dd className="numeric text-ink">{formatCurrency(totals.tax)}</dd>
+            </div>
+            <div className="flex justify-between gap-4 border-t border-line pt-1.5 text-sm font-semibold">
+              <dt className="text-ink">{t('invoices.itemsTotal', 'Line items total')}</dt>
+              <dd className="numeric text-ink">{formatCurrency(totals.total)}</dd>
+            </div>
+          </dl>
+        </>
       )}
-
-      {/* Confirmation Dialog */}
-      <AlertDialog
-        open={confirmDialog.open}
-        onOpenChange={(open) =>
-          setConfirmDialog({ open, itemIndex: null, itemName: '' })
-        }
-        title={t('invoices.deleteItemTitle', 'Delete Item')}
-        description={t(
-          'invoices.deleteItemMessage',
-          'Remove "{name}" from this invoice?',
-          { name: confirmDialog.itemName }
-        )}
-        confirmText={t('common.delete', 'Delete')}
-        cancelText={t('common.cancel', 'Cancel')}
-        onConfirm={confirmDeleteItem}
-        variant="warning"
-      />
-    </div>
+    </section>
   );
 }

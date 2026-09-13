@@ -1,35 +1,65 @@
-import React from 'react';
+import { useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useNavigate } from 'react-router-dom';
-import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '../ui/Form';
-import { Input } from '../ui/Input';
-import { Button } from '../ui/Button';
-import { Switch } from '../ui/Switch';
-import { Card } from '../ui/Card';
-import { MultiSelect } from '../ui/MultiSelect';
+import { ArrowLeft } from 'lucide-react';
+import {
+  Button,
+  Card,
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+  Input,
+  MultiSelect,
+  Switch,
+} from '../ui';
 import { useCreateUser, useRoles } from '../../hooks/useUserManagement';
 import { useTranslation } from '../../hooks/useTranslation';
 import { useToast } from '../../contexts/ToastContext';
-import { Loader2, ArrowLeft } from 'lucide-react';
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * Tạo tài khoản người dùng.
+ *
+ * Hai thẻ, theo đúng hai câu hỏi người tạo tài khoản phải trả lời:
+ *
+ *   1. NGƯỜI NÀY LÀ AI — tên, email, số điện thoại.
+ *   2. HỌ LÀM ĐƯỢC GÌ  — vai trò, mật khẩu, bật/tắt tài khoản.
+ *
+ * Bản cũ chia thành NĂM mục ("Personal Information", "Contact Information",
+ * "Security", "Roles", "Account Status"), mỗi mục một tiêu đề cỡ lớn cho một
+ * hoặc hai ô nhập. Tiêu đề nhiều hơn nội dung thì nó không còn phân nhóm được
+ * gì nữa, chỉ kéo dài trang.
+ *
+ * Mật khẩu để trống là CÓ Ý: backend tự sinh một mật khẩu mạnh. Câu giải thích
+ * nằm ngay dưới ô chứ không nằm trong placeholder — placeholder biến mất ngay
+ * khi người dùng gõ ký tự đầu tiên, đúng lúc họ cần đọc nó nhất.
+ * ═══════════════════════════════════════════════════════════════════════════ */
 
 const createUserSchema = z.object({
   firstName: z.string().min(1, 'First name is required').max(100),
   lastName: z.string().min(1, 'Last name is required').max(100),
   email: z.string().email('Invalid email address'),
-  phoneNumber: z.string().transform(val => val.trim() === '' ? undefined : val).optional(),
-  password: z.string().min(10, 'Password must be at least 10 characters').or(z.literal('')).transform(val => val === '' ? undefined : val).optional(),
+  phoneNumber: z
+    .string()
+    .transform((value) => (value.trim() === '' ? undefined : value))
+    .optional(),
+  password: z
+    .string()
+    .min(10, 'Password must be at least 10 characters')
+    .or(z.literal(''))
+    .transform((value) => (value === '' ? undefined : value))
+    .optional(),
   roles: z.array(z.string()).min(1, 'At least one role is required'),
   isActive: z.boolean(),
 });
 
 type CreateUserFormValues = z.infer<typeof createUserSchema>;
 
-/**
- * Create User Page Component
- * Full page form for creating a new user with role assignment
- */
 export function CreateUserPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -42,10 +72,10 @@ export function CreateUserPage() {
     defaultValues: {
       firstName: '',
       lastName: '',
-      email: '', // MUST BE EMPTY
+      email: '',
       phoneNumber: '',
       password: '',
-      roles: [], // MUST BE EMPTY ARRAY
+      roles: [],
       isActive: true,
     },
   });
@@ -53,169 +83,141 @@ export function CreateUserPage() {
   const onSubmit = async (values: CreateUserFormValues) => {
     try {
       await createUserMutation.mutateAsync(values);
-      toast.showSuccess('Success', 'User created successfully');
+      // Thông báo đi qua t(): bản cũ viết cứng "Success" / "User created
+      // successfully" nên bật tiếng Việt vẫn hiện ra tiếng Anh.
+      toast.showSuccess(t('common.success', 'Success'), t('users.createSuccess', 'Account created'));
       navigate('/users');
     } catch (error) {
       toast.showError(
-        'Error',
-        error instanceof Error ? error.message : 'Failed to create user'
+        t('common.error', 'Error'),
+        error instanceof Error
+          ? error.message
+          : t('users.createError', 'Could not create the account')
       );
     }
   };
 
-  // Convert roles to MultiSelect options
-  const roleOptions = React.useMemo(
-    () =>
-      roles?.map((role) => ({
-        value: role.name,
-        label: role.name,
-      })) || [],
+  const roleOptions = useMemo(
+    () => roles?.map((role) => ({ value: role.name, label: role.name })) ?? [],
     [roles]
   );
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-4">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => navigate('/users')}
-            className="flex items-center"
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            {t('users.backToList', 'Back to users')}
-          </Button>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">{t('users.createUser', 'Create User')}</h1>
-            <p className="text-sm text-gray-500 mt-1">
-              {t('users.createSubtitle', 'Add a user to the system and choose their roles')}
-            </p>
-          </div>
-        </div>
+    <div className="flex flex-col gap-4 pb-8">
+      <Button
+        variant="ghost"
+        size="sm"
+        className="self-start px-2"
+        onClick={() => navigate('/users')}
+        leadingIcon={<ArrowLeft className="h-4 w-4" aria-hidden="true" />}
+      >
+        {t('users.backToList', 'Back to users')}
+      </Button>
+
+      <div>
+        <h1 className="text-xl font-semibold text-ink">{t('users.createUser', 'Create User')}</h1>
+        <p className="mt-0.5 text-sm text-ink-muted">
+          {t('users.createSubtitle', 'Add a user to the system and choose their roles')}
+        </p>
       </div>
 
-      {/* Form Card */}
-      <Card className="p-6">
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            {/* Personal Information Section */}
-            <div>
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">
-                {t('users.personalInformation', 'Personal Information')}
-              </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* First Name */}
-                <FormField
-                  control={form.control}
-                  name="firstName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{t('auth.firstName', 'First name')} *</FormLabel>
-                      <FormControl>
-                        <Input placeholder={t('users.firstNamePlaceholder', 'e.g. An')} {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-4">
+          {/* ── Người này là ai ──────────────────────────────────────────── */}
+          <Card className="p-4 sm:p-5">
+            <h2 className="text-lg font-semibold text-ink">
+              {t('users.personalInformation', 'Personal Information')}
+            </h2>
 
-                {/* Last Name */}
-                <FormField
-                  control={form.control}
-                  name="lastName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{t('auth.lastName', 'Last name')} *</FormLabel>
-                      <FormControl>
-                        <Input placeholder={t('users.lastNamePlaceholder', 'e.g. Nguyen Van')} {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-            </div>
-
-            {/* Contact Information Section */}
-            <div>
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">
-                {t('users.contactInformation', 'Contact Information')}
-              </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Email */}
-                <FormField
-                  control={form.control}
-                  name="email"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{t('auth.email', 'Email Address')} *</FormLabel>
-                      <FormControl>
-                        <Input type="email" placeholder={t('users.emailPlaceholder', 'name@example.com')} {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                {/* Phone Number */}
-                <FormField
-                  control={form.control}
-                  name="phoneNumber"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{t('auth.phoneNumber', 'Phone number')}</FormLabel>
-                      <FormControl>
-                        <Input type="tel" placeholder={t('users.phonePlaceholder', '09xxxxxxxx')} {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-            </div>
-
-            {/* Security Section */}
-            <div>
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">
-                {t('users.security', 'Security')}
-              </h2>
+            <div className="mt-4 grid gap-4 md:grid-cols-2">
               <FormField
                 control={form.control}
-                name="password"
+                name="firstName"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>{t('auth.password', 'Password')}</FormLabel>
+                    <FormLabel>{t('auth.firstName', 'First name')} *</FormLabel>
                     <FormControl>
-                      <Input 
-                        type="password" 
-                        placeholder={t('users.passwordPlaceholder', 'Leave empty to generate one')} 
-                        {...field} 
+                      <Input placeholder={t('users.firstNamePlaceholder', 'e.g. An')} {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="lastName"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('auth.lastName', 'Last name')} *</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder={t('users.lastNamePlaceholder', 'e.g. Nguyen Van')}
+                        {...field}
                       />
                     </FormControl>
-                    <FormDescription>
-                      {t('users.passwordHint', 'At least 10 characters. Leave the field empty and a strong password is generated.')}
-                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('auth.email', 'Email Address')} *</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="email"
+                        placeholder={t('users.emailPlaceholder', 'name@example.com')}
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="phoneNumber"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('auth.phoneNumber', 'Phone number')}</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="tel"
+                        inputMode="numeric"
+                        placeholder={t('users.phonePlaceholder', '09xxxxxxxx')}
+                        {...field}
+                      />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
             </div>
+          </Card>
 
-            {/* Roles Section */}
-            <div>
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">
-                {t('users.roleAssignment', 'Roles')}
-              </h2>
+          {/* ── Họ làm được gì ───────────────────────────────────────────── */}
+          <Card className="p-4 sm:p-5">
+            <h2 className="text-lg font-semibold text-ink">
+              {t('users.accessAndSecurity', 'Access and security')}
+            </h2>
+
+            <div className="mt-4 flex flex-col gap-4">
               <FormField
                 control={form.control}
                 name="roles"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>{t('invitations.role', 'Role')} *</FormLabel>
+                    <FormLabel>{t('users.roleAssignment', 'Roles')} *</FormLabel>
                     <FormDescription>
-                      {t('users.roleHint', 'Pick one or more roles. The roles chosen appear as tags below.')}
+                      {t(
+                        'users.roleHint',
+                        'Pick one or more roles. The roles chosen appear as tags below.'
+                      )}
                     </FormDescription>
                     <FormControl>
                       <MultiSelect
@@ -230,20 +232,34 @@ export function CreateUserPage() {
                   </FormItem>
                 )}
               />
-            </div>
 
-            {/* Account Status Section */}
-            <div>
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">
-                {t('users.accountStatus', 'Account Status')}
-              </h2>
+              <FormField
+                control={form.control}
+                name="password"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('auth.password', 'Password')}</FormLabel>
+                    <FormControl>
+                      <Input type="password" autoComplete="new-password" {...field} />
+                    </FormControl>
+                    <FormDescription>
+                      {t(
+                        'users.passwordHint',
+                        'At least 10 characters. Leave the field empty and a strong password is generated.'
+                      )}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
               <FormField
                 control={form.control}
                 name="isActive"
                 render={({ field }) => (
-                  <FormItem className="flex items-center justify-between rounded-lg border p-4 bg-gray-50">
-                    <div className="space-y-0.5">
-                      <FormLabel className="text-base font-medium">{t('users.activeStatus', 'Account active')}</FormLabel>
+                  <FormItem className="flex items-center justify-between gap-4 rounded-md border border-line p-3">
+                    <div>
+                      <FormLabel>{t('users.activeStatus', 'Account active')}</FormLabel>
                       <FormDescription>
                         {t('users.activeHint', 'An inactive account cannot sign in.')}
                       </FormDescription>
@@ -255,27 +271,31 @@ export function CreateUserPage() {
                 )}
               />
             </div>
+          </Card>
 
-            {/* Form Actions */}
-            <div className="flex items-center justify-end space-x-4 pt-6 border-t">
+          <div className="sticky bottom-0 z-20 -mx-4 border-t border-line bg-surface px-4 py-3 shadow-sticky sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+            <div className="flex flex-wrap items-center justify-end gap-2">
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => navigate('/users')}
                 disabled={createUserMutation.isPending}
+                className="max-sm:flex-1"
               >
                 {t('common.cancel', 'Cancel')}
               </Button>
-              <Button type="submit" disabled={createUserMutation.isPending}>
-                {createUserMutation.isPending && (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                )}
+              <Button
+                type="submit"
+                isLoading={createUserMutation.isPending}
+                loadingText={t('common.saving', 'Saving...')}
+                className="max-sm:flex-1"
+              >
                 {t('users.createUser', 'Create User')}
               </Button>
             </div>
-          </form>
-        </Form>
-      </Card>
+          </div>
+        </form>
+      </Form>
     </div>
   );
 }
